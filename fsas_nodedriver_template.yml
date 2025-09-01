@@ -1,0 +1,18 @@
+apiVersion: management.cattle.io/v3
+kind: NodeDriver
+metadata:
+  annotations:
+    passwordFields: credentialsPassword
+    privateCredentialFields: credentialsPassword
+    publicCredentialFields: credentialsUsername,tenantUuid,apiUrl,ntpUrl,dnsIp
+  name: fsas
+spec:
+  active: true
+  addCloudCredential: true
+  builtin: false
+  checksum: <sha256_checksum>
+  description: ''
+  displayName: fsas
+  externalId: ''
+  uiUrl: ''
+  url: <fsas_nodedriver_binary_url>
