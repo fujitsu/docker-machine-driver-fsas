@@ -32,6 +32,7 @@ const (
 	WAIT_FOR_STATUS_INSTALL_STEP          time.Duration = 5 * time.Second
 	WAIT_FOR_STATUS_STOPPED_TIMEOUT       time.Duration = 15 * time.Second
 	WAIT_FOR_STATUS_NOT_FOUND_TIMEOUT     time.Duration = 15 * time.Second
+	WAIT_FOR_START_AFTER_REBOOT           time.Duration = 60 * time.Second
 )
 
 const (
@@ -645,11 +646,8 @@ func (d *Driver) applyCloudInit(sshHostName string) error {
 	}
 
 	// Wait for the machine to reach the Running state
-	if err := d.waitForStatus(d.mapMachineStatusToState(ACTIVE_PON), WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
-		slog.Error("Error occured during waitForStatus execution: ", "err", err)
-		return err
-	}
-
+	slog.Info("Waiting for the machine to reach the Running state")
+	statusClock.Sleep(WAIT_FOR_START_AFTER_REBOOT)
 	return nil
 }
 
