@@ -25,8 +25,17 @@ jobs:
         CGO_ENABLED: "0"
     - name: Test
       run: go test ./...
+    - name: Create node driver YAML
+      run: bash ./ci_tools/generate_nodedriver_yaml.sh
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: docker-machine-driver-fsas
         path: docker-machine-driver-fsas
+        retention-days: 14
+    - name: Upload YAML
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-machine-driver-fsas.yaml
+        path: ./ci_tools/docker-machine-driver-fsas.yml
+        retention-days: 14
