@@ -65,6 +65,19 @@ func TestMain(m *testing.M) {
 	publicKeyIsValid = true
 	LastExecutedSSHCommand = ""
 
+	currentUser, _ := user.Current()
+	homeDir := currentUser.HomeDir
+	sshKeyDir, err := filepath.Abs(filepath.Join(homeDir, ".ssh"))
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	err = os.MkdirAll(sshKeyDir, 0o700)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	exitCode := m.Run() // run tests
 
 	// tear-down code here
@@ -135,7 +148,6 @@ func Test_createSSHKey(t *testing.T) {
 	sshKeyName := "newSssKeys"
 	sshKeyNamePub := "newSssKeys.pub"
 	sshKeyPath, err := filepath.Abs(filepath.Join(homeDir, ".ssh", sshKeyName))
-	os.MkdirAll(filepath.Dir(sshKeyPath), 0o700)
 	assert.NoError(t, err)
 
 	err = sc.createSSHKey(sshKeyPath)
