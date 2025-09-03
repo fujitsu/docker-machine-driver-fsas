@@ -33,5 +33,6 @@ jobs:
         name: docker-machine-driver-fsas-artifact
         path: |
           docker-machine-driver-fsas
-          docker-machine-driver-fsas.yaml
+          docker-machine-driver-fsas.yml
         retention-days: 14
+        if-no-files-found: warn
