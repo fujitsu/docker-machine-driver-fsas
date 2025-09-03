@@ -135,6 +135,7 @@ func Test_createSSHKey(t *testing.T) {
 	sshKeyName := "newSssKeys"
 	sshKeyNamePub := "newSssKeys.pub"
 	sshKeyPath, err := filepath.Abs(filepath.Join(homeDir, ".ssh", sshKeyName))
+	os.MkdirAll(filepath.Dir(sshKeyPath), 0o700)
 	assert.NoError(t, err)
 
 	err = sc.createSSHKey(sshKeyPath)
