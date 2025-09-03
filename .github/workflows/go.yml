@@ -3,10 +3,7 @@
 
 name: Go
 
-on:
-  push:
-  pull_request:
-    branches: [ "main" ]
+on: push
 
 jobs:
 
@@ -22,10 +19,12 @@ jobs:
       run: go version
     - name: Install dependencies
       run: go get .
+    - name: Set build flag
+      run: echo "CGO_ENABLED=0" >> $CGO_ENABLED
     - name: Build
       run: go build -o docker-machine-driver-fsas .
     - name: Test
-      run: go test -v ./...
+      run: go test ./...
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
