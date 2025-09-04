@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
@@ -27,7 +27,7 @@ jobs:
       run: go test ./...
     - name: Create node driver YAML
       run: bash ./ci_tools/generate_nodedriver_yaml.sh
-    - name: Upload binary
+    - name: Upload binary and YAML
       uses: actions/upload-artifact@v4
       with:
         name: docker-machine-driver-fsas-artifact
