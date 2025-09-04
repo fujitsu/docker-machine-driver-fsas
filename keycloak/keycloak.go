@@ -58,7 +58,7 @@ type KeycloakClient struct {
 	UserName      string
 	UserPassword  string
 	clientId      string
-	clientSecrets string
+	clientSecret  string
 	AccessToken   string
 	RefreshToken  string
 
@@ -84,8 +84,8 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 		envVars := os.Environ()
 		slog.Debug("All environment variables:")
 		for i, envVar := range envVars {
-			if strings.HasPrefix(envVar, "CLIENT_SECRETS") {
-				slog.Debug("env var: ", "i", i, "envVar", "CLIENT_SECRETS=<hidden-for-security-reasons>")
+			if strings.HasPrefix(envVar, "CLIENT_SECRET") {
+				slog.Debug("env var: ", "i", i, "envVar", "CLIENT_SECRET=<hidden-for-security-reasons>")
 				continue
 			}
 			slog.Debug("env var: ", "i", i, "envVar", envVar)
@@ -94,7 +94,7 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 
 	const (
 		envVarForClientId      = "CLIENT_ID"
-		envVarForClientSecrets = "CLIENT_SECRETS"
+		envVarForClientSecret  = "CLIENT_SECRET"
 	)
 
 	clientId := os.Getenv(envVarForClientId)
@@ -103,10 +103,10 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 		return nil, fmt.Errorf("environment variable '%s' for Keycloak client id is empty", envVarForClientId)
 	}
 
-	clientSecrets := os.Getenv(envVarForClientSecrets)
-	if clientSecrets == "" {
+	clientSecret := os.Getenv(envVarForClientSecret)
+	if clientSecret == "" {
 		logAllEnvVars()
-		return nil, fmt.Errorf("environment variable '%s' for Keycloak client secrets is empty", envVarForClientSecrets)
+		return nil, fmt.Errorf("environment variable '%s' for Keycloak client secret is empty", envVarForClientSecret)
 	}
 
 	serverURI := httputils.UrlBuilder(baseURI, endpoint)
@@ -117,7 +117,7 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 		UserName:      userName,
 		UserPassword:  userPassword,
 		clientId:      clientId,
-		clientSecrets: clientSecrets,
+		clientSecret:  clientSecret,
 		AccessToken:   "",
 		RefreshToken:  "",
 		cdiClient:     httputils.NewStandardCdiHTTPClient(serverURI),
@@ -311,7 +311,7 @@ func (k *KeycloakClient) getRequestBodyWithAccessToken() url.Values {
 func (k *KeycloakClient) getBasicRequestBody() url.Values {
 	return url.Values{
 		"client_id":     {k.clientId},
-		"client_secret": {k.clientSecrets},
+		"client_secret": {k.clientSecret},
 	}
 }
 
