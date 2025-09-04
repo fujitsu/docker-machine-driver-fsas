@@ -536,7 +536,7 @@ const (
 	TestUserNameAllowedToCreateCluster        = "james"
 	TestUserPasswordAllowedToCreateCluster    = "james"
 	TestClientId                              = "test-client"
-	TestClientSecrets                         = "test-client"
+	TestClientSecret                          = "test-client"
 
 	TestBearerTokenRequestBody = "client_id=test-client&client_secret=test-client&grant_type=password&password=alice&response=id_token+token&scope=openid&username=alice"
 	// TestAccessTokenExpected    = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJjT21qTFYwQVhCWVFycFJBMnh5MVh1akRWX250TTZQY3dyZ2ZWTWJyRGRFIn0.eyJleHAiOjE3MzE1MDk3ODMsImlhdCI6MTczMTUwOTcyMywianRpIjoiNTEzNjRjMTYtNzJjZi00ZmJiLTk0YTctYTE4MzUyZGQwYzM4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9tYXN0ZXIiLCJzdWIiOiIxM2E5MjE3Zi1kYjIzLTQ4YTYtOWVmYS1hYmNkYWM4MWZmZWQiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJhZG1pbi1jbGkiLCJzZXNzaW9uX3N0YXRlIjoiZDA2ZjhkNWYtNDE0Ni00YTc3LTkxNmQtNTA1ODQ2NjZkY2FiIiwiYWNyIjoiMSIsInNjb3BlIjoicHJvZmlsZSBlbWFpbCIsInNpZCI6ImQwNmY4ZDVmLTQxNDYtNGE3Ny05MTZkLTUwNTg0NjY2ZGNhYiIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiYWRtaW4ifQ.X_sIDgZNKn-3cu-aOS0vwgF2a0DBldP4PjHaJtfnZzq4744C3MSN5YDtYeqNOn3-pgwS-yTKArTLqJZgwGk3Edv4oqVc59uMDWRfATzS9JQh_NMI8ZvxapHCBwIlpkc0xtTqu-bGbuswfH5QhDWwcny5Et3LMOtu6KOVuscdKnFRgQpHOcyeT7LehdAVhbRb1ZGOsTiAsOpR3E8wAU3SzqXQwXbfvK5pixzGxbjjOPc7MN5HWPwXamMoOZQTLsxCAEqe1X138LkPmWXhV4b9bU6hrfmic27C18ME6QbcY45UxnkOMsy0IXhc_d5GLsEZGTIy5za7zlE8QDXZm0pjOw"
