@@ -31,9 +31,9 @@ func TestNewKeycloakAuthService_Success(t *testing.T) {
 	endpoint := "/id_manager/"
 
 	expectedClientId := "cdi"
-	expectedClientSecrets := "secrets"
+	expectedClientSecret := "secret"
 	t.Setenv("CLIENT_ID", expectedClientId)
-	t.Setenv("CLIENT_SECRETS", expectedClientSecrets)
+	t.Setenv("CLIENT_SECRET", expectedClientSecret)
 
 	authService, err := NewKeycloak(realm, userName, userPassword, baseURI, endpoint)
 
@@ -43,7 +43,7 @@ func TestNewKeycloakAuthService_Success(t *testing.T) {
 	assert.Equal(t, userName, authService.UserName)
 	assert.Equal(t, userPassword, authService.UserPassword)
 	assert.Equal(t, expectedClientId, authService.clientId)
-	assert.Equal(t, expectedClientSecrets, authService.clientSecrets)
+	assert.Equal(t, expectedClientSecret, authService.clientSecret)
 	assert.Equal(t, "", authService.AccessToken)
 	assert.Equal(t, "", authService.RefreshToken)
 }
@@ -161,7 +161,7 @@ func Test_refreshToken_Fail404(t *testing.T) {
 		UserName:      "test-user",
 		UserPassword:  "test-password",
 		clientId:      mockClientId,
-		clientSecrets: mockClientSecret,
+		clientSecret:  mockClientSecret,
 		cdiClient:     mockClient,
 	}
 
@@ -193,7 +193,7 @@ func Test_getTokens_Success(t *testing.T) {
 		UserName:      "test-user",
 		UserPassword:  "test-password",
 		clientId:      mockClientId,
-		clientSecrets: mockClientSecret,
+		clientSecret:  mockClientSecret,
 		cdiClient:     mockClient,
 	}
 
@@ -231,7 +231,7 @@ func TestGetBearerToken_InvalidResponse(t *testing.T) {
 		UserName:      "test-user",
 		UserPassword:  "test-password",
 		clientId:      mockClientId,
-		clientSecrets: mockClientSecret,
+		clientSecret:  mockClientSecret,
 		cdiClient:     mockClient,
 	}
 
@@ -262,7 +262,7 @@ func TestGetBearerToken_NoAccessToken(t *testing.T) {
 		UserName:      "test-user",
 		UserPassword:  "test-password",
 		clientId:      mockClientId,
-		clientSecrets: mockClientSecret,
+		clientSecret:  mockClientSecret,
 		cdiClient:     mockClient,
 	}
 
@@ -602,7 +602,7 @@ func TestUserBelongsToClusterCreatorRoles(t *testing.T) {
 }
 
 func TestGetBasicRequestBody(t *testing.T) {
-	authService := &KeycloakClient{clientId: "test-client-id", clientSecrets: "test-client-secret"}
+	authService := &KeycloakClient{clientId: "test-client-id", clientSecret: "test-client-secret"}
 	requestBody := authService.getBasicRequestBody()
 
 	assert.Equal(t, url.Values{"client_id": []string{"test-client-id"},
@@ -610,7 +610,7 @@ func TestGetBasicRequestBody(t *testing.T) {
 }
 
 func TestGetRequestBodyWithToken(t *testing.T) {
-	authService := &KeycloakClient{clientId: "test-client-id", clientSecrets: "test-client-secret", AccessToken: "test-token"}
+	authService := &KeycloakClient{clientId: "test-client-id", clientSecret: "test-client-secret", AccessToken: "test-token"}
 	requestBody := authService.getRequestBodyWithAccessToken()
 	assert.Equal(t, url.Values{"client_id": []string{"test-client-id"}, "client_secret": []string{"test-client-secret"},
 		"token": []string{"test-token"}}, requestBody)
@@ -619,7 +619,7 @@ func TestGetRequestBodyWithToken(t *testing.T) {
 func TestGetRequestBodyForBearerToken(t *testing.T) {
 	authService := &KeycloakClient{
 		clientId:      "test-client-id",
-		clientSecrets: "test-client-secret",
+		clientSecret:  "test-client-secret",
 		UserName:      "test-username",
 		UserPassword:  "test-password",
 	}
