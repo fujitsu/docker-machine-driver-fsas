@@ -31,7 +31,7 @@ func NewCustomLogger() *slog.Logger {
 	return logger
 }
 
-// Declare formatterOptions
+// Declare  formatterOptions
 type formatterOptionTypes struct {
 	// default logging options like: timestamp, level, message
 	Default slog.HandlerOptions
