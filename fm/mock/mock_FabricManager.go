@@ -153,6 +153,54 @@ func (_c *MockFabricManager_GetMachineDetails_Call) RunAndReturn(run func(string
 	return _c
 }
 
+// GracefulShutdown provides a mock function with given fields: machineUUID, tenantId, bearerToken
+func (_m *MockFabricManager) GracefulShutdown(machineUUID string, tenantId string, bearerToken string) error {
+	ret := _m.Called(machineUUID, tenantId, bearerToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GracefulShutdown")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(machineUUID, tenantId, bearerToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockFabricManager_GracefulShutdown_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GracefulShutdown'
+type MockFabricManager_GracefulShutdown_Call struct {
+	*mock.Call
+}
+
+// GracefulShutdown is a helper method to define mock.On call
+//   - machineUUID string
+//   - tenantId string
+//   - bearerToken string
+func (_e *MockFabricManager_Expecter) GracefulShutdown(machineUUID interface{}, tenantId interface{}, bearerToken interface{}) *MockFabricManager_GracefulShutdown_Call {
+	return &MockFabricManager_GracefulShutdown_Call{Call: _e.mock.On("GracefulShutdown", machineUUID, tenantId, bearerToken)}
+}
+
+func (_c *MockFabricManager_GracefulShutdown_Call) Run(run func(machineUUID string, tenantId string, bearerToken string)) *MockFabricManager_GracefulShutdown_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockFabricManager_GracefulShutdown_Call) Return(_a0 error) *MockFabricManager_GracefulShutdown_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockFabricManager_GracefulShutdown_Call) RunAndReturn(run func(string, string, string) error) *MockFabricManager_GracefulShutdown_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ImageInstall provides a mock function with given fields: tenantId, ssdId, imageFilename, bearerToken
 func (_m *MockFabricManager) ImageInstall(tenantId string, ssdId string, imageFilename string, bearerToken string) error {
 	ret := _m.Called(tenantId, ssdId, imageFilename, bearerToken)

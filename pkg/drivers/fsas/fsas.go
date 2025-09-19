@@ -873,24 +873,16 @@ func (d *Driver) Start() error {
 func (d *Driver) Stop() error {
 	slog.Debug("Try to stop host gracefully")
 
-	hostName, err := d.GetSSHHostname()
-	if err != nil {
-		slog.Error("Could not acquire target SSH hostname because of an error: ", "err", err)
-		return err
-	}
-
-	if !d.SshManager.IsInit() {
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.OsImageSshHostPubKey)
-		if err != nil {
-			slog.Error("error while initializing Standard SSH Manager: ", "err", err)
+	if !d.FabricManager.IsInit() {
+		if err := d.initFabricManager(); err != nil {
+			slog.Error("error while initializing Fabric Manager: ", "err", err)
 			return err
 		}
-		d.SshManager = sshManager
 	}
 
-	if err := d.SshManager.SendStopCommand(); err != nil {
-		slog.Error("error while sending STOP command to machine: ", "machineName", d.MachineName,
-			"machineUUID", d.MachineUUID, "err", err)
+	slog.Info("requesting graceful shutdown for machine: ", "machine_uuid", d.MachineUUID)
+	if err := d.FabricManager.GracefulShutdown(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
+		slog.Error("Graceful shutdown failed for: ", "machine_uuid", d.MachineUUID, "err", err)
 		return err
 	}
 
