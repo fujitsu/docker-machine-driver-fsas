@@ -1504,7 +1504,7 @@ func TestStop_success(t *testing.T) {
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
-	mockSshManager := sshMock.NewMockSshManager(t)
+
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			IPAddress: "10.1.2.3",
@@ -1514,10 +1514,7 @@ func TestStop_success(t *testing.T) {
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
-		SshManager:    mockSshManager,
 	}
-
-	mockSshManager.On("IsInit").Return(true)
 
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
@@ -1525,40 +1522,18 @@ func TestStop_success(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
 
-	mockSshManager.On("SendStopCommand").Return(nil)
+	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil)
 
 	err := driver.Stop()
 	assert.NoError(t, err)
 
 }
 
-func TestStop_sendingCommand_failed(t *testing.T) {
-
-	mockSshManager := sshMock.NewMockSshManager(t)
-	driver := &Driver{
-		BaseDriver: &drivers.BaseDriver{
-			IPAddress:   "10.1.2.3",
-			SSHUser:     "user-1",
-			MachineName: "mach-1",
-		},
-		SSHPassword: "password1",
-		MachineUUID: "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
-		SshManager:  mockSshManager,
-	}
-
-	mockSshManager.On("IsInit").Return(true)
-	sshError := fmt.Errorf("Error getting config for native Go SSH:")
-	mockSshManager.On("SendStopCommand").Return(sshError)
-
-	err := driver.Stop()
-	assert.ErrorIs(t, err, sshError)
-}
-
-func TestStop_waitForStatus_failed(t *testing.T) {
+func TestStop_GracefulShutdown_failed(t *testing.T) {
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
-	mockSshManager := sshMock.NewMockSshManager(t)
+
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			IPAddress: "10.1.2.3",
@@ -1568,10 +1543,33 @@ func TestStop_waitForStatus_failed(t *testing.T) {
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
-		SshManager:    mockSshManager,
 	}
 
-	mockSshManager.On("IsInit").Return(true)
+	mockKeycloak.On("IsInit").Return(true).Maybe()
+	mockFM.On("IsInit").Return(true)
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+
+	shutdownErr := fmt.Errorf("FM graceful shutdown failed")
+	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(shutdownErr).Once()
+
+	err := driver.Stop()
+	assert.ErrorIs(t, err, shutdownErr)
+}
+
+func TestStop_waitForStatus_failed(t *testing.T) {
+
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			IPAddress: "10.1.2.3",
+			SSHUser:   "user-1",
+		},
+		SSHPassword:   "password1",
+		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
+		FabricManager: mockFM,
+		Keycloak:      mockKeycloak,
+	}
 
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
@@ -1579,7 +1577,7 @@ func TestStop_waitForStatus_failed(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
 
-	mockSshManager.On("SendStopCommand").Return(nil)
+	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil)
 
 	err := driver.Stop()
 	assert.ErrorContains(t, err, "error getting state: unknown machine status: 99")
@@ -1588,7 +1586,6 @@ func TestStop_waitForStatus_failed(t *testing.T) {
 func TestRestartSuccess(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
-	mockSshManager := sshMock.NewMockSshManager(t)
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			IPAddress: "10.1.2.3",
@@ -1598,16 +1595,14 @@ func TestRestartSuccess(t *testing.T) {
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
-		SshManager:    mockSshManager,
 	}
-	mockSshManager.On("IsInit").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
 	// Stop
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil).Once()
-	mockSshManager.On("SendStopCommand").Return(nil)
+	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil)
 
 	// Start
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 13, nil).Once()
@@ -1621,7 +1616,6 @@ func TestRestartSuccess(t *testing.T) {
 func TestRestartFail_Stop(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
-	mockSshManager := sshMock.NewMockSshManager(t)
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			IPAddress: "10.1.2.3",
@@ -1631,25 +1625,23 @@ func TestRestartFail_Stop(t *testing.T) {
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
-		SshManager:    mockSshManager,
 	}
-	mockSshManager.On("IsInit").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
 	// No Start on Stop Failure
 
-	// Stop Fail - SSH
-	sshError := fmt.Errorf("Error getting config for native Go SSH:")
-	mockSshManager.On("SendStopCommand").Return(sshError).Once()
+	// Stop Fail - FM
+	shutdownError := fmt.Errorf("FM graceful shutdown failed")
+	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(shutdownError).Once()
 
 	err := driver.Restart()
-	assert.ErrorIs(t, err, sshError)
+	assert.ErrorIs(t, err, shutdownError)
 
 	// Stop Fail - Status
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil).Once()
-	mockSshManager.On("SendStopCommand").Return(nil).Once()
+	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil).Once()
 
 	err = driver.Restart()
 	assert.ErrorContains(t, err, "error getting state: unknown machine status: 99")
@@ -1659,7 +1651,6 @@ func TestRestartFail_Stop(t *testing.T) {
 func TestRestartFail_Start(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
-	mockSshManager := sshMock.NewMockSshManager(t)
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			IPAddress: "10.1.2.3",
@@ -1669,16 +1660,17 @@ func TestRestartFail_Start(t *testing.T) {
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
-		SshManager:    mockSshManager,
 	}
-	mockSshManager.On("IsInit").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
 	// Stop
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil).Once()
-	mockSshManager.On("SendStopCommand").Return(nil)
+	// Normal UUID
+	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil).Once()
+	// Empty UUID
+	mockFM.On("GracefulShutdown", "", "", models.AccessTokenExample).Return(nil).Maybe()
 
 	// Start Fail - Status
 	errorData := "error getting state: unknown machine status: 987"
