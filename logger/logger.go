@@ -14,19 +14,23 @@ import (
 )
 
 var (
-	logger      = NewCustomLogger()
+	logger      = NewCustomLogger(os.Stdout)
 	loggerLevel = new(slog.LevelVar)
 )
 
-func NewCustomLogger() *slog.Logger {
-	debugLevelEnabled := os.Getenv("FSAS_DEBUG")
+const (
+	enableDebugLevel = "FSAS_DEBUG"
+)
+
+func NewCustomLogger(w io.Writer) *slog.Logger {
+	debugLevelEnabled := os.Getenv(enableDebugLevel)
 	if strings.ToLower(debugLevelEnabled) == "true" {
 		loggerLevel.Set(slog.LevelDebug)
 	} else {
 		loggerLevel.Set(slog.LevelInfo)
 	}
 
-	stdoutHandler := NewCustomHandler(os.Stdout, &formatterOptions.Extended)
+	stdoutHandler := NewCustomHandler(w, &formatterOptions.Extended)
 	logger := slog.New(stdoutHandler)
 	return logger
 }
