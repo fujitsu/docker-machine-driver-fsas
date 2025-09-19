@@ -35,7 +35,6 @@ var (
 // SshManager interface defines the methods for interacting with the SSH Manager.
 type SshManager interface {
 	IsInit() bool
-	SendStopCommand() error
 	ExchangeKeys(sshKeyPath string) error
 	ExecuteScript(scriptPath, scriptContent string, postRemove bool, runWithSudo bool) error
 	WriteFileOnRemoteMachine(path, fileContent string, fileMode os.FileMode) error
@@ -91,16 +90,6 @@ func (sc *StandardSshManager) String() string {
 // IsInit Returns true if constructor succeed else false
 func (sc *StandardSshManager) IsInit() bool {
 	return isInit
-}
-
-// SendStopCommand Sends stop (shutdown) command to remote.
-/*
-WARNING: user that sends stop command must be configured as sudo without password,
-	     otherwise it will not work
-*/
-func (sc *StandardSshManager) SendStopCommand() error {
-	_, err := sc.runCommand("sudo shutdown -h now")
-	return err
 }
 
 func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
