@@ -4,18 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
-
-	"log/slog"
 )
 
 var (
-	logger      = NewCustomLogger(os.Stdout)
-	loggerLevel = new(slog.LevelVar)
+	logger = NewCustomLogger(os.Stdout)
 )
 
 const (
@@ -24,51 +21,16 @@ const (
 
 func NewCustomLogger(w io.Writer) *slog.Logger {
 	debugLevelEnabled := os.Getenv(enableDebugLevel)
+	var loggerLevel = new(slog.LevelVar)
 	if strings.ToLower(debugLevelEnabled) == "true" {
 		loggerLevel.Set(slog.LevelDebug)
 	} else {
 		loggerLevel.Set(slog.LevelInfo)
 	}
 
-	stdoutHandler := NewCustomHandler(w, &formatterOptions.Extended)
+	stdoutHandler := NewCustomHandler(w, &slog.HandlerOptions{Level: loggerLevel, AddSource: true})
 	logger := slog.New(stdoutHandler)
 	return logger
-}
-
-// Declare formatterOptions
-type formatterOptionTypes struct {
-	// default logging options like: timestamp, level, message
-	Default slog.HandlerOptions
-	// default type and additionally file name and line number
-	Extended slog.HandlerOptions
-	// extended type and additionally function name
-	Detailed slog.HandlerOptions
-}
-
-// Initialize formatterOptions.
-var formatterOptions = formatterOptionTypes{
-	Default:  slog.HandlerOptions{Level: loggerLevel},
-	Extended: slog.HandlerOptions{Level: loggerLevel, AddSource: true},
-	Detailed: slog.HandlerOptions{
-		Level:     loggerLevel,
-		AddSource: true,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == "source" {
-				// The argument in function "runtime.Caller" is the number of stack frames
-				// to ascend, with 0 identifying the caller of Caller. The return values report the
-				// program counter, file name, and line number within the file of the corresponding call.
-				pc, file, line, ok := runtime.Caller(7)
-				if ok {
-					function := runtime.FuncForPC(pc)
-					if function != nil {
-						// Set function name, file name, and line number as value
-						a.Value = slog.StringValue(function.Name() + " " + file + ":" + strconv.Itoa(line))
-					}
-				}
-			}
-			return a
-		},
-	},
 }
 
 // ---------------------
@@ -98,11 +60,14 @@ func (h *CustomHandler) Handle(ctx context.Context, r slog.Record) error {
 	} else {
 		fileName, lineNumber := getLogCallInfo()
 		dataFromAllAttributes := getDataFromAllAttributes(r)
+		dataFromAllAttributes = CensorTextWithRegex(dataFromAllAttributes)
+		message = CensorTextWithRegex(message)
 		if dataFromAllAttributes == "" {
 			message = fmt.Sprintf("%s", message)
 		} else {
 			message = fmt.Sprintf("%s %s", message, dataFromAllAttributes)
 		}
+
 		logLine = fmt.Sprintf("%s:%d; %s; [%s]; %s;",
 			fileName, lineNumber, timestamp, level, message)
 	}

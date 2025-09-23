@@ -35,23 +35,6 @@ const (
 	WAIT_FOR_START_AFTER_REBOOT           time.Duration = 60 * time.Second
 )
 
-const (
-	BUILDING_BEFORE_QUEUE int = 10
-	BUILDING              int = 11
-	BOOTING               int = 12
-	ACTIVE_PON            int = 13
-	POWERING_OFF          int = 14
-	ACTIVE_POFF           int = 15
-	UNBUILDING            int = 16
-	UNBUILDED             int = 17
-	OS_INSTALLING         int = 18
-	ERASING               int = 19
-	ADDING_RESOURCE       int = 20
-	DELETING_RESOURCE     int = 21
-	UNBUILDING_WAIT       int = 30
-	ERROR                 int = 90
-)
-
 // Driver is the implementation of BaseDriver interface
 type Driver struct {
 	*drivers.BaseDriver
@@ -114,6 +97,7 @@ func NewDriver() *Driver {
 const (
 	defaultSSHUser               = "rancher"
 	defaultSSHPassword           = "rancher"
+	defaultMachineType           = "ALL"
 	defaultFabricManagerEndpoint = "/fabric_manager/api/v1"
 	defaultKeycloakEndpoint      = "/id_manager"
 	errorMandatoryOption         = "%s must be specified using the CLI option %s"
@@ -527,8 +511,8 @@ func (d *Driver) innerCreate() error {
 	d.MachineUUID = machineUUID
 	slog.Info("Successfully filled MachineUUID: ", "MachineUUID", d.MachineUUID)
 
-	slog.Info("Waiting for status: ", "status", d.mapMachineStatusToState(ACTIVE_POFF).String())
-	if err := d.waitForStatus(d.mapMachineStatusToState(ACTIVE_POFF), WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
+	slog.Info("Waiting for status: ", "status", ACTIVE_POFF)
+	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
 		return err
 	}
 
@@ -541,15 +525,15 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	slog.Info("Waiting for the installation of the operating system: ", "status", d.mapMachineStatusToState(OS_INSTALLING).String())
-	if err := d.waitForStatus(d.mapMachineStatusToState(OS_INSTALLING), WAIT_FOR_STATUS_STEP_FOR_INSTALLATION, WAIT_FOR_STATUS_TIMEOUT); err != nil {
+	slog.Info("Waiting for the installation of the operating system: ", "status", OS_INSTALLING)
+	if err := d.waitForStatus(OS_INSTALLING, WAIT_FOR_STATUS_STEP_FOR_INSTALLATION, WAIT_FOR_STATUS_TIMEOUT); err != nil {
 		return err
 	}
 
 	slog.Info("Installing operating system: ", "OS", d.OsImageName)
 
-	slog.Info("Waiting for operating system installation to complete: ", "status", d.mapMachineStatusToState(ACTIVE_POFF).String())
-	if err := d.waitForStatus(d.mapMachineStatusToState(ACTIVE_POFF), WAIT_FOR_STATUS_INSTALL_STEP, WAIT_FOR_STATUS_INSTALL_TIMEOUT); err != nil {
+	slog.Info("Waiting for operating system installation to complete: ", "status", ACTIVE_POFF)
+	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_INSTALL_STEP, WAIT_FOR_STATUS_INSTALL_TIMEOUT); err != nil {
 		return err
 	}
 
@@ -669,17 +653,28 @@ func (d *Driver) GetIP() (string, error) {
 
 // GetState returns the state that the host is in (running, stopped, etc)
 func (d *Driver) GetState() (state.State, error) {
+	cdiState, err := d.getCdiState()
+	if err != nil {
+		return state.Error, err
+	}
+	// Map status code to state
+	machineState := d.mapMachineStatusToState(cdiState)
+	return machineState, nil
+}
+
+// getCdiState returns the state that the FSAS host is in (ACTIVE_PON, BOOTING, etc)
+func (d *Driver) getCdiState() (CdiMachineState, error) {
 	slog.Debug("Try to get state of the host")
 
-	// error when MachineUUID is empty, return state.None
+	// error when MachineUUID is empty, return state.Error
 	if d.MachineUUID == "" {
 		slog.Error("Machine's UUID was unexpectedly empty: ", "machine_name", d.MachineName)
-		return state.None, fmt.Errorf("machine uuid is empty")
+		return ERROR, fmt.Errorf("machine uuid is empty")
 	}
 
 	// init Fabric Manager and Keycloak
 	if err := d.initClients(); err != nil {
-		return state.None, err
+		return ERROR, err
 	}
 
 	// Retrieve status code of Machine from Fabric Manager
@@ -688,19 +683,33 @@ func (d *Driver) GetState() (state.State, error) {
 
 	if err != nil {
 		slog.Error("Could not get Machine status: ", "err", err)
-		return state.None, err
+		return ERROR, err
 	}
 
-	// Map status code to state
-	machineState := d.mapMachineStatusToState(machineStatus)
+	return CdiMachineState(machineStatus), nil
+}
 
-	// On unknown machine status code, return state.None
-	if machineState == state.None {
-		slog.Error("Machine status mapping resulted in unknown state: ", "machineStatus", machineStatus)
-		return machineState, fmt.Errorf("unknown machine status: %s", fmt.Sprint(machineStatus))
+// mapMachineStatusToState Converts FSAS host state into Rancher state
+func (d *Driver) mapMachineStatusToState(cdiState CdiMachineState) state.State {
+	slog.Debug("Map FM machineStatus code to State code")
+
+	switch cdiState {
+	case BUILDING, BUILDING_BEFORE_QUEUE, BOOTING:
+		return state.Starting
+	case ACTIVE_PON:
+		return state.Running
+	case POWERING_OFF:
+		return state.Stopping
+	case ACTIVE_POFF, UNBUILDED, UNBUILDING, UNBUILDING_WAIT:
+		return state.Stopped
+	case OS_INSTALLING:
+		return state.Paused
+	case ERROR:
+		return state.Error
+	default:
+		slog.Warn("Unrecognized machine status: ", "machineStatus", cdiState)
+		return state.None
 	}
-
-	return machineState, nil
 }
 
 // GetURL returns a Docker compatible host URL for connecting to this host
@@ -719,19 +728,17 @@ func (d *Driver) GetURL() (string, error) {
 }
 
 // waitForStatus Wait for host status
-func (d *Driver) waitForStatus(expectedState state.State, step, timeout time.Duration) error {
-	slog.Debug("Wait for status: ", "status", expectedState)
-
+func (d *Driver) waitForStatus(expectedState CdiMachineState, step, timeout time.Duration) error {
 	startTime := statusClock.Now()
 
 	for {
-		currentState, err := d.GetState()
+		currentState, err := d.getCdiState()
 		if err != nil {
 			slog.Error("Error while checking state: ", "err", err)
 			return fmt.Errorf("error getting state: %w", err)
 		}
 
-		if currentState == d.mapMachineStatusToState(ERROR) {
+		if currentState == ERROR {
 			slog.Error("Received ERROR state")
 			return fmt.Errorf("received ERROR state error state: %d", ERROR)
 		}
@@ -772,8 +779,9 @@ func (d *Driver) Kill() error {
 		return err
 	}
 
-	if err := d.waitForStatus(d.mapMachineStatusToState(ACTIVE_POFF), WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_STOPPED_TIMEOUT); err != nil {
-		slog.Error("Error while waiting for status: ", "status", d.mapMachineStatusToState(ACTIVE_POFF).String(), "err", err)
+	slog.Info("Waiting for status: ", "status", ACTIVE_POFF)
+	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_STOPPED_TIMEOUT); err != nil {
+		slog.Error("Error while waiting for status: ", "status", ACTIVE_POFF, "err", err)
 		return err
 	}
 
@@ -807,8 +815,9 @@ func (d *Driver) Remove() error {
 		return err
 	}
 
-	if err := d.waitForStatus(d.mapMachineStatusToState(UNBUILDED), WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_NOT_FOUND_TIMEOUT); err != nil {
-		slog.Error("Error while waiting for status: ", "status", d.mapMachineStatusToState(UNBUILDED).String(), "err", err)
+	slog.Info("Waiting for status: ", "status", UNBUILDED)
+	if err := d.waitForStatus(UNBUILDED, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_NOT_FOUND_TIMEOUT); err != nil {
+		slog.Error("Error while waiting for status: ", "status", UNBUILDED, "err", err)
 		return err
 	}
 
@@ -860,7 +869,8 @@ func (d *Driver) Start() error {
 	}
 
 	// Wait for the machine to reach the Running state
-	if err := d.waitForStatus(d.mapMachineStatusToState(ACTIVE_PON), WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
+	slog.Info("Waiting for status: ", "status", ACTIVE_PON)
+	if err := d.waitForStatus(ACTIVE_PON, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
 		slog.Error("Error occured during waitForStatus execution: ", "err", err)
 		return err
 	}
@@ -886,8 +896,9 @@ func (d *Driver) Stop() error {
 		return err
 	}
 
-	if err := d.waitForStatus(d.mapMachineStatusToState(ACTIVE_POFF), WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_STOPPED_TIMEOUT); err != nil {
-		slog.Error("Error while waiting for status: ", "status", d.mapMachineStatusToState(ACTIVE_POFF).String(), "err", err)
+	slog.Info("Waiting for status: ", "status", ACTIVE_POFF)
+	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_STOPPED_TIMEOUT); err != nil {
+		slog.Error("Error while waiting for status: ", "status", ACTIVE_POFF, "err", err)
 		return err
 	}
 
@@ -908,21 +919,11 @@ func (d *Driver) GetSSHUsername() string {
 	return d.SSHUser
 }
 
-func (d *Driver) mapMachineStatusToState(machineStatus int) state.State {
-	slog.Debug("Map FM machineStatus code to State code")
-	statusMap := map[int]state.State{
-		ACTIVE_PON:    state.Running,
-		ACTIVE_POFF:   state.Stopped,
-		UNBUILDED:     state.NotFound,
-		BOOTING:       state.Starting,
-		OS_INSTALLING: state.Paused,
-		ERROR:         state.Error,
-	}
-	stateFromMap, exists := statusMap[machineStatus]
-	if !exists {
-		slog.Error("Machine status not found in map: ", "machineStatus", machineStatus)
-	}
-	return stateFromMap
+// setTokenToEmptySTring invalidates token.
+// Token is definitely expired after one hour, and this method enables other ways of authentication.
+func (d *Driver) setTokenToEmptySTring() {
+	slog.Debug("Set token to empty string")
+
 }
 
 func (d *Driver) assignIpAddresses() error {
