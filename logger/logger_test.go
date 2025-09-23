@@ -128,6 +128,42 @@ func Test_verifyLogFormat(t *testing.T) {
 			attributes:    []any{"foo", 11, "pi", 3.14},
 			expectedPart2: "[ERROR]; Hello world! foo=11, pi=3.14",
 		},
+
+		{name: "level Info, with censored sensitive data",
+			logLevel:      Info,
+			message:       `password=supersecret&secret=topsecret&"access_token":"abc123"&"refresh_token":"r123"&"id_token":"i123"`,
+			attributes:    nil,
+			expectedPart2: `[INFO]; password=[REDACTED]&secret=[REDACTED]&"access_token":[REDACTED]&"refresh_token":[REDACTED]&"id_token":[REDACTED];`,
+		},
+		{name: "level Info, with censored sensitive data in attributes",
+			logLevel:      Info,
+			message:       "hello world:",
+			attributes:    []any{"foo", "password=supersecret&secret=topsecret&", "bar", `"access_token":"abc123"&"refresh_token":"r123"&"id_token":"i123"`},
+			expectedPart2: `[INFO]; hello world: foo=password=[REDACTED]&secret=[REDACTED]&, bar="access_token":[REDACTED]&"refresh_token":[REDACTED]&"id_token":[REDACTED];`,
+		},
+
+		{name: "level Debug, with censored sensitive data in attributes (real life example)",
+			logLevel: Debug,
+			message:  "Initiating POST request:",
+			attributes: []any{
+				"endpoint", "/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token/introspect",
+				"payload", "client_id=cdi&client_secret=topsecret&token=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJmT1VSOXpEcnZ2MFpnaEx2TUJPcEUzTT"},
+			expectedPart2: `[DEBUG]; Initiating POST request: endpoint=/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token/introspect, payload=client_id=cdi&client_secret=[REDACTED]&token=[REDACTED]`,
+		},
+
+		{name: "level Warn, with censored sensitive data; real-life http request with default phrases",
+			logLevel:      Warn,
+			message:       "Initiating POST request: ; endpoint=/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token, payload=client_id=cdi&client_secret=SensitiveInfo&grant_type=password&password=foobar&response=id_token+token&scope=openid&username=jdoe;",
+			attributes:    nil,
+			expectedPart2: "[WARN]; Initiating POST request: ; endpoint=/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token, payload=client_id=cdi&client_secret=[REDACTED]&grant_type=password&password=[REDACTED]&response=id_token+token&scope=openid&username=jdoe;",
+		},
+
+		{name: "level Error, with censored sensitive data; simplified real-life http response with default phrases",
+			logLevel:      Error,
+			message:       `response_body={"access_token":"eyJhn0.eyJQ.W418g","expires_in":1750,"refresh_expires_in":7200,"refresh_token":"eyJhbGcX43A","token_type":"Bearer","id_token":"eyJhbGciOi36vyHeg","not-before-policy":0,"session_state":"d8321164-bd12-4606-922e-f170f2b2088d","scope":"openid pgcdi_privileges email profile"};`,
+			attributes:    nil,
+			expectedPart2: `[ERROR]; response_body={"access_token":[REDACTED],"expires_in":1750,"refresh_expires_in":7200,"refresh_token":[REDACTED],"token_type":"Bearer","id_token":[REDACTED],"not-before-policy":0,"session_state":"d8321164-bd12-4606-922e-f170f2b2088d","scope":"openid pgcdi_privileges email profile"};`,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -138,8 +174,8 @@ func Test_verifyLogFormat(t *testing.T) {
 
 			output := captureLogOutput(tc.logLevel, tc.message, tc.attributes...)
 
-			assert.Contains(t, output, expectedMessagePart1, fmt.Sprintf("expected output to contain %q but got %q", expectedMessagePart1, output))
-			assert.Contains(t, output, tc.expectedPart2, fmt.Sprintf("expected output to contain %q but got %q", tc.expectedPart2, output))
+			assert.Contains(t, output, expectedMessagePart1, fmt.Sprintf("expected output to contain \n%q but got \n%q", expectedMessagePart1, output))
+			assert.Contains(t, output, tc.expectedPart2, fmt.Sprintf("expected output to contain \n%q but got \n%q", tc.expectedPart2, output))
 		})
 	}
 
