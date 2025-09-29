@@ -1,0 +1,46 @@
+name: Create release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  call_build_and_test:
+    uses: ./.github/workflows/setup-and-test.yml
+  create_release:
+      needs: call_build_and_test
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v2
+        - name: Build binary
+          run: go build -o docker-machine-driver-fsas .
+          env:
+            CGO_ENABLED: "0"
+        - name: Generate checksum file for binary
+          uses: Solratic/checksum-action@v1
+          with:
+            pattern: "docker-machine-driver-fsas"
+            suffix: "sha256"
+        - name: Create node driver YAML
+          run: bash ./ci_tools/generate_nodedriver_yaml.sh ${{ github.ref_name }}
+        - name: Upload binary and YAML
+          uses: actions/upload-artifact@v4
+          with:
+            name: docker-machine-driver-fsas-artifact
+            path: |
+              docker-machine-driver-fsas
+              docker-machine-driver-fsas.yml
+            retention-days: 4
+            if-no-files-found: warn
+        - name: Release
+          uses: softprops/action-gh-release@v2
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            files: |
+              docker-machine-driver-fsas.sha256
+              docker-machine-driver-fsas.yml
+              docker-machine-driver-fsas
+    
