@@ -1,9 +1,12 @@
 package cfgutils
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
+	"github.com/fujitsu/docker-machine-driver-fsas/models"
 )
 
 var (
@@ -19,14 +22,21 @@ type CfgManager interface {
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
-type StandardCfgManager struct{}
+type StandardCfgManager struct {
+	resources []models.Resource
+}
 
 var _ CfgManager = (*StandardCfgManager)(nil)
 
 // NewStandardCfgManager Returns new instance of Standard Configuration Manager
-func NewStandardCfgManager() *StandardCfgManager {
+func NewStandardCfgManager(devicesSpecJson string) *StandardCfgManager {
+	var resources []models.Resource
+	if err := json.Unmarshal([]byte(devicesSpecJson), &resources); err != nil {
+		slog.Warn("Failed to parse DevicesSpecJson, proceeding with empty resources: ", "err", err)
+		resources = []models.Resource{}
+	}
 	isInit = true
-	return &StandardCfgManager{}
+	return &StandardCfgManager{resources: resources}
 }
 
 // IsInit Returns true if constructor succeed else false
@@ -47,7 +57,14 @@ func (sc *StandardCfgManager) PrepareMetadata(instanceId, hostname string) strin
 // prepareRke2ConfigScript Prepares script for RKE2
 func (sc *StandardCfgManager) PrepareRke2ConfigScript(configName, machineUUID string) string {
 	slog.Debug(fmt.Sprintf("Prepare RKE2 Config Script: %s", configName))
-	configContent := sc.prepareRke2ConfigProviderId(machineUUID)
+	providerIdEntry := sc.prepareRke2ConfigProviderId(machineUUID)
+	nodeLabelEntry := sc.prepareRke2ConfigNodeLabelsForGpu()
+	var configContent string
+	if nodeLabelEntry != "" {
+		configContent = fmt.Sprintf("%s\n%s", providerIdEntry, nodeLabelEntry)
+	} else {
+		configContent = providerIdEntry
+	}
 	return fmt.Sprintf(rke2ConfigScriptContent, configName, configContent)
 }
 
@@ -112,4 +129,55 @@ fi
 func (sc *StandardCfgManager) PrepareRootPartitionResizeScript() string {
 	slog.Debug("Prepare root partition resize script")
 	return rootPartitionResizeScriptContent
+}
+
+// prepareRke2ConfigNodeLabelsForGpu returns a string with node labels
+func (sc *StandardCfgManager) prepareRke2ConfigNodeLabelsForGpu() string {
+	slog.Debug("Prepare RKE2 Config Node Labels")
+	// GPU map (short names to full names)
+	allowedGPUs := map[string]string{
+		"nvidia-a100-40g": "nvidia-a100-40g",
+		"nvidia-a100-80g": "nvidia-a100-80g",
+		"nvidia-h100":     "nvidia-h100",
+		"a100-40g":        "nvidia-a100-40g",
+		"a100-80g":        "nvidia-a100-80g",
+		"h100":            "nvidia-h100",
+	}
+	labels := []string{}
+	for _, res := range sc.resources {
+		if res.ResourceType != "gpu" || res.ResourceSpec == nil {
+			continue
+		}
+		model := ""
+		for _, cond := range res.ResourceSpec.Condition {
+			if cond.Column == "model" && cond.Operator == "eq" {
+				model = cond.Value
+				break
+			}
+		}
+		fullModel, ok := allowedGPUs[model]
+		if !ok {
+			slog.Warn("Skipping labels because GPU model not allowed: ", "value", model)
+			continue
+		}
+		if res.MinResourceCount > res.MaxResourceCount {
+			slog.Warn("Invalid GPU config: MinResourceCount > MaxResourceCount ", "model", fullModel, "min", res.MinResourceCount, "max", res.MaxResourceCount)
+			continue
+		}
+		if res.MinResourceCount > 0 {
+			labels = append(labels, fmt.Sprintf("cohdi.io/%s-size-min=%d", fullModel, res.MinResourceCount))
+		} else {
+			slog.Warn("MinResourceCount missing for GPU: ", "model", fullModel)
+		}
+		if res.MaxResourceCount > 0 {
+			labels = append(labels, fmt.Sprintf("cohdi.io/%s-size-max=%d", fullModel, res.MaxResourceCount))
+		} else {
+			slog.Warn("MaxResourceCount missing for GPU: ", "model", fullModel)
+		}
+	}
+	if len(labels) == 0 {
+		slog.Debug("No GPU labels generated because of empty GPU resources")
+		return ""
+	}
+	return fmt.Sprintf(`kubelet-arg+: "node-labels=%s"`, strings.Join(labels, ","))
 }

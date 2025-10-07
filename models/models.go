@@ -46,11 +46,13 @@ type Resource struct {
 	ResourceNum      int             `json:"res_num,omitempty"` // Present only in payload of POST /machines
 	ResourceSpec     *ResSpec        `json:"res_spec,omitempty"`
 	Tags             *ResStorageTags `json:"tags,omitempty"`
-	Network          *Network        `json:"network,omitempty"`       // It's the only localization where network data are processed
-	ResourceUUID     string          `json:"res_uuid,omitempty"`      // Present only in responses
-	ResourceName     string          `json:"res_name,omitempty"`      // Present only in responses
-	ResourceStatus   int             `json:"res_status,omitempty"`    // Present only in responses
-	ResourceOpStatus string          `json:"res_op_status,omitempty"` // Present only in responses
+	Network          *Network        `json:"network,omitempty"`            // It's the only localization where network data are processed
+	ResourceUUID     string          `json:"res_uuid,omitempty"`           // Present only in responses
+	ResourceName     string          `json:"res_name,omitempty"`           // Present only in responses
+	ResourceStatus   int             `json:"res_status,omitempty"`         // Present only in responses
+	ResourceOpStatus string          `json:"res_op_status,omitempty"`      // Present only in responses
+	MinResourceCount int             `json:"min_resource_count,omitempty"` // GPU field (read-only and optional)
+	MaxResourceCount int             `json:"max_resource_count,omitempty"` // GPU field (read-only and optional)
 }
 
 // Custom Unmarshaler to handle both "res_spec" and "res_spcec"
@@ -84,17 +86,21 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Custom Marshaler to omit "tags"
+// Custom Marshaler to omit "tags", "minresourcecount" and "maxresourcecount"
 /*
-	The reason why a custom marshaller is defined is because "tags"
-	field cannot be send in a POST request when creating the machine.
-	However, the "tags" field is needed by the nodedriver to determine
-	which disk to install the operating system on.
+	The reason why a custom marshaller is defined is because some fields
+   	are only needed internally - they cannot be serialized in the requests to FM API,
+    but are needed to be deserialized from customer's input in GUI
+   Specifically:
+   - tags: used by the node driver to determine which disk to install the OS on
+   - min_resource_count / max_resource_count: GPU fields
+     that can be present in customer input JSON, but must never be sent
+     to Fabric Manager as they are not part of the API specification.
 */
 func (r *Resource) MarshalJSON() ([]byte, error) {
-	// Create a temporary struct without the Tags field
-	type Alias Resource
-	alias := &Alias{
+	// Create a temporary struct without the Tags, MinResourceCount and MaxResourceCount fields
+	type OutgoingResource Resource
+	alias := &OutgoingResource {
 		ResourceType:     r.ResourceType,
 		ResourceNum:      r.ResourceNum,
 		ResourceSpec:     r.ResourceSpec,
