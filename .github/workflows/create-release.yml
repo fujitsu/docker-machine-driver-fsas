@@ -27,7 +27,7 @@ jobs:
             path: |
               docker-machine-driver-fsas
               docker-machine-driver-fsas.yml
-            retention-days: 4
+            retention-days: 90
             if-no-files-found: warn
         - name: Release
           uses: softprops/action-gh-release@v2
