@@ -19,6 +19,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           verbose: true
+      - name: Diagnostic info
+        run: |
+          echo  "pwd= $(pwd)"
+          ls -lA
+          groups
+          touch CHANGELOG.md
       - name: Save changelog to file
         run: |
           printf 'Changelog file generated automatically. Do not edit.\n' > CHANGELOG.md
