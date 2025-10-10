@@ -24,6 +24,7 @@ jobs:
           verbose: true
       - name: Save changelog to file
         run: |
+          sudo chmod 666 CHANGELOG.md
           printf 'Changelog file generated automatically. Do not edit.\n' > CHANGELOG.md
           printf 'Changelog generated at: %s\n' "$(date --iso-8601=seconds)" >> CHANGELOG.md
           printf '%s\n' "${{ steps.changelog.outputs.changelog }}" >> CHANGELOG.md
