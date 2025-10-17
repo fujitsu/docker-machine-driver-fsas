@@ -1,6 +1,14 @@
 Changelog file generated automatically. Do not edit.
-Changelog generated at: 2025-10-10T09:20:24+00:00
+Changelog generated at: 2025-10-17T11:04:50+00:00
 # Changelog
+
+## [Unreleased](https://github.com/fujitsu/docker-machine-driver-fsas/tree/HEAD)
+
+[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.7...HEAD)
+
+**Merged pull requests:**
+
+- add log extension to gitignore; [\#15](https://github.com/fujitsu/docker-machine-driver-fsas/pull/15) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
 
 ## [v0.1.7](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.7) (2025-10-07)
 
