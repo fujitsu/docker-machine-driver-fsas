@@ -1,4 +1,6 @@
 name: Setup and test
+permissions:
+  contents: read
 on:
   push:
   workflow_call:
