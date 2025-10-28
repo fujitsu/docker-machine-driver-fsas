@@ -3,6 +3,7 @@ package sshutils
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
+	"github.com/fujitsu/docker-machine-driver-fsas/models"
 
 	"github.com/pkg/sftp"
 	"github.com/rancher/machine/libmachine/ssh"
@@ -22,24 +24,66 @@ import (
 const (
 	port                                    = 22
 	cmdRebootCloudInit                      = "sudo cloud-init clean --logs --reboot"
+	cmdRegisterOS                           = "sudo -E SUSEConnect -r %s -e %s"
+	cmdGetStatusOS                          = "sudo -E SUSEConnect -s"
+	cmdRegisterModuleOS                     = "sudo -E SUSEConnect -p %s"
+	cmdDeregisterOS                         = "sudo -E SUSEConnect -d"
 	remoteScriptDir                         = "/tmp/fsas-nodedriver"
 	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 5 * time.Second
 )
 
 var (
-	ErrNoneOfConstructorArgsCanBeEmpty = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'hostPublicKey'")
+	ErrNoneOfConstructorArgsCanBeEmpty = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'sshKeyPath', 'hostPublicKey'")
 	isInit                             = false
 	publicKeyIsValid                   = false
 )
 
+// SSHKeyParser defines the interface for parsing an SSH key from a path.
+type SSHKeyParser interface {
+	Parse(keyPath string) gossh.Signer
+}
+
+// fileSSHKeyParser is the default implementation that reads from the filesystem.
+type fileSSHKeyParser struct{}
+
+// NewFileSSHKeyParser creates a new parser that reads from the filesystem.
+func NewFileSSHKeyParser() SSHKeyParser {
+	return &fileSSHKeyParser{}
+}
+
+// Parse implements the SSHKeyParser interface by calling the original global function.
+func (p *fileSSHKeyParser) Parse(keyPath string) gossh.Signer {
+	if keyPath == "" {
+		return nil
+	}
+	if _, err := os.Stat(keyPath); err != nil {
+		return nil
+	}
+	keyBytes, err := os.ReadFile(keyPath)
+	if err != nil {
+		slog.Warn("Could not read SSH key path: ", "path", keyPath, "err", err)
+		return nil
+	}
+	privateKey, err := gossh.ParsePrivateKey(keyBytes)
+	if err != nil {
+		slog.Warn("Could not parse SSH key: ", "path", keyPath, "err", err)
+		return nil
+	}
+	return privateKey
+}
+
+var _ SSHKeyParser = (*fileSSHKeyParser)(nil)
+
 // SshManager interface defines the methods for interacting with the SSH Manager.
 type SshManager interface {
 	IsInit() bool
-	ExchangeKeys(sshKeyPath string) error
+	ExchangeKeys() error
 	ExecuteScript(scriptPath, scriptContent string, postRemove bool, runWithSudo bool) error
 	WriteFileOnRemoteMachine(path, fileContent string, fileMode os.FileMode) error
 	DisablePasswordSSHLogin() error
 	RebootCloudInit() error
+	RegisterOS(regcode, email string) error
+	DeregisterOS() error
 }
 
 // StandardSshManager struct holds configuration for SSH Manager interaction.
@@ -50,15 +94,16 @@ type StandardSshManager struct {
 	SshKeyPath    string
 	Client        ssh.Client
 	HostPublicKey gossh.PublicKey
+	keyParser     SSHKeyParser
 }
 
 var _ SshManager = (*StandardSshManager)(nil)
 
 // NewStandardSshManager Returns new instance of Standard SSH Manager and error
-func NewStandardSshManager(hostName, userName, sshPassword, hostPublicKey string) (*StandardSshManager, error) {
+func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath, hostPublicKey string) (*StandardSshManager, error) {
 	slog.Debug("Standard SSH Manager constructor: ", "host", hostName, "user", userName)
 
-	if hostName == "" || userName == "" || sshPassword == "" || hostPublicKey == "" {
+	if hostName == "" || userName == "" || sshPassword == "" || hostPublicKey == "" || sshKeyPath == "" {
 
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
@@ -76,6 +121,8 @@ func NewStandardSshManager(hostName, userName, sshPassword, hostPublicKey string
 		SshPassword:   sshPassword,
 		Client:        &ssh.NativeClient{},
 		HostPublicKey: publicKey,
+		SshKeyPath:    sshKeyPath,
+		keyParser:     NewFileSSHKeyParser(),
 	}, nil
 }
 
@@ -93,11 +140,16 @@ func (sc *StandardSshManager) IsInit() bool {
 }
 
 func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
+	authMethods := []gossh.AuthMethod{
+		gossh.Password(sc.SshPassword),
+	}
+	if sshPrivateKey := sc.keyParser.Parse(sc.SshKeyPath); sshPrivateKey != nil {
+		authMethods = append(authMethods, gossh.PublicKeys(sshPrivateKey))
+	}
+
 	config := &gossh.ClientConfig{
 		User: sc.UserName,
-		Auth: []gossh.AuthMethod{
-			gossh.Password(sc.SshPassword),
-		},
+		Auth: authMethods,
 		HostKeyCallback:   gossh.FixedHostKey(sc.HostPublicKey),
 		HostKeyAlgorithms: []string{sc.HostPublicKey.Type()},
 	}
@@ -144,22 +196,15 @@ func (sc *StandardSshManager) hostPublicKeyIsValid() error {
 func (sc *StandardSshManager) initNativeClient() error {
 	if _, ok := sc.Client.(*ssh.NativeClient); ok {
 
-		var auth *ssh.Auth
-
-		if sc.SshKeyPath == "" {
-			auth = &ssh.Auth{
-				Passwords: []string{sc.SshPassword},
-			}
-		} else {
-			auth = &ssh.Auth{
-				Passwords: []string{sc.SshPassword},
-				Keys:      []string{sc.SshKeyPath},
-			}
+		slog.Debug("Authenticating using password and SSH key: ", "path", sc.SshKeyPath)
+		auth := &ssh.Auth{
+			Passwords: []string{sc.SshPassword},
+			Keys:      []string{sc.SshKeyPath},
 		}
 
 		nativeClient, err := ssh.NewNativeClient(sc.UserName, sc.HostName, port, auth)
 		if err != nil {
-			slog.Error("Error creating SSH client:", "err", err)
+			slog.Error("Error creating SSH client: ", "err", err)
 			return err
 		}
 		slog.Info("SSH native client successfully initialized: ", "host", sc.HostName, "user", sc.UserName)
@@ -197,14 +242,14 @@ func (sc *StandardSshManager) runCommand(command string) (string, error) {
 	return output, nil
 }
 
-func (sc *StandardSshManager) ExchangeKeys(sshKeyPath string) error {
+func (sc *StandardSshManager) ExchangeKeys() error {
 
-	if err := sc.createSSHKey(sshKeyPath); err != nil {
+	if err := sc.createSSHKey(); err != nil {
 		slog.Error("Could not generate SSH keys because of an error: ", "err", err)
 		return err
 	}
 
-	if err := sc.transferSSHKeyToMachine(sshKeyPath); err != nil {
+	if err := sc.transferSSHKeyToMachine(); err != nil {
 		slog.Error("Could not transfer SSH keys because of an error: ", "err", err)
 		return err
 	}
@@ -214,13 +259,13 @@ func (sc *StandardSshManager) ExchangeKeys(sshKeyPath string) error {
 }
 
 // createSSHKey is responsible for generating new SSH key pair
-func (sc *StandardSshManager) createSSHKey(sshKeyPath string) error {
+func (sc *StandardSshManager) createSSHKey() error {
 
-	if err := ssh.GenerateSSHKey(sshKeyPath); err != nil {
+	if err := ssh.GenerateSSHKey(sc.SshKeyPath); err != nil {
 		slog.Error("SSH key could not be generated because of an error: ", "err", err)
 		return err
 	}
-	slog.Info("SSH key pair generated successfully: ", "path", sshKeyPath)
+	slog.Info("SSH key pair generated successfully: ", "path", sc.SshKeyPath)
 
 	return nil
 }
@@ -258,14 +303,14 @@ func (sc *StandardSshManager) RebootCloudInit() error {
 }
 
 // transferSSHKeyToMachine is responsible for transferring existing SSH key to newly created machine
-func (sc *StandardSshManager) transferSSHKeyToMachine(sshKeyPath string) error {
+func (sc *StandardSshManager) transferSSHKeyToMachine() error {
 
-	pubSshKeyPath := sshKeyPath + ".pub"
+	pubSshKeyPath := sc.SshKeyPath + ".pub"
 	slog.Debug("Opening file: ", "file", pubSshKeyPath)
 
 	buffer, err := os.ReadFile(pubSshKeyPath)
 	if err != nil {
-		slog.Error("Error opening file: ", "sshKeyPath", sshKeyPath)
+		slog.Error("Error opening file: ", "sshKeyPath", pubSshKeyPath, "err", err)
 		return err
 	}
 
@@ -460,5 +505,68 @@ func (sc *StandardSshManager) removeRemoteFile(path string, runWithSudo bool) er
 		return err
 	}
 
+	return nil
+}
+
+// RegisterOS - Registers SLES OS license using SUSEConnect
+func (sc *StandardSshManager) RegisterOS(regcode, email string) error {
+	if regcode == "" {
+		slog.Info("OS registration skipped: no registration code provided.")
+		return nil
+	}
+
+	// Step 1: Perform the initial base registration.
+	slog.Info("Attempting initial OS registration: ", "email", email)
+	initialRegCommand := fmt.Sprintf(cmdRegisterOS, regcode, email)
+	if _, err := sc.runCommand(initialRegCommand); err != nil {
+		slog.Error("Error executing initial OS registration: ", "err", err)
+		return err
+	}
+	slog.Info("Initial OS registration successful")
+
+	// Step 2: Get the status of all products in JSON format.
+	slog.Info("Fetching status of all SUSE modules...")
+	jsonOutput, err := sc.runCommand(cmdGetStatusOS)
+	if err != nil {
+		slog.Error("Error fetching SUSE product status: ", "err", err)
+		return err
+	}
+
+	// Step 3: Parse the JSON response.
+	var products []models.SuseProduct
+	if err := json.Unmarshal([]byte(jsonOutput), &products); err != nil {
+		slog.Error("Error parsing SUSE product status JSON: ", "err", err)
+		return err
+	}
+
+	// Step 4: Loop through products and register any that are not registered.
+	slog.Info("Checking for unregistered modules...")
+	for _, product := range products {
+		if product.Status == "Not Registered" {
+			productString := fmt.Sprintf("%s/%s/%s", product.Identifier, product.Version, product.Arch)
+			slog.Info("Found unregistered module. Attempting to register: ", "module", productString)
+
+			moduleRegCommand := fmt.Sprintf(cmdRegisterModuleOS, productString)
+			if _, err := sc.runCommand(moduleRegCommand); err != nil {
+				slog.Error("Error registering module: ", "module", productString, "err", err)
+				return err
+			}
+			slog.Info("Successfully registered module: ", "module", productString)
+		}
+	}
+
+	slog.Info("OS and all modules registered successfully")
+
+	return nil
+}
+
+// DeregisterOS - De-registers SLES OS using SUSEConnect
+func (sc *StandardSshManager) DeregisterOS() error {
+	_, err := sc.runCommand(cmdDeregisterOS)
+	if err != nil {
+		slog.Error("Error executing SLES OS deregistration: ", "err", err)
+		return err
+	}
+	slog.Info("SLES OS deregistered successfully")
 	return nil
 }

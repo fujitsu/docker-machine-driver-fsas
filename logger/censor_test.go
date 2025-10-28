@@ -31,6 +31,14 @@ func TestCensorTextWithRegex_DefaultPhrases(t *testing.T) {
 			input:    `response_body={"access_token":"eyJhn0.eyJQ.W418g","expires_in":1750,"refresh_expires_in":7200,"refresh_token":"eyJhbGcX43A","token_type":"Bearer","id_token":"eyJhbGciOi36vyHeg","not-before-policy":0,"session_state":"d8321164-bd12-4606-922e-f170f2b2088d","scope":"openid pgcdi_privileges email profile"};`,
 			expected: `response_body={"access_token":[REDACTED],"expires_in":1750,"refresh_expires_in":7200,"refresh_token":[REDACTED],"token_type":"Bearer","id_token":[REDACTED],"not-before-policy":0,"session_state":"d8321164-bd12-4606-922e-f170f2b2088d","scope":"openid pgcdi_privileges email profile"};`,
 		},
+		{name: "SSH command with SLES subscription registration code - debug",
+			input: "Running command via SSH:  command=sudo SUSEConnect -r XXXXXXXXXXXXXXXX -e user@example.com, host=192.168.122.126, user=rancher",
+			expected: "Running command via SSH:  command=sudo SUSEConnect -r [REDACTED] -e user@example.com, host=192.168.122.126, user=rancher",
+		},
+		{name: "SSH command with SLES subscription registration code - error",
+			input: "Error running command: command=sudo SUSEConnect -r XXXXXXXXXXXXXXXX -e user@example.com, output=sudo: SUSEConnect: command not found",
+			expected: "Error running command: command=sudo SUSEConnect -r [REDACTED] -e user@example.com, output=sudo: SUSEConnect: command not found",
+		},
 	}
 
 	for _, tc := range testCases {

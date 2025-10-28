@@ -40,6 +40,7 @@ var defaultForbiddenPhrases = []CensorRegexRedactor{
 	{Regex: `(?i)"id_token":".*?"`,
 		Prefix: `"id_token":`,
 	},
+	{Regex: "(?i)SUSEConnect -r.*?-e", Prefix: "SUSEConnect -r ", Suffix: " -e"},
 }
 
 /*

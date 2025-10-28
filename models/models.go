@@ -194,3 +194,11 @@ type MachineSpecsArgs struct {
 	NtpServer                 string
 	DnsServer                 string
 }
+
+// SuseProduct represents a single product or module reported by SUSEConnect
+type SuseProduct struct {
+	Identifier string `json:"identifier"`
+	Version    string `json:"version"`
+	Arch       string `json:"arch"`
+	Status     string `json:"status"`
+}

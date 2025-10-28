@@ -21,6 +21,51 @@ func (_m *MockSshManager) EXPECT() *MockSshManager_Expecter {
 	return &MockSshManager_Expecter{mock: &_m.Mock}
 }
 
+// DeregisterOS provides a mock function with no fields
+func (_m *MockSshManager) DeregisterOS() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeregisterOS")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockSshManager_DeregisterOS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeregisterOS'
+type MockSshManager_DeregisterOS_Call struct {
+	*mock.Call
+}
+
+// DeregisterOS is a helper method to define mock.On call
+func (_e *MockSshManager_Expecter) DeregisterOS() *MockSshManager_DeregisterOS_Call {
+	return &MockSshManager_DeregisterOS_Call{Call: _e.mock.On("DeregisterOS")}
+}
+
+func (_c *MockSshManager_DeregisterOS_Call) Run(run func()) *MockSshManager_DeregisterOS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockSshManager_DeregisterOS_Call) Return(_a0 error) *MockSshManager_DeregisterOS_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockSshManager_DeregisterOS_Call) RunAndReturn(run func() error) *MockSshManager_DeregisterOS_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DisablePasswordSSHLogin provides a mock function with no fields
 func (_m *MockSshManager) DisablePasswordSSHLogin() error {
 	ret := _m.Called()
@@ -66,17 +111,17 @@ func (_c *MockSshManager_DisablePasswordSSHLogin_Call) RunAndReturn(run func() e
 	return _c
 }
 
-// ExchangeKeys provides a mock function with given fields: sshKeyPath
-func (_m *MockSshManager) ExchangeKeys(sshKeyPath string) error {
-	ret := _m.Called(sshKeyPath)
+// ExchangeKeys provides a mock function with no fields
+func (_m *MockSshManager) ExchangeKeys() error {
+	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExchangeKeys")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(sshKeyPath)
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -90,14 +135,13 @@ type MockSshManager_ExchangeKeys_Call struct {
 }
 
 // ExchangeKeys is a helper method to define mock.On call
-//   - sshKeyPath string
-func (_e *MockSshManager_Expecter) ExchangeKeys(sshKeyPath interface{}) *MockSshManager_ExchangeKeys_Call {
-	return &MockSshManager_ExchangeKeys_Call{Call: _e.mock.On("ExchangeKeys", sshKeyPath)}
+func (_e *MockSshManager_Expecter) ExchangeKeys() *MockSshManager_ExchangeKeys_Call {
+	return &MockSshManager_ExchangeKeys_Call{Call: _e.mock.On("ExchangeKeys")}
 }
 
-func (_c *MockSshManager_ExchangeKeys_Call) Run(run func(sshKeyPath string)) *MockSshManager_ExchangeKeys_Call {
+func (_c *MockSshManager_ExchangeKeys_Call) Run(run func()) *MockSshManager_ExchangeKeys_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run()
 	})
 	return _c
 }
@@ -107,7 +151,7 @@ func (_c *MockSshManager_ExchangeKeys_Call) Return(_a0 error) *MockSshManager_Ex
 	return _c
 }
 
-func (_c *MockSshManager_ExchangeKeys_Call) RunAndReturn(run func(string) error) *MockSshManager_ExchangeKeys_Call {
+func (_c *MockSshManager_ExchangeKeys_Call) RunAndReturn(run func() error) *MockSshManager_ExchangeKeys_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -247,6 +291,53 @@ func (_c *MockSshManager_RebootCloudInit_Call) Return(_a0 error) *MockSshManager
 }
 
 func (_c *MockSshManager_RebootCloudInit_Call) RunAndReturn(run func() error) *MockSshManager_RebootCloudInit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RegisterOS provides a mock function with given fields: regcode, email
+func (_m *MockSshManager) RegisterOS(regcode string, email string) error {
+	ret := _m.Called(regcode, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegisterOS")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(regcode, email)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockSshManager_RegisterOS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterOS'
+type MockSshManager_RegisterOS_Call struct {
+	*mock.Call
+}
+
+// RegisterOS is a helper method to define mock.On call
+//   - regcode string
+//   - email string
+func (_e *MockSshManager_Expecter) RegisterOS(regcode interface{}, email interface{}) *MockSshManager_RegisterOS_Call {
+	return &MockSshManager_RegisterOS_Call{Call: _e.mock.On("RegisterOS", regcode, email)}
+}
+
+func (_c *MockSshManager_RegisterOS_Call) Run(run func(regcode string, email string)) *MockSshManager_RegisterOS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSshManager_RegisterOS_Call) Return(_a0 error) *MockSshManager_RegisterOS_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockSshManager_RegisterOS_Call) RunAndReturn(run func(string, string) error) *MockSshManager_RegisterOS_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1,0 +1,25 @@
+with-expecter: true
+filename: "mock_{{.InterfaceName}}.go"
+dir: "{{.PackageName}}/mock"
+mockname: "Mock{{.InterfaceName}}"
+outpkg: "{{.PackageName}}"
+packages:
+  github.com/fujitsu/docker-machine-driver-fsas/httputils:
+    interfaces:
+      CdiHTTPClient:
+  github.com/fujitsu/docker-machine-driver-fsas/fm:
+    interfaces:
+      FabricManager:
+  github.com/fujitsu/docker-machine-driver-fsas/keycloak:
+    interfaces:
+      Keycloak:
+  github.com/fujitsu/docker-machine-driver-fsas/sshutils:
+    interfaces:
+      SshManager:
+      SSHKeyParser:
+  github.com/fujitsu/docker-machine-driver-fsas/cfgutils:
+    interfaces:
+      CfgManager:
+  github.com/fujitsu/docker-machine-driver-fsas/timeutils:
+      interfaces:
+        Clock:
