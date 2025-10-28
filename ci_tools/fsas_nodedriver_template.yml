@@ -2,9 +2,9 @@ apiVersion: management.cattle.io/v3
 kind: NodeDriver
 metadata:
   annotations:
-    passwordFields: credentialsPassword
-    privateCredentialFields: credentialsPassword
-    publicCredentialFields: credentialsUsername,tenantUuid,apiUrl,ntpUrl,dnsIp
+    passwordFields: credentialsPassword,slesRegistrationCode
+    privateCredentialFields: credentialsPassword,slesRegistrationCode
+    publicCredentialFields: credentialsUsername,tenantUuid,apiUrl,ntpUrl,dnsIp,slesRegistrationEmail
   name: fsas
 spec:
   active: true

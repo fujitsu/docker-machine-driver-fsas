@@ -3,6 +3,7 @@ package fsas
 import (
 	"encoding/json"
 	"fmt"
+	"net/mail"
 
 	"os"
 	"path/filepath"
@@ -58,6 +59,8 @@ type Driver struct {
 	OsImageSshHostPubKey      string
 	MachineUUID               string
 	UserDataFile              string
+	SlesRegistrationCode      string
+	SlesRegistrationEmail     string
 	FabricManager             fm.FabricManager    `json:"-"`
 	Keycloak                  keycloak.Keycloak   `json:"-"`
 	SshManager                sshutils.SshManager `json:"-"`
@@ -87,6 +90,8 @@ func NewDriver() *Driver {
 		OsImageName:               "",
 		MachineUUID:               "",
 		UserDataFile:              "",
+		SlesRegistrationCode:      "",
+		SlesRegistrationEmail:     "",
 		FabricManager:             &fm.FabricManagerClient{},
 		Keycloak:                  &keycloak.KeycloakClient{},
 		SshManager:                &sshutils.StandardSshManager{},
@@ -124,6 +129,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("OsImageSshHostPubKey: %s, ", d.OsImageSshHostPubKey) +
 		fmt.Sprintf("MachineUUID: %s, ", d.MachineUUID) +
 		fmt.Sprintf("UserDataFile: %s", d.UserDataFile) +
+		fmt.Sprintf("SlesRegistrationEmail: %s", d.SlesRegistrationEmail) +
 		"}"
 }
 
@@ -225,6 +231,16 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "FSAS_IMAGE_OS_SSH_HOST_PUB_KEY",
 		},
 		mcnflag.StringFlag{
+			Name:   "fsas-sles-registration-code",
+			Usage:  "SLES registration code",
+			EnvVar: "FSAS_SLES_REGISTRATION_CODE",
+		},
+		mcnflag.StringFlag{
+			Name:   "fsas-sles-registration-email",
+			Usage:  "SLES registration email",
+			EnvVar: "FSAS_SLES_REGISTRATION_EMAIL",
+		},
+		mcnflag.StringFlag{
 			Name:   "fsas-userdata",
 			Usage:  "Warning: this field should remain empty as custom userdata are not supported!",
 			EnvVar: "FSAS_USERDATA",
@@ -276,6 +292,13 @@ func (d *Driver) UnmarshalJSON(data []byte) error {
 
 	if _, ok := driverOpts.Values["fsas-dns-ip"]; ok {
 		d.DnsIp = driverOpts.String("fsas-dns-ip")
+	}
+
+	if _, ok := driverOpts.Values["fsas-sles-registration-code"]; ok {
+		d.SlesRegistrationCode = driverOpts.String("fsas-sles-registration-code")
+	}
+	if _, ok := driverOpts.Values["fsas-sles-registration-email"]; ok {
+		d.SlesRegistrationEmail = driverOpts.String("fsas-sles-registration-email")
 	}
 
 	if _, ok := driverOpts.Values["fsas-userdata"]; ok {
@@ -361,6 +384,12 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 
 	d.OsImageSshHostPubKey = flags.String("fsas-image-os-ssh-host-pub-key")
 	slog.Debug("Driver ", "FSAS OS image ssh host public key ", d.OsImageSshHostPubKey)
+
+	d.SlesRegistrationCode = flags.String("fsas-sles-registration-code")
+	slog.Debug("Driver ", "FSAS SLES registration code", "<hidden-for-security-reasons>")
+
+	d.SlesRegistrationEmail = flags.String("fsas-sles-registration-email")
+	slog.Debug("Driver ", "FSAS SLES registration email", d.SlesRegistrationEmail)
 
 	return d.checkConfig()
 }
@@ -460,6 +489,16 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image ssh host public key", "--fsas-image-os-ssh-host-pub-key")
 	}
 
+	if d.SlesRegistrationCode != "" {
+		if d.SlesRegistrationEmail == "" {
+			return fmt.Errorf("when SLES registration code is not empty then SLES registration email must also not be empty. Fill in param %s", "--fsas-sles-registration-email")
+		} else {
+
+			if _, err := mail.ParseAddress(d.SlesRegistrationEmail); err != nil {
+				return fmt.Errorf("Email address is not valid: %s", d.SlesRegistrationEmail)
+			}
+		}
+	}
 	return nil
 }
 
@@ -553,7 +592,7 @@ func (d *Driver) innerCreate() error {
 	slog.Info("Acquired ssh hostname: ", "hostname", hostName)
 
 	if !d.SshManager.IsInit() {
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.OsImageSshHostPubKey)
+		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
 		if err != nil {
 			slog.Error("error while initializing Standard SSH Manager: ", "err", err)
 			return err
@@ -561,7 +600,12 @@ func (d *Driver) innerCreate() error {
 		d.SshManager = sshManager
 	}
 
-	if err := d.SshManager.ExchangeKeys(d.GetSSHKeyPath()); err != nil {
+	if err := d.SshManager.ExchangeKeys(); err != nil {
+		return err
+	}
+
+	if err := d.SshManager.RegisterOS(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
+		slog.Error("Failed to register OS via SSH using SUSEConnect: ", "err", err, "email", d.SlesRegistrationEmail)
 		return err
 	}
 
@@ -808,6 +852,25 @@ func (d *Driver) Remove() error {
 	// Fabric Manager needs also keycloak client then init both
 	if err := d.initClients(); err != nil {
 		return err
+	}
+
+	hostName, err := d.GetSSHHostname()
+	if err != nil {
+		// Similar as above - we must ignore hostname acquisition error to avoid perpetual loop
+		slog.Warn("Could not acquire target SSH hostname because of an error: ", "err", err)
+	} else {
+		slog.Info("Acquired SSH hostname: ", "hostname", hostName)
+		if !d.SshManager.IsInit() {
+			sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
+			if err != nil {
+				slog.Error("error while initializing Standard SSH Manager: ", "err", err)
+				return err
+			}
+			d.SshManager = sshManager
+		}
+		if err := d.SshManager.DeregisterOS(); err != nil {
+			slog.Warn("Could not deregister SLES OS, manual action might be required: ", "err", err)
+		}
 	}
 
 	if err := d.FabricManager.RemoveMachine(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {

@@ -109,7 +109,7 @@ func TestStandardCdiHTTPClient_Post_ErrorResponse(t *testing.T) {
 }
 
 func TestStandardCdiHTTPClient_Post_NetworkError(t *testing.T) {
-	client := NewStandardCdiHTTPClient("http://invalid-url")        // Invalid URL to cause a send error
+	client := NewStandardCdiHTTPClient("invalid-url")        // Invalid URL to cause a send error
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil))) // Suppress slog output in test
 	payload := []byte(`{"key": "value"}`)
 	var response Response
