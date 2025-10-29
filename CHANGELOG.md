@@ -1,5 +1,5 @@
 Changelog file generated automatically. Do not edit.
-Changelog generated at: 2025-10-21T14:55:32+00:00
+Changelog generated at: 2025-10-28T12:36:32+00:00
 # Changelog
 
 ## [Unreleased](https://github.com/fujitsu/docker-machine-driver-fsas/tree/HEAD)
@@ -8,6 +8,7 @@ Changelog generated at: 2025-10-21T14:55:32+00:00
 
 **Merged pull requests:**
 
+- Merged PR 1776: feature/handle\_sles\_registration [\#17](https://github.com/fujitsu/docker-machine-driver-fsas/pull/17) ([fujitsu-domzalskis](https://github.com/fujitsu-domzalskis))
 - Feature/set explicitly permisions in workflow files [\#16](https://github.com/fujitsu/docker-machine-driver-fsas/pull/16) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
 - add log extension to gitignore; [\#15](https://github.com/fujitsu/docker-machine-driver-fsas/pull/15) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
 
