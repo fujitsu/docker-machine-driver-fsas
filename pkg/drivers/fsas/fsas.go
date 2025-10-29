@@ -619,13 +619,6 @@ func (d *Driver) innerCreate() error {
 	removeOnFinish := true
 	runSudo := true
 
-	// Generate script content for resizing
-	resizeScriptContent := d.CfgManager.PrepareRootPartitionResizeScript()
-	// Run resize partition script
-	if err := d.SshManager.ExecuteScript(scriptPath, resizeScriptContent, removeOnFinish, runSudo); err != nil {
-		return err
-	}
-
 	// Generate script content for RKE2 setup
 	overrideProviderIdScriptContent := d.CfgManager.PrepareRke2ConfigScript("100-fsas-providerid", d.MachineUUID)
 

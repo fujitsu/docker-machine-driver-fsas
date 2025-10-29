@@ -156,51 +156,6 @@ func (_c *MockCfgManager_PrepareRke2ConfigScript_Call) RunAndReturn(run func(str
 	return _c
 }
 
-// PrepareRootPartitionResizeScript provides a mock function with no fields
-func (_m *MockCfgManager) PrepareRootPartitionResizeScript() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for PrepareRootPartitionResizeScript")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// MockCfgManager_PrepareRootPartitionResizeScript_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PrepareRootPartitionResizeScript'
-type MockCfgManager_PrepareRootPartitionResizeScript_Call struct {
-	*mock.Call
-}
-
-// PrepareRootPartitionResizeScript is a helper method to define mock.On call
-func (_e *MockCfgManager_Expecter) PrepareRootPartitionResizeScript() *MockCfgManager_PrepareRootPartitionResizeScript_Call {
-	return &MockCfgManager_PrepareRootPartitionResizeScript_Call{Call: _e.mock.On("PrepareRootPartitionResizeScript")}
-}
-
-func (_c *MockCfgManager_PrepareRootPartitionResizeScript_Call) Run(run func()) *MockCfgManager_PrepareRootPartitionResizeScript_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockCfgManager_PrepareRootPartitionResizeScript_Call) Return(_a0 string) *MockCfgManager_PrepareRootPartitionResizeScript_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockCfgManager_PrepareRootPartitionResizeScript_Call) RunAndReturn(run func() string) *MockCfgManager_PrepareRootPartitionResizeScript_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // NewMockCfgManager creates a new instance of MockCfgManager. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockCfgManager(t interface {

@@ -178,9 +178,3 @@ func Test_prepareRke2ConfigNodeLabels_FromExactJSON(t *testing.T) {
 	labels := manager.prepareRke2ConfigNodeLabelsForGpu()
 	t.Logf("Generated GPU label: %s", labels)
 }
-
-func TestPrepareRootPartitionResizeScript(t *testing.T) {
-	manager := NewStandardCfgManager("[]")
-	scriptContent := manager.PrepareRootPartitionResizeScript()
-	assert.Equal(t, rootPartitionResizeScriptContent, scriptContent)
-}
