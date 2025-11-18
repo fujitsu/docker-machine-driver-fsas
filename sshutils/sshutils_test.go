@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	mock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
+	mock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
@@ -32,7 +32,7 @@ var (
 // MockSSHClient implements the ssh.Client interface
 type MockSSHClient struct {
 	ExecutedCommands []string
-	OutputFunc func(command string) (string, error)
+	OutputFunc       func(command string) (string, error)
 }
 
 // Output runs a command on the remote host and returns its output
@@ -99,7 +99,7 @@ func Test_runCommand_Fail(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPath = ""  // This is a trick to avoid initializing SSH key auth method during the unit test
+	manager.SshKeyPath = "" // This is a trick to avoid initializing SSH key auth method during the unit test
 
 	output, err := manager.runCommand("custom command")
 
@@ -117,7 +117,7 @@ func Test_runCommand_Success_Missing_Exit(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPath = ""  // This is a trick to avoid initializing SSH key auth method during the unit test
+	manager.SshKeyPath = "" // This is a trick to avoid initializing SSH key auth method during the unit test
 
 	command := "cloud-init --reboot"
 	output, err := manager.runCommand(command)
@@ -145,7 +145,7 @@ func Test_createSSHKey(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.FileExists(t, sshKeyPath)
-	assert.FileExists(t, sshKeyPath + ".pub")
+	assert.FileExists(t, sshKeyPath+".pub")
 }
 
 func Test_transferSSHKeyToMachineOpenFail(t *testing.T) {
@@ -255,16 +255,16 @@ func Test_removeRemoteFile_Fail(t *testing.T) {
 }
 
 func TestGenerateSecureRandomInt(t *testing.T) {
-    for i := 0; i < 100; i++ {
-        result, err := generateSecureRandomInt(1, 999)
-        require.NoError(t, err, "unexpected error")
-        assert.True(t, result >= 1 && result <= 999, "result out of bounds: %d", result)
-    }
+	for i := 0; i < 100; i++ {
+		result, err := generateSecureRandomInt(1, 999)
+		require.NoError(t, err, "unexpected error")
+		assert.True(t, result >= 1 && result <= 999, "result out of bounds: %d", result)
+	}
 }
 
 func TestGenerateSecureRandomInt_InvalidRange(t *testing.T) {
-    _, err := generateSecureRandomInt(10, 1)
-    assert.Error(t, err, "generateSecureRandomInt() should return an error when min > max, but got nil")
+	_, err := generateSecureRandomInt(10, 1)
+	assert.Error(t, err, "generateSecureRandomInt() should return an error when min > max, but got nil")
 }
 
 func Test_ExecuteScript_RemovesScriptAndDirectory(t *testing.T) {
@@ -712,15 +712,27 @@ func Test_getSshClientConfig_PassAndKey(t *testing.T) {
 func Test_DeregisterOS_Success(t *testing.T) {
 	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
 	assert.NoError(t, err)
-	mockClient := &MockSSHClient{}
+	emptyProducts := []models.SuseProduct{}
+	jsonOutput, _ := json.Marshal(emptyProducts)
+	mockClient := &MockSSHClient{
+		OutputFunc: func(cmd string) (string, error) {
+			switch cmd {
+			case cmdGetStatusOS:
+				return string(jsonOutput), nil
+			case cmdDeregisterOS:
+				return "", nil
+			default:
+				return "", fmt.Errorf("unexpected command")
+			}
+		},
+	}
 	manager.Client = mockClient
 	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
 	assert.NoError(t, err)
 
-	expectedCommands := []string{cmdDeregisterOS}
-	assert.Equal(t, mockClient.ExecutedCommands, expectedCommands)
+	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
 }
 
 func Test_DeregisterOS_Fail(t *testing.T) {
@@ -735,5 +747,62 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
-	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
+	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
+}
+
+func Test_DeregisterOS_Attempt_When_NoRegisteredProducts(t *testing.T) {
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	assert.NoError(t, err)
+	products := []models.SuseProduct{
+		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Not Registered"},
+	}
+	jsonOutput, _ := json.Marshal(products)
+
+	mockClient := &MockSSHClient{
+		OutputFunc: func(cmd string) (string, error) {
+			switch cmd {
+			case cmdGetStatusOS:
+				return string(jsonOutput), nil
+			case cmdDeregisterOS:
+				return "", nil
+			default:
+				return "", fmt.Errorf("unexpected command")
+			}
+		},
+	}
+	manager.Client = mockClient
+	manager.SshKeyPath = ""
+
+	err = manager.DeregisterOS()
+	assert.NoError(t, err)
+
+	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
+}
+
+func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	assert.NoError(t, err)
+	products := []models.SuseProduct{
+		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Registered"},
+	}
+	jsonOutput, _ := json.Marshal(products)
+
+	mockClient := &MockSSHClient{
+		OutputFunc: func(cmd string) (string, error) {
+			if cmd == cmdGetStatusOS {
+				return string(jsonOutput), nil
+			}
+			if cmd == cmdDeregisterOS {
+				return "", nil
+			}
+			return "", fmt.Errorf("unexpected command")
+		},
+	}
+	manager.Client = mockClient
+	manager.SshKeyPath = ""
+
+	err = manager.DeregisterOS()
+	assert.NoError(t, err)
+
+	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
 }
