@@ -716,14 +716,10 @@ func Test_DeregisterOS_Success(t *testing.T) {
 	jsonOutput, _ := json.Marshal(emptyProducts)
 	mockClient := &MockSSHClient{
 		OutputFunc: func(cmd string) (string, error) {
-			switch cmd {
-			case cmdGetStatusOS:
+			if cmd == cmdGetStatusOS {
 				return string(jsonOutput), nil
-			case cmdDeregisterOS:
-				return "", nil
-			default:
-				return "", fmt.Errorf("unexpected command")
 			}
+			return "", fmt.Errorf("unexpected command")
 		},
 	}
 	manager.Client = mockClient
@@ -732,7 +728,7 @@ func Test_DeregisterOS_Success(t *testing.T) {
 	err = manager.DeregisterOS()
 	assert.NoError(t, err)
 
-	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
+	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
 }
 
 func Test_DeregisterOS_Fail(t *testing.T) {
@@ -750,7 +746,7 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
 }
 
-func Test_DeregisterOS_Attempt_When_NoRegisteredProducts(t *testing.T) {
+func Test_DeregisterOS_Skip_When_NoRegisteredProducts(t *testing.T) {
 	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
 	assert.NoError(t, err)
 	products := []models.SuseProduct{
@@ -760,14 +756,10 @@ func Test_DeregisterOS_Attempt_When_NoRegisteredProducts(t *testing.T) {
 
 	mockClient := &MockSSHClient{
 		OutputFunc: func(cmd string) (string, error) {
-			switch cmd {
-			case cmdGetStatusOS:
+			if cmd == cmdGetStatusOS {
 				return string(jsonOutput), nil
-			case cmdDeregisterOS:
-				return "", nil
-			default:
-				return "", fmt.Errorf("unexpected command")
 			}
+			return "", fmt.Errorf("unexpected command")
 		},
 	}
 	manager.Client = mockClient
@@ -776,7 +768,7 @@ func Test_DeregisterOS_Attempt_When_NoRegisteredProducts(t *testing.T) {
 	err = manager.DeregisterOS()
 	assert.NoError(t, err)
 
-	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
+	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
 }
 
 func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
