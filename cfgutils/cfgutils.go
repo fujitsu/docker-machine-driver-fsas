@@ -22,9 +22,9 @@ var (
 type CfgManager interface {
 	IsInit() bool
 	PrepareMetadata(instanceId, hostname string) string
-	PrepareRke2ConfigScript(configName, machineUUID string) string
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
+	ImplantRKE2Config(configName, machineUUID string, removeOnFinish bool) error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -63,7 +63,7 @@ func (sc *StandardCfgManager) PrepareMetadata(instanceId, hostname string) strin
 }
 
 // prepareRke2ConfigScript Prepares script for RKE2
-func (sc *StandardCfgManager) PrepareRke2ConfigScript(configName, machineUUID string) string {
+func (sc *StandardCfgManager) prepareRke2ConfigScript(configName, machineUUID string) string {
 	slog.Debug(fmt.Sprintf("Prepare RKE2 Config Script: %s", configName))
 	providerIdEntry := sc.prepareRke2ConfigProviderId(machineUUID)
 	nodeLabelEntry := sc.prepareRke2ConfigNodeLabelsForGpu()
@@ -226,5 +226,47 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 		slog.Error("Failed to write userdata file:", "path", sc.userDataFile, "err", err)
 		return err
 	}
+	return nil
+}
+
+/*
+ImplantRKE2Config extends userdata cloud-config file with script that configure rke2.
+
+Method adds two items to userdata file:
+ 1. to section "write_files" add script that configure rke2
+ 2. to section "runcmd" add line that execute above script that configure rke2
+
+E.g.
+
+	write_files:
+	  - path: /tmp/setup_rke2.sh
+		content: #!/bin/bash...
+		encoding: "gzip+b64"
+		permissions: "0744"
+	runcmd:
+	  - sh /tmp/setup_rke2.sh
+*/
+func (sc *StandardCfgManager) ImplantRKE2Config(configName, machineUUID string, removeOnFinish bool) error {
+	rke2ConfigScript := sc.prepareRke2ConfigScript(configName, machineUUID)
+	rke2ConfigScriptFilePath := `/tmp/setup_rke2.sh`
+
+	// prepare content of executable file
+	rke2ConfigScriptWriteFilesItem := []CloudConfigItem{
+		NewCloudConfigItemWriteFiles(rke2ConfigScriptFilePath, rke2ConfigScript)}
+
+	if err := sc.ExtendUserdataWriteFiles(rke2ConfigScriptWriteFilesItem); err != nil {
+		return err
+	}
+
+	// prepare command that execute already prepared executable
+	rke2ConfigScriptRunCmd := []string{fmt.Sprintf("sh %s", rke2ConfigScriptFilePath)}
+	if removeOnFinish {
+		rke2ConfigScriptRunCmd = append(rke2ConfigScriptRunCmd, fmt.Sprintf("rm %s", rke2ConfigScriptFilePath))
+	}
+
+	if err := sc.ExtendUserdataRunCmd(rke2ConfigScriptRunCmd); err != nil {
+		return err
+	}
+
 	return nil
 }

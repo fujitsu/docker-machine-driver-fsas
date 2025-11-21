@@ -235,4 +235,34 @@ write_files:
     content: H4sIAAAAAAAA/wAAAP//cs7JL01RSM7PS8tMVyguTU5OTU1JTVFIyy9SKC/KLEmNT8vMSS0GBAAA//84FqCbJgAAAA==
     encoding: "gzip+b64"
     permissions: "0644"`
+
+	expectedImplantRke2ConfigNoDeletion1rc1wf = `#cloud-config
+runcmd:
+  - sh /tmp/setup_rke2.sh
+write_files:
+  - path: /tmp/setup_rke2.sh
+    content: H4sIAAAAAAAA/wAAAP//hMrBTgJBDADQ+3xFRW+mdHcAA4je4Mo3dKcdaBZmSGc1McZ/NyHx7Pm98PhAgxVq55Crg4AVGBcNfNT4ClLDdRRzwBuQTomcSzqr09O3/FCqJdtp/sXXy1xC4gl2O9gfD/D+X6a+6zA3bnjz+mmibnKnMH4MetEJ2U/PW5j9MZq83X8S2xL1602UtHrBxcCKS10xbjh3GHNi4RyXfVzPwv54CFKLht8AAAD//06tloLlAAAA
+    encoding: "gzip+b64"
+    permissions: "0644"`
+
+	expectedImplantRke2ConfigNoDeletion2rc1wf = `#cloud-config
+runcmd:
+  - timedatectl set-timezone Europe/Warsaw
+  - sh /tmp/setup_rke2.sh
+write_files:
+  - path: /tmp/setup_rke2.sh
+    content: H4sIAAAAAAAA/wAAAP//hMrBTgJBDADQ+3xFRW+mdHcAA4je4Mo3dKcdaBZmSGc1McZ/NyHx7Pm98PhAgxVq55Crg4AVGBcNfNT4ClLDdRRzwBuQTomcSzqr09O3/FCqJdtp/sXXy1xC4gl2O9gfD/D+X6a+6zA3bnjz+mmibnKnMH4MetEJ2U/PW5j9MZq83X8S2xL1602UtHrBxcCKS10xbjh3GHNi4RyXfVzPwv54CFKLht8AAAD//06tloLlAAAA
+    encoding: "gzip+b64"
+    permissions: "0644"`
+
+	expectedImplantRke2ConfigWithDeletion2rc1wf = `#cloud-config
+runcmd:
+  - timedatectl set-timezone Europe/Warsaw
+  - sh /tmp/setup_rke2.sh
+  - rm /tmp/setup_rke2.sh
+write_files:
+  - path: /tmp/setup_rke2.sh
+    content: H4sIAAAAAAAA/wAAAP//hMrBTgJBDADQ+3xFRW+mdHcAA4je4Mo3dKcdaBZmSGc1McZ/NyHx7Pm98PhAgxVq55Crg4AVGBcNfNT4ClLDdRRzwBuQTomcSzqr09O3/FCqJdtp/sXXy1xC4gl2O9gfD/D+X6a+6zA3bnjz+mmibnKnMH4MetEJ2U/PW5j9MZq83X8S2xL1602UtHrBxcCKS10xbjh3GHNi4RyXfVzPwv54CFKLht8AAAD//06tloLlAAAA
+    encoding: "gzip+b64"
+    permissions: "0644"`
 )

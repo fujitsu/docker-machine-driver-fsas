@@ -137,10 +137,12 @@ func TestPrepareRke2ConfigScript(t *testing.T) {
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
 				`kubelet-arg+: "provider-id=fsas-cdi://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`),
 		},
+
 		{machineUUID: "1234",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
 				`kubelet-arg+: "provider-id=fsas-cdi://1234"`),
 		},
+
 		{machineUUID: "",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
 				`kubelet-arg+: "provider-id=fsas-cdi://"`),
@@ -151,7 +153,7 @@ func TestPrepareRke2ConfigScript(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.machineUUID, func(t *testing.T) {
-			observed := manager.PrepareRke2ConfigScript(configName, tc.machineUUID)
+			observed := manager.prepareRke2ConfigScript(configName, tc.machineUUID)
 			assert.Equal(t, tc.expected, observed)
 		})
 	}
@@ -174,7 +176,7 @@ func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
 	manager := NewStandardCfgManager(devicesSpecJson, "")
 
 	configName := "100-gpu-labels"
-	script := manager.PrepareRke2ConfigScript(configName, "my-machine-uuid")
+	script := manager.prepareRke2ConfigScript(configName, "my-machine-uuid")
 
 	expected := fmt.Sprintf(rke2ConfigScriptContent, configName,
 		`kubelet-arg+: "provider-id=fsas-cdi://my-machine-uuid"
@@ -654,4 +656,80 @@ func Test_userdataFile_not_exists(t *testing.T) {
 		})
 	}
 
+}
+
+func TestImplantRKE2Config(t *testing.T) {
+	testCases := []struct {
+		name            string
+		readFileContent []byte
+		expectedStr     string
+		expectedError   error
+		removeOnFinish  bool
+	}{
+		{name: "case 1: cloud-init does not contain any sections; do not remove script on finish",
+			readFileContent: []byte(userdataSampleContentNoSections),
+			removeOnFinish:  false,
+			expectedStr:     expectedImplantRke2ConfigNoDeletion1rc1wf,
+			expectedError:   nil,
+		},
+
+		{name: "case 2: cloud-init contains section 'run_cmd'; do not remove script on finish",
+			readFileContent: []byte(userdataSampleContent),
+			removeOnFinish:  false,
+			expectedStr:     expectedImplantRke2ConfigNoDeletion2rc1wf,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: cloud-init contains section 'run_cmd'; do remove script on finish",
+			readFileContent: []byte(userdataSampleContent),
+			removeOnFinish:  true,
+			expectedStr:     expectedImplantRke2ConfigWithDeletion2rc1wf,
+			expectedError:   nil,
+		},
+	}
+
+	var expected, observed map[string][]any
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
+			}
+
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+			err = sc.ImplantRKE2Config("100-fsas-providerid", "1892dc56-3bae-4e5a-9af0-2fcadaf24128", tc.removeOnFinish)
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+			}
+
+		})
+	}
 }
