@@ -16,6 +16,7 @@ type CloudConfigItem interface {
 }
 
 // structure for storing items that correspond to cloud config userdata file items from module 'runcmd'
+
 type cloudConfigItemRunCmd struct {
 	commands []string
 }
@@ -37,6 +38,7 @@ func (c cloudConfigItemRunCmd) getModuleName() string {
 }
 
 // structure for storing items that corresponds to cloud config userdata file items from module 'write_files'
+
 type cloudConfigItemWriteFiles struct {
 	encoding    string
 	content     string
@@ -49,7 +51,8 @@ func NewCloudConfigItemWriteFiles(path, content string) cloudConfigItemWriteFile
 		encoding:    "gzip+b64",
 		content:     content,
 		permissions: fmt.Sprintf("%04o", writeFilePermissions),
-		path:        path,
+
+		path: path,
 	}
 }
 
@@ -60,6 +63,7 @@ func (c cloudConfigItemWriteFiles) getNewCloudConfigContent() ([]interface{}, er
 	}
 	b64Encoded := base64.StdEncoding.EncodeToString(zippedContent)
 	return []interface{}{
+
 		map[string]string{
 			"encoding":    c.encoding,
 			"content":     b64Encoded,
@@ -84,6 +88,7 @@ func gzipEncode(data []byte) ([]byte, error) {
 
 	if err := gz.Close(); err != nil {
 		return nil, err
+
 	}
 
 	return b.Bytes(), nil
