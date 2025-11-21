@@ -624,15 +624,13 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	// Prepare scripts execution parameters
-	scriptPath := "" // Random paths
-	removeOnFinish := true
-	runSudo := true
+	if !d.CfgManager.IsInit() {
+		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
+		d.CfgManager = cfgManager
+	}
 
-	// Generate script content for RKE2 setup
-	overrideProviderIdScriptContent := d.CfgManager.PrepareRke2ConfigScript("100-fsas-providerid", d.MachineUUID)
-
-	if err := d.SshManager.ExecuteScript(scriptPath, overrideProviderIdScriptContent, removeOnFinish, runSudo); err != nil {
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
 		return err
 	}
 
@@ -646,6 +644,7 @@ func (d *Driver) innerCreate() error {
 	}
 
 	slog.Info("Logging content of cloud config file at the end of method innerCreate")
+
 	logContentOfCloudConfigFile(d.UserDataFile)
 
 	return nil
