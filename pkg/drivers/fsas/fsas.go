@@ -614,21 +614,6 @@ func (d *Driver) innerCreate() error {
 		d.CfgManager = cfgManager
 	}
 
-	// write sample data using modified userdata file
-	d.CfgManager.ExtendUserdataRunCmd([]string{
-		`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,
-		`echo "Cloud config test succeeded" >> /tmp/cloud-config-test-runcmd.log`,
-	})
-
-	items := []cfgutils.CloudConfigItem{
-		cfgutils.NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
-		cfgutils.NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files-2.log", "Cloud config succeeded for write_files part 2"),
-	}
-	d.CfgManager.ExtendUserdataWriteFiles(items)
-
-	slog.Info("Logging content of cloud config userdata file after extending it")
-	logContentOfCloudConfigFile(d.UserDataFile)
-
 	// Prepare scripts execution parameters
 	scriptPath := "" // Random paths
 	removeOnFinish := true

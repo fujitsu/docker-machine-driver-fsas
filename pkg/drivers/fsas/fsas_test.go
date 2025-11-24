@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fujitsu/docker-machine-driver-fsas/cfgutils"
 	cfgMock "github.com/fujitsu/docker-machine-driver-fsas/cfgutils/mock"
 	"github.com/fujitsu/docker-machine-driver-fsas/fm"
 	fmmock "github.com/fujitsu/docker-machine-driver-fsas/fm/mock"
@@ -908,7 +907,6 @@ func TestCreate(t *testing.T) {
 	mockSSH.On("RebootCloudInit").Return(nil)
 	mockSSH.On("DisablePasswordSSHLogin").Return(nil)
 	mockClock.On("Sleep", WAIT_FOR_START_AFTER_REBOOT).Return(nil)
-	applyMockForExtendedUserMethods(mockCfg)
 
 	// Mock implementation of os.ReadFile
 	originalOsReadFile := osReadFile
@@ -919,18 +917,6 @@ func TestCreate(t *testing.T) {
 
 	err := driver.Create()
 	assert.NoError(t, err)
-}
-
-func applyMockForExtendedUserMethods(mockCfg *cfgMock.MockCfgManager) {
-	mockCfg.On("ExtendUserdataRunCmd", []string{
-		`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,
-		`echo "Cloud config test succeeded" >> /tmp/cloud-config-test-runcmd.log`,
-	}).Return(nil).Once()
-	items := []cfgutils.CloudConfigItem{
-		cfgutils.NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
-		cfgutils.NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files-2.log", "Cloud config succeeded for write_files part 2"),
-	}
-	mockCfg.On("ExtendUserdataWriteFiles", items).Return(nil).Once()
 }
 
 func TestCreateCloudInitFail(t *testing.T) {
@@ -1004,7 +990,6 @@ func TestCreateCloudInitFail(t *testing.T) {
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 17, nil).Once()
-	applyMockForExtendedUserMethods(mockCfg)
 
 	// Mock implementation of os.ReadFile
 	originalOsReadFile := osReadFile
@@ -1575,7 +1560,6 @@ func TestCreateExecuteScriptFail(t *testing.T) {
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// waitForStatus in Remove call
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
-	applyMockForExtendedUserMethods(mockCfg)
 
 	err := driver.Create()
 	assert.EqualError(t, err, mockError.Error())
@@ -1646,7 +1630,6 @@ func TestCreateFailRemoveFail(t *testing.T) {
 	removeError := fmt.Errorf("Remove after failed inner Create failed as well")
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(removeError)
-	applyMockForExtendedUserMethods(mockCfg)
 
 	err := driver.Create()
 	assert.EqualError(t, err, "error during Create: 'ExecuteScript unsuccessful'; followed by error during Remove: 'Remove after failed inner Create failed as well'")
