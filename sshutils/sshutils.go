@@ -148,8 +148,8 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 	}
 
 	config := &gossh.ClientConfig{
-		User: sc.UserName,
-		Auth: authMethods,
+		User:              sc.UserName,
+		Auth:              authMethods,
 		HostKeyCallback:   gossh.FixedHostKey(sc.HostPublicKey),
 		HostKeyAlgorithms: []string{sc.HostPublicKey.Type()},
 	}
@@ -562,7 +562,33 @@ func (sc *StandardSshManager) RegisterOS(regcode, email string) error {
 
 // DeregisterOS - De-registers SLES OS using SUSEConnect
 func (sc *StandardSshManager) DeregisterOS() error {
-	_, err := sc.runCommand(cmdDeregisterOS)
+	jsonOutput, err := sc.runCommand(cmdGetStatusOS)
+	if err != nil {
+		slog.Error("Could not get SUSE product status before deregistration: ", "err", err)
+		return err
+	}
+
+	var products []models.SuseProduct
+	if err := json.Unmarshal([]byte(jsonOutput), &products); err != nil {
+		slog.Error("Failed to parse SUSE status JSON before deregistration: ", "err", err)
+		return err
+	}
+
+	anyRegistered := false
+	for _, p := range products {
+		if p.Status == "Registered" {
+			anyRegistered = true
+			break
+		}
+	}
+
+	// Only deregister if something was registered
+	if !anyRegistered {
+		slog.Info("Skipping OS deregistration: no products registered.")
+		return nil
+	}
+
+	_, err = sc.runCommand(cmdDeregisterOS)
 	if err != nil {
 		slog.Error("Error executing SLES OS deregistration: ", "err", err)
 		return err
