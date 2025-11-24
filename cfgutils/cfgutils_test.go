@@ -264,35 +264,35 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
 
 	testCases := []struct {
-		action                func()
-		name                  string
-		input                 []string
-		expectedStr           string
-		nrExpectedItemsRuncmd int
-		expectedError         error
+		action          func()
+		name            string
+		input           []string
+		expectedStr     string
+		nrExpectedItems int
+		expectedError   error
 	}{
-		{name: "case 1: empty list",
-			action:                func() { resetOsMocks() },
-			input:                 []string{},
-			expectedStr:           userdataSampleContent,
-			nrExpectedItemsRuncmd: 1,
-			expectedError:         nil,
+		{name: "case 1: input as empty list",
+			action:          func() { resetOsMocks() },
+			input:           []string{},
+			expectedStr:     userdataSampleContent,
+			nrExpectedItems: 1,
+			expectedError:   nil,
 		},
 
 		{name: "case 2: add one item to section 'runcmd'",
-			action:                func() { resetOsMocks() },
-			input:                 inputOneItemRunCmd,
-			expectedStr:           expectedStr2Cmd1Write,
-			nrExpectedItemsRuncmd: 2,
-			expectedError:         nil,
+			action:          func() { resetOsMocks() },
+			input:           inputOneItemRunCmd,
+			expectedStr:     expectedStr2Cmd1Write,
+			nrExpectedItems: 2,
+			expectedError:   nil,
 		},
 
 		{name: "case 3: add two items to section 'runcmd'",
-			action:                func() { resetOsMocks() },
-			input:                 inputTwoItemsRunCmd,
-			expectedStr:           expectedStr3Cmd1Write,
-			nrExpectedItemsRuncmd: 3,
-			expectedError:         nil,
+			action:          func() { resetOsMocks() },
+			input:           inputTwoItemsRunCmd,
+			expectedStr:     expectedStr3Cmd1Write,
+			nrExpectedItems: 3,
+			expectedError:   nil,
 		},
 
 		{name: "case 4: section runcmd does not exists",
@@ -300,10 +300,10 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 				resetOsMocks()
 				mockOsReadFileContent = []byte(userdataSampleContentNoSectionRunCmd)
 			},
-			input:                 inputOneItemRunCmd,
-			expectedStr:           expectedStr1Cmd1Write,
-			nrExpectedItemsRuncmd: 1,
-			expectedError:         nil,
+			input:           inputOneItemRunCmd,
+			expectedStr:     expectedStr1Cmd1Write,
+			nrExpectedItems: 1,
+			expectedError:   nil,
 		},
 
 		{name: "case 5: no usedata file",
@@ -311,10 +311,10 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 				resetOsMocks()
 				osStatErrorMessage = "no such file"
 			},
-			input:                 nil,
-			expectedStr:           "",
-			nrExpectedItemsRuncmd: 0,
-			expectedError:         fs.ErrNotExist,
+			input:           nil,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   fs.ErrNotExist,
 		},
 
 		{name: "case 6: error while reading from usedata file",
@@ -323,10 +323,10 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, expectedErrorReadingFromFile }
 				osReadFile = osReadFileMock
 			},
-			input:                 nil,
-			expectedStr:           "",
-			nrExpectedItemsRuncmd: 0,
-			expectedError:         expectedErrorReadingFromFile,
+			input:           nil,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorReadingFromFile,
 		},
 
 		{name: "case 7: error while writing to usedata file",
@@ -338,10 +338,10 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 				}
 				osWriteFile = osWriteFileMock
 			},
-			input:                 inputOneItemRunCmd,
-			expectedStr:           "",
-			nrExpectedItemsRuncmd: 0,
-			expectedError:         expectedErrorWritingToFile,
+			input:           inputOneItemRunCmd,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorWritingToFile,
 		},
 	}
 
@@ -375,12 +375,8 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 					t.Fatalf("YAML differs.\nExpected: %#v\nObserved:   %#v", expected, observed)
 				}
 
-				if len(observed["runcmd"]) != tc.nrExpectedItemsRuncmd {
-					t.Errorf("expected %d items in 'runcmd', got %d", tc.nrExpectedItemsRuncmd, len(observed["runcmd"]))
-				}
-
-				if len(observed["write_files"]) != 1 {
-					t.Errorf("expected 1 item in section 'write_files', got %d", len(observed["write_files"]))
+				if len(observed["runcmd"]) != tc.nrExpectedItems {
+					t.Errorf("expected %d items in 'runcmd', got %d", tc.nrExpectedItems, len(observed["runcmd"]))
 				}
 			}
 		})
