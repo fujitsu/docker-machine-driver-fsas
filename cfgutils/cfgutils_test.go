@@ -260,7 +260,7 @@ func resetOsMocks() {
 
 }
 
-func TestExtendUserdataRunCmd_Success(t *testing.T) {
+func TestExtendUserdataRunCmd(t *testing.T) {
 	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
 
 	testCases := []struct {
@@ -282,15 +282,15 @@ func TestExtendUserdataRunCmd_Success(t *testing.T) {
 		{name: "case 2: add one item to section 'runcmd'",
 			action:                func() { resetOsMocks() },
 			input:                 inputOneItemRunCmd,
-			expectedStr:           case2ExpectedStr,
+			expectedStr:           expectedStr2Cmd1Write,
 			nrExpectedItemsRuncmd: 2,
 			expectedError:         nil,
 		},
 
-		{name: "case 3: add two items for section 'runcmd'",
+		{name: "case 3: add two items to section 'runcmd'",
 			action:                func() { resetOsMocks() },
 			input:                 inputTwoItemsRunCmd,
-			expectedStr:           case3ExpectedStr,
+			expectedStr:           expectedStr3Cmd1Write,
 			nrExpectedItemsRuncmd: 3,
 			expectedError:         nil,
 		},
@@ -301,7 +301,7 @@ func TestExtendUserdataRunCmd_Success(t *testing.T) {
 				mockOsReadFileContent = []byte(userdataSampleContentNoSectionRunCmd)
 			},
 			input:                 inputOneItemRunCmd,
-			expectedStr:           case4ExpectedStr,
+			expectedStr:           expectedStr1Cmd1Write,
 			nrExpectedItemsRuncmd: 1,
 			expectedError:         nil,
 		},
@@ -317,16 +317,31 @@ func TestExtendUserdataRunCmd_Success(t *testing.T) {
 			expectedError:         fs.ErrNotExist,
 		},
 
-		{name: "case 6: error while reading usedata file",
+		{name: "case 6: error while reading from usedata file",
 			action: func() {
 				resetOsMocks()
-				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, case6ExpectedError }
+				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, expectedErrorReadingFromFile }
 				osReadFile = osReadFileMock
 			},
 			input:                 nil,
 			expectedStr:           "",
 			nrExpectedItemsRuncmd: 0,
-			expectedError:         case6ExpectedError,
+			expectedError:         expectedErrorReadingFromFile,
+		},
+
+		{name: "case 7: error while writing to usedata file",
+			action: func() {
+				resetOsMocks()
+				osWriteFileMock = func(name string, data []byte, perm os.FileMode) error {
+					mockOsWriteFileContent = nil
+					return expectedErrorWritingToFile
+				}
+				osWriteFile = osWriteFileMock
+			},
+			input:                 inputOneItemRunCmd,
+			expectedStr:           "",
+			nrExpectedItemsRuncmd: 0,
+			expectedError:         expectedErrorWritingToFile,
 		},
 	}
 

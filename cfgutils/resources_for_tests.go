@@ -23,7 +23,7 @@ write_files:
 		`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,
 	}
 
-	case2ExpectedStr = `
+	expectedStr2Cmd1Write = `
 #cloud-config
 runcmd:
   - timedatectl set-timezone Europe/Warsaw
@@ -39,7 +39,7 @@ write_files:
 		`echo "Cloud config test succeeded" >> /tmp/cloud-config-test-runcmd.log`,
 	}
 
-	case3ExpectedStr = `
+	expectedStr3Cmd1Write = `
 #cloud-config
 runcmd:
   - timedatectl set-timezone Europe/Warsaw
@@ -51,9 +51,9 @@ write_files:
     encoding: "gzip+b64"
     permissions: "0644"`
 
-	case6ExpectedError = errors.New("error while reading file")
+	expectedErrorReadingFromFile = errors.New("error while reading file")
 
-	case4ExpectedStr = `
+	expectedStr1Cmd1Write = `
 #cloud-config
 runcmd:
   - echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log
@@ -62,4 +62,6 @@ write_files:
     content: Foo was here
     encoding: "gzip+b64"
     permissions: "0644"`
+
+	expectedErrorWritingToFile = errors.New("error while writing file")
 )
