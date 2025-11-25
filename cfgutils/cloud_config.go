@@ -44,7 +44,7 @@ func NewCloudConfigItemWriteFiles(path, content string) cloudConfigItemWriteFile
 	return cloudConfigItemWriteFiles{
 		encoding:    "gzip+b64",
 		content:     content,
-		permissions: "0664",
+		permissions: "0644",
 		path:        path,
 	}
 }
