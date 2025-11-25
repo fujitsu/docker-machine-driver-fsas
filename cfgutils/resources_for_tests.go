@@ -9,6 +9,7 @@ runcmd:
 `
 
 	userdataSampleContentNoSectionRunCmd = `#cloud-config`
+	userdataSampleInvalidYamlContent     = `.32??#(&&)58ffo:bar`
 
 	inputOneItemRunCmd = []string{
 		`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,

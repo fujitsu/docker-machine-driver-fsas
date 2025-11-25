@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"reflect"
 	"testing"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
@@ -371,15 +370,30 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 					t.Fatalf("failed to unmarshal observed: %v", err)
 				}
 
-				if !reflect.DeepEqual(expected, observed) {
-					t.Fatalf("YAML differs.\nExpected: %#v\nObserved:   %#v", expected, observed)
-				}
-
-				if len(observed["runcmd"]) != tc.nrExpectedItems {
-					t.Errorf("expected %d items in 'runcmd', got %d", tc.nrExpectedItems, len(observed["runcmd"]))
-				}
+				assert.Equal(t, expected, observed)
+				assert.Equal(t, len(observed["runcmd"]), tc.nrExpectedItems)
 			}
 		})
 	}
 
+}
+
+func TestExtendUserdataRunCmd_YamlUnmarshallinError(t *testing.T) {
+	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
+
+	resetOsMocks()
+	mockOsReadFileContent = []byte(userdataSampleInvalidYamlContent)
+	err := sc.ExtendUserdataRunCmd(inputOneItemRunCmd)
+	if err == nil {
+		t.Fatal("expected error, but got nil")
+	}
+
+	expectedErrMsg := []string{
+		"yaml: unmarshal errors",
+		"line 1: cannot unmarshal !!str",
+	}
+
+	for _, errMsg := range expectedErrMsg {
+		assert.Contains(t, err.Error(), errMsg)
+	}
 }
