@@ -199,8 +199,6 @@ func Test_prepareRke2ConfigNodeLabels_FromExactJSON(t *testing.T) {
 	t.Logf("Generated GPU label: %s", labels)
 }
 
-// ----------------------------------------------------------
-
 var (
 	osStatErrorMessage = ""
 	osStatMock         = func(name string) (os.FileInfo, error) {
@@ -227,7 +225,7 @@ var (
 	}
 )
 
-func resetOsMocks() {
+func resetOsMocks(userdataContent string) {
 	osStatErrorMessage = ""
 	osStatMock = func(name string) (os.FileInfo, error) {
 		if osStatErrorMessage != "" {
@@ -253,7 +251,7 @@ func resetOsMocks() {
 	}
 
 	osStat = osStatMock
-	mockOsReadFileContent = []byte(userdataSampleContent)
+	mockOsReadFileContent = []byte(userdataContent)
 	osReadFile = osReadFileMock
 	osWriteFile = osWriteFileMock
 
@@ -271,7 +269,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 		expectedError   error
 	}{
 		{name: "case 1: input as empty list",
-			action:          func() { resetOsMocks() },
+			action:          func() { resetOsMocks(userdataSampleContent) },
 			input:           []string{},
 			expectedStr:     userdataSampleContent,
 			nrExpectedItems: 1,
@@ -279,35 +277,34 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 		},
 
 		{name: "case 2: add one item to section 'runcmd'",
-			action:          func() { resetOsMocks() },
+			action:          func() { resetOsMocks(userdataSampleContent) },
 			input:           inputOneItemRunCmd,
-			expectedStr:     expectedStr2Cmd1Write,
+			expectedStr:     expectedStr2Cmd,
 			nrExpectedItems: 2,
 			expectedError:   nil,
 		},
 
 		{name: "case 3: add two items to section 'runcmd'",
-			action:          func() { resetOsMocks() },
+			action:          func() { resetOsMocks(userdataSampleContent) },
 			input:           inputTwoItemsRunCmd,
-			expectedStr:     expectedStr3Cmd1Write,
+			expectedStr:     expectedStr3Cmd,
 			nrExpectedItems: 3,
 			expectedError:   nil,
 		},
 
-		{name: "case 4: section runcmd does not exists",
+		{name: "case 4: section 'runcmd' does not exist",
 			action: func() {
-				resetOsMocks()
-				mockOsReadFileContent = []byte(userdataSampleContentNoSectionRunCmd)
+				resetOsMocks(userdataSampleContentNoSections)
 			},
 			input:           inputOneItemRunCmd,
-			expectedStr:     expectedStr1Cmd1Write,
+			expectedStr:     expectedStr1Cmd,
 			nrExpectedItems: 1,
 			expectedError:   nil,
 		},
 
 		{name: "case 5: no usedata file",
 			action: func() {
-				resetOsMocks()
+				resetOsMocks(userdataSampleContent)
 				osStatErrorMessage = "no such file"
 			},
 			input:           nil,
@@ -318,7 +315,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 
 		{name: "case 6: error while reading from usedata file",
 			action: func() {
-				resetOsMocks()
+				resetOsMocks(userdataSampleContent)
 				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, expectedErrorReadingFromFile }
 				osReadFile = osReadFileMock
 			},
@@ -330,7 +327,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 
 		{name: "case 7: error while writing to usedata file",
 			action: func() {
-				resetOsMocks()
+				resetOsMocks(userdataSampleContent)
 				osWriteFileMock = func(name string, data []byte, perm os.FileMode) error {
 					mockOsWriteFileContent = nil
 					return expectedErrorWritingToFile
@@ -381,7 +378,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 func TestExtendUserdataRunCmd_YamlUnmarshallinError(t *testing.T) {
 	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
 
-	resetOsMocks()
+	resetOsMocks(userdataSampleContent)
 	mockOsReadFileContent = []byte(userdataSampleInvalidYamlContent)
 	err := sc.ExtendUserdataRunCmd(inputOneItemRunCmd)
 	if err == nil {
@@ -396,4 +393,120 @@ func TestExtendUserdataRunCmd_YamlUnmarshallinError(t *testing.T) {
 	for _, errMsg := range expectedErrMsg {
 		assert.Contains(t, err.Error(), errMsg)
 	}
+}
+
+func TestExtendUserdataWriteFiles(t *testing.T) {
+	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
+
+	testCases := []struct {
+		action          func()
+		name            string
+		input           []CloudConfigItem
+		expectedStr     string
+		nrExpectedItems int
+		expectedError   error
+	}{
+		{name: "case 1: input as empty list",
+			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
+			input:           []CloudConfigItem{},
+			expectedStr:     userdataSampleContentWriteFiles,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 2: add one item to section 'write_files'",
+			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
+			input:           inputOneItemWriteFiles,
+			expectedStr:     expectedStr2Write,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: add two items to section 'write_files'",
+			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
+			input:           inputTwoItemsWriteFiles,
+			expectedStr:     expectedStr3Write,
+			nrExpectedItems: 3,
+			expectedError:   nil,
+		},
+
+		{name: "case 4: section 'write_files' does not exist",
+			action:          func() { resetOsMocks(userdataSampleContentNoSections) },
+			input:           inputOneItemWriteFiles,
+			expectedStr:     expectedStr1Write,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 5: no usedata file",
+			action: func() {
+				resetOsMocks(userdataSampleContentWriteFiles)
+				osStatErrorMessage = "no such file"
+			},
+			input:           nil,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   fs.ErrNotExist,
+		},
+
+		{name: "case 6: error while reading from usedata file",
+			action: func() {
+				resetOsMocks(userdataSampleContentWriteFiles)
+				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, expectedErrorReadingFromFile }
+				osReadFile = osReadFileMock
+			},
+			input:           nil,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorReadingFromFile,
+		},
+
+		{name: "case 7: error while writing to usedata file",
+			action: func() {
+				resetOsMocks(userdataSampleContentWriteFiles)
+				osWriteFileMock = func(name string, data []byte, perm os.FileMode) error {
+					mockOsWriteFileContent = nil
+					return expectedErrorWritingToFile
+				}
+				osWriteFile = osWriteFileMock
+			},
+			input:           inputOneItemWriteFiles,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorWritingToFile,
+		},
+	}
+
+	var expected, observed map[string][]any
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.action != nil {
+				tc.action()
+			}
+			err := sc.ExtendUserdataWriteFiles(tc.input)
+
+			if tc.expectedError != nil {
+				if !errors.Is(err, tc.expectedError) {
+					t.Fatalf("expected: %v, but got: %v", tc.expectedError, err)
+				}
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail. Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				if err := yaml.Unmarshal(mockOsWriteFileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+				assert.Equal(t, len(observed["write_files"]), tc.nrExpectedItems)
+			}
+		})
+	}
+
 }
