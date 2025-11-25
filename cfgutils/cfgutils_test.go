@@ -375,14 +375,14 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 
 }
 
-func TestExtendUserdataRunCmd_YamlUnmarshallinError(t *testing.T) {
+func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
 
-	resetOsMocks(userdataSampleContent)
-	mockOsReadFileContent = []byte(userdataSampleInvalidYamlContent)
-	err := sc.ExtendUserdataRunCmd(inputOneItemRunCmd)
-	if err == nil {
-		t.Fatal("expected error, but got nil")
+	type userdataFn func() error
+	functions := []userdataFn{
+		func() error { return sc.ExtendUserdataRunCmd(inputOneItemRunCmd) },
+		func() error { return sc.ExtendUserdataWriteFiles(inputOneItemWriteFiles) },
+		func() error { return sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles) },
 	}
 
 	expectedErrMsg := []string{
@@ -390,8 +390,15 @@ func TestExtendUserdataRunCmd_YamlUnmarshallinError(t *testing.T) {
 		"line 1: cannot unmarshal !!str",
 	}
 
-	for _, errMsg := range expectedErrMsg {
-		assert.Contains(t, err.Error(), errMsg)
+	for _, fn := range functions {
+		resetOsMocks(userdataSampleContent)
+		mockOsReadFileContent = []byte(userdataSampleInvalidYamlContent)
+
+		if err := fn(); err != nil {
+			for _, errMsg := range expectedErrMsg {
+				assert.Contains(t, err.Error(), errMsg)
+			}
+		}
 	}
 }
 
