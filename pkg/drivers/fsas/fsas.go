@@ -610,7 +610,7 @@ func (d *Driver) innerCreate() error {
 	}
 
 	if !d.CfgManager.IsInit() {
-		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson)
+		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
 		d.CfgManager = cfgManager
 	}
 
