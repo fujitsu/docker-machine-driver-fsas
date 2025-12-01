@@ -8,8 +8,19 @@ runcmd:
   - timedatectl set-timezone Europe/Warsaw
 `
 
-	userdataSampleContentNoSections  = `#cloud-config`
-	userdataSampleInvalidYamlContent = `.32??#(&&)58ffo:bar`
+	userdataSampleContentNoSections                 = `#cloud-config`
+	userdataSampleInvalidYamlContentRandomAscii     = `.32??#(&&)58ffo:bar`
+	userdataSampleInvalidYamlContentRunCmdIsInteger = `#cloud-config
+  runcmd: 123`
+	userdataSampleInvalidYamlContentRunCmdIsString = `#cloud-config
+  runcmd: foobar`
+	userdataSampleInvalidYamlContentRunCmdIsBool = `#cloud-config
+  runcmd: true`
+	userdataSampleInvalidYamlContentRunCmdIsMap = `#cloud-config
+  runcmd:
+    foo: bar`
+	userdataSampleInvalidYamlContentRunCmdIsNil = `#cloud-config
+  runcmd:`
 
 	inputOneItemRunCmd = []string{
 		`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,

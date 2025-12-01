@@ -378,27 +378,65 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
 
-	type userdataFn func() error
-	functions := []userdataFn{
-		func() error { return sc.ExtendUserdataRunCmd(inputOneItemRunCmd) },
-		func() error { return sc.ExtendUserdataWriteFiles(inputOneItemWriteFiles) },
-		func() error { return sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles) },
+	testCases := []struct {
+		action           func()
+		name             string
+		expectedErrorStr []string
+	}{
+		{name: "case 1: invalid yaml file - random ascii chars",
+			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRandomAscii) },
+			expectedErrorStr: []string{
+				"yaml: unmarshal errors",
+				"line 1: cannot unmarshal !!str",
+			},
+		},
+		{name: "case 2: invalid yaml file - runcmd is not list but integer",
+			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsInteger) },
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 3: invalid yaml file - runcmd is not list but string",
+			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsString) },
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 4: invalid yaml file - runcmd is not list but bool",
+			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsBool) },
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 5: invalid yaml file - runcmd is not list but map",
+			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsMap) },
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 6: invalid yaml file - runcmd is not list but nil",
+			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsNil) },
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
 	}
 
-	expectedErrMsg := []string{
-		"yaml: unmarshal errors",
-		"line 1: cannot unmarshal !!str",
-	}
-
-	for _, fn := range functions {
-		resetOsMocks(userdataSampleContent)
-		mockOsReadFileContent = []byte(userdataSampleInvalidYamlContent)
-
-		if err := fn(); err != nil {
-			for _, errMsg := range expectedErrMsg {
-				assert.Contains(t, err.Error(), errMsg)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.action != nil {
+				tc.action()
 			}
-		}
+			err := sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles)
+
+			if err == nil {
+				t.Fatal("expected error but got nil")
+			} else {
+				for _, errMsg := range tc.expectedErrorStr {
+					assert.Contains(t, err.Error(), errMsg)
+				}
+			}
+		})
 	}
 }
 

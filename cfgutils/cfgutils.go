@@ -1,6 +1,7 @@
 package cfgutils
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -170,51 +171,57 @@ func (sc *StandardCfgManager) ExtendUserdataWriteFiles(fileObjects []CloudConfig
 
 // extendUserdata Extends cloud config userdata file
 func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
-
-	userDataFile := sc.userDataFile
-	if userDataFile != "" {
-		if _, err := osStat(userDataFile); os.IsNotExist(err) {
-			slog.Error("User data file does not exist: ", "path", userDataFile, "err", err)
-			return err
-		}
-
-		var userdata []byte
-		userdata, err := osReadFile(userDataFile)
-		if err != nil {
-			return err
-		}
-
-		cloudConfig := make(map[any]any)
-		if err = yaml.Unmarshal(userdata, &cloudConfig); err != nil {
-			return err
-		}
-
-		for _, i := range cci {
-			newContent, err := i.addToCloudConfigFile()
-			if err != nil {
-				return fmt.Errorf("error while appending userdata file; section= %s; %w", i.section(), err)
-			}
-
-			if _, ok := cloudConfig[i.section()]; !ok {
-				// key does not exist then create fresh list
-				cloudConfig[i.section()] = []any{}
-			}
-
-			origSectionContent := cloudConfig[i.section()].([]any)
-			cloudConfig[i.section()] = append(origSectionContent, newContent...)
-		}
-
-		userdataContent, err := yaml.Marshal(cloudConfig)
-		if err != nil {
-			return err
-		}
-
-		finalContent := append([]byte("#cloud-config\n"), userdataContent...)
-		err = osWriteFile(userDataFile, finalContent, 0644)
-		if err != nil {
-			return err
-		}
-
+	if sc.userDataFile == "" {
+		return nil
 	}
-	return nil
+
+	if _, err := osStat(sc.userDataFile); os.IsNotExist(err) {
+		slog.Error("User data file does not exist:", "path", sc.userDataFile, "err", err)
+		return err
+	}
+
+	userdata, err := osReadFile(sc.userDataFile)
+	if err != nil {
+		return err
+	}
+
+	cloudConfig := make(map[string]interface{})
+	if err := yaml.Unmarshal(userdata, &cloudConfig); err != nil {
+		return err
+	}
+
+	for _, ccItem := range cci {
+		moduleName := ccItem.getModuleName()
+
+		newContent, err := ccItem.getNewCloudConfigContent()
+		if err != nil {
+			return fmt.Errorf("error while appending userdata file; module= %s: %w", moduleName, err)
+		}
+
+		existing, ok := cloudConfig[moduleName]
+		if !ok {
+			cloudConfig[moduleName] = newContent
+			continue
+		}
+
+		slice, ok := existing.([]interface{})
+		if !ok {
+			return fmt.Errorf("module %s exists but is not a list", moduleName)
+		}
+
+		cloudConfig[moduleName] = append(slice, newContent...)
+	}
+
+	yamlBytes, err := yaml.Marshal(cloudConfig)
+	if err != nil {
+		return err
+	}
+
+	trimmed := bytes.TrimSpace(yamlBytes)
+
+	if !bytes.HasPrefix(trimmed, []byte("#cloud-config")) {
+		trimmed = append([]byte("#cloud-config\n"), trimmed...)
+	}
+
+	return osWriteFile(sc.userDataFile, trimmed, writeFilePermissions)
 }
