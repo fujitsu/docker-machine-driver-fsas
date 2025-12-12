@@ -1,16 +1,18 @@
 Changelog file generated automatically. Do not edit.
-Changelog generated at: 2025-10-28T12:36:32+00:00
+Changelog generated at: 2025-12-11T15:59:23+00:00
 # Changelog
 
-## [Unreleased](https://github.com/fujitsu/docker-machine-driver-fsas/tree/HEAD)
+## [v0.1.9](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.9) (2025-11-24)
 
-[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.7...HEAD)
+[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.8...v0.1.9)
 
 **Merged pull requests:**
 
-- Merged PR 1776: feature/handle\_sles\_registration [\#17](https://github.com/fujitsu/docker-machine-driver-fsas/pull/17) ([fujitsu-domzalskis](https://github.com/fujitsu-domzalskis))
-- Feature/set explicitly permisions in workflow files [\#16](https://github.com/fujitsu/docker-machine-driver-fsas/pull/16) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
-- add log extension to gitignore; [\#15](https://github.com/fujitsu/docker-machine-driver-fsas/pull/15) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
+- Deregister only registered SLES product [\#19](https://github.com/fujitsu/docker-machine-driver-fsas/pull/19) ([AnjriI](https://github.com/AnjriI))
+
+## [v0.1.8](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.8) (2025-10-29)
+
+[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.7...v0.1.8)
 
 ## [v0.1.7](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.7) (2025-10-07)
 
@@ -20,36 +22,17 @@ Changelog generated at: 2025-10-28T12:36:32+00:00
 
 [Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.5...v0.1.6-hotfix-cdi-746)
 
-**Merged pull requests:**
-
-- Merged PR 1612: Implementation of GPU node labels  [\#7](https://github.com/fujitsu/docker-machine-driver-fsas/pull/7) ([AnjriI](https://github.com/AnjriI))
-
 ## [v0.1.5](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.5) (2025-10-03)
 
 [Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.4...v0.1.5)
-
-**Merged pull requests:**
-
-- new workflows for testing, creating release and generating changelog … [\#6](https://github.com/fujitsu/docker-machine-driver-fsas/pull/6) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
 
 ## [v0.1.4](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.4) (2025-09-23)
 
 [Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.3-hotfix-cdi-802...v0.1.4)
 
-**Merged pull requests:**
-
-- handle situation when CDI status cannot be found in statuses assignment map; [\#5](https://github.com/fujitsu/docker-machine-driver-fsas/pull/5) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
-
 ## [v0.1.3-hotfix-cdi-802](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.3-hotfix-cdi-802) (2025-09-19)
 
 [Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.2-hotfix-cdi-817...v0.1.3-hotfix-cdi-802)
-
-**Merged pull requests:**
-
-- Merged PR 1451: Implement graceful shutdown using FM API [\#4](https://github.com/fujitsu/docker-machine-driver-fsas/pull/4) ([AnjriI](https://github.com/AnjriI))
-- Fix/cdi-527 [\#3](https://github.com/fujitsu/docker-machine-driver-fsas/pull/3) ([lukasz-piotrowski-fujitsu](https://github.com/lukasz-piotrowski-fujitsu))
-- Merged PR 1477: Applying singular of CLIENT\_SECRETS and relevant across codebase  [\#2](https://github.com/fujitsu/docker-machine-driver-fsas/pull/2) ([AnjriI](https://github.com/AnjriI))
-- Add pipeline into Github repository [\#1](https://github.com/fujitsu/docker-machine-driver-fsas/pull/1) ([fujitsu-domzalskis](https://github.com/fujitsu-domzalskis))
 
 ## [v0.1.2-hotfix-cdi-817](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.2-hotfix-cdi-817) (2025-09-04)
 
@@ -61,7 +44,7 @@ Changelog generated at: 2025-10-28T12:36:32+00:00
 
 ## [v0.1.0](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.0) (2025-09-01)
 
-[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/5f755625641ed1da2a127e80c54c38286efb4a7d...v0.1.0)
+[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/2be96e8ace1161aed15eb202341d78786306e639...v0.1.0)
 
 
 

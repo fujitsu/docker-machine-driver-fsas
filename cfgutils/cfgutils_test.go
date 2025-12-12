@@ -57,9 +57,9 @@ func Test_prepareRke2ConfigProviderId(t *testing.T) {
 		expected    string
 	}{
 		{machineUUID: "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
-			expected: `kubelet-arg+: "provider-id=fsas://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`},
+			expected: `kubelet-arg+: "provider-id=fsas-cdi://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`},
 		{machineUUID: "",
-			expected: `kubelet-arg+: "provider-id=fsas://"`},
+			expected: `kubelet-arg+: "provider-id=fsas-cdi://"`},
 	}
 
 	manager := NewStandardCfgManager("[]")
@@ -127,13 +127,13 @@ func TestPrepareRke2ConfigScript(t *testing.T) {
 	}{
 		{machineUUID: "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`)},
+				`kubelet-arg+: "provider-id=fsas-cdi://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`)},
 		{machineUUID: "1234",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas://1234"`)},
+				`kubelet-arg+: "provider-id=fsas-cdi://1234"`)},
 		{machineUUID: "",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas://"`)},
+				`kubelet-arg+: "provider-id=fsas-cdi://"`)},
 	}
 
 	manager := NewStandardCfgManager("[]")
@@ -164,7 +164,7 @@ func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
 	configName := "100-gpu-labels"
 	script := manager.PrepareRke2ConfigScript(configName, "my-machine-uuid")
 	expected := fmt.Sprintf(rke2ConfigScriptContent, configName,
-		`kubelet-arg+: "provider-id=fsas://my-machine-uuid"
+		`kubelet-arg+: "provider-id=fsas-cdi://my-machine-uuid"
 kubelet-arg+: "node-labels=cohdi.io/nvidia-a100-40g-size-min=1,cohdi.io/nvidia-a100-40g-size-max=2"`)
 	assert.Equal(t, expected, script)
 }

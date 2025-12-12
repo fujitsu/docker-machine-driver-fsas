@@ -83,7 +83,7 @@ done
 // prepareRke2ConfigProviderId Returns string with provider ID containing machine UUID
 func (sc *StandardCfgManager) prepareRke2ConfigProviderId(MachineUUID string) string {
 	slog.Debug("Prepare RKE2 Config Provider ID")
-	providerIdEntry := fmt.Sprintf(`kubelet-arg+: "provider-id=fsas://%s"`, MachineUUID)
+	providerIdEntry := fmt.Sprintf(`kubelet-arg+: "provider-id=fsas-cdi://%s"`, MachineUUID)
 	slog.Debug(providerIdEntry)
 	return providerIdEntry
 }
