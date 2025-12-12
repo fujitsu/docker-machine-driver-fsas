@@ -93,12 +93,12 @@ func (sc *StandardCfgManager) prepareRke2ConfigNodeLabelsForGpu() string {
 	slog.Debug("Prepare RKE2 Config Node Labels")
 	// GPU map (short names to full names)
 	allowedGPUs := map[string]string{
-		"nvidia-a100-40g": "nvidia-a100-40g",
-		"nvidia-a100-80g": "nvidia-a100-80g",
-		"nvidia-h100":     "nvidia-h100",
-		"a100-40g":        "nvidia-a100-40g",
-		"a100-80g":        "nvidia-a100-80g",
-		"h100":            "nvidia-h100",
+		"a100": "nvidia-a100",
+		"a40":  "nvidia-a40",
+		"a30":  "nvidia-a30",
+		"a2":   "nvidia-a2",
+		"L40":  "nvidia-l40",
+		"L40S": "nvidia-l40s",
 	}
 	labels := []string{}
 	for _, res := range sc.resources {

@@ -96,7 +96,7 @@ func Test_prepareRke2ConfigNodeLabels_Dynamic(t *testing.T) {
 			"res_num": 1,
 			"res_spec": {
 				"condition": [
-					{"column": "model", "operator": "eq", "value": "a100-40g"}
+					{"column": "model", "operator": "eq", "value": "a100"}
 				]
 			},
 			"min_resource_count": 1
@@ -106,7 +106,7 @@ func Test_prepareRke2ConfigNodeLabels_Dynamic(t *testing.T) {
 			"res_num": 1,
 			"res_spec": {
 				"condition": [
-					{"column": "model", "operator": "eq", "value": "nvidia-h100"}
+					{"column": "model", "operator": "eq", "value": "a100"}
 				]
 			},
 			"min_resource_count": 2,
@@ -115,7 +115,7 @@ func Test_prepareRke2ConfigNodeLabels_Dynamic(t *testing.T) {
 	]`
 	manager := NewStandardCfgManager(devicesSpecJson)
 	labelStr := manager.prepareRke2ConfigNodeLabelsForGpu()
-	expected := `kubelet-arg+: "node-labels=cohdi.io/nvidia-h100-size-min=2,cohdi.io/nvidia-h100-size-max=3"`
+	expected := `kubelet-arg+: "node-labels=cohdi.io/nvidia-a100-size-min=2,cohdi.io/nvidia-a100-size-max=3"`
 	assert.Equal(t, expected, labelStr)
 }
 
@@ -153,7 +153,7 @@ func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
 			"res_num": 1,
 			"res_spec": {
 				"condition": [
-					{"column": "model", "operator": "eq", "value": "a100-40g"}
+					{"column": "model", "operator": "eq", "value": "a40"}
 				]
 			},
 			"min_resource_count": 1,
@@ -165,7 +165,7 @@ func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
 	script := manager.PrepareRke2ConfigScript(configName, "my-machine-uuid")
 	expected := fmt.Sprintf(rke2ConfigScriptContent, configName,
 		`kubelet-arg+: "provider-id=fsas-cdi://my-machine-uuid"
-kubelet-arg+: "node-labels=cohdi.io/nvidia-a100-40g-size-min=1,cohdi.io/nvidia-a100-40g-size-max=2"`)
+kubelet-arg+: "node-labels=cohdi.io/nvidia-a40-size-min=1,cohdi.io/nvidia-a40-size-max=2"`)
 	assert.Equal(t, expected, script)
 }
 func Test_prepareRke2ConfigNodeLabels_FromExactJSON(t *testing.T) {
