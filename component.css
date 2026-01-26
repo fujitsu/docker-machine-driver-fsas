@@ -1,0 +1,5 @@
+/* Dummy CSS - satisfies Rancher auto-request */
+.custom-driver-form { padding: 20px; }
+.form-field { margin-bottom: 15px; }
+.form-field label { display: block; margin-bottom: 5px; }
+.form-field input { width: 100%; padding: 8px; border: 1px solid #ccc; }
