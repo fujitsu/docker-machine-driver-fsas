@@ -326,6 +326,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SSHUser = flags.String("fsas-ssh-user")
 	slog.Debug("Driver ", "ssh-user", d.SSHUser)
 
+	d.SSHPort = drivers.DefaultSSHPort
+	slog.Debug("Driver ", "ssh-port", d.SSHPort)
+
 	d.SSHPassword = flags.String("fsas-ssh-password")
 	slog.Debug("Driver ", "ssh-password", "<hidden-for-security-reasons>")
 
