@@ -67,7 +67,7 @@ write_files:
 
 	inputOneItemWriteFilesExe = []CloudConfigItem{
 		NewCloudConfigItemWriteFiles("/tmp/run.sh", "#!/bin/bash",
-			IsExecutable())}
+			SetExecutablePermission())}
 
 	inputTwoItemsWriteFiles = []CloudConfigItem{
 		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
@@ -102,6 +102,17 @@ write_files:
     content: H4sIAAAAAAAA/wAAAP//UlbUT8rM009KLM4ABAAA//9pWODrCwAAAA==
     encoding: "gzip+b64"
     permissions: "0744"`
+
+	expectedStr2WriteSetPermissions = `#cloud-config
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /tmp/cdi.cert
+    content: H4sIAAAAAAAA/wAAAP//UlZWTkpNz8xTSE4tKgEEAAD//wyPJqgNAAAA
+    encoding: "gzip+b64"
+    permissions: "0400"`
 
 	expectedStr3Write = `#cloud-config
 write_files:

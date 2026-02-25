@@ -17,10 +17,15 @@ type config struct {
 	permissions fs.FileMode
 }
 
-func IsExecutable() options {
+func SetCustomPermissions(permissions fs.FileMode) options {
 	return func(c *config) {
-		c.permissions = os.FileMode(0744)
+		c.permissions = permissions
 	}
+}
+
+func SetExecutablePermission() options {
+	return SetCustomPermissions(os.FileMode(0744))
+
 }
 
 type CloudConfigItem interface {

@@ -452,6 +452,10 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 func TestExtendUserdataWriteFiles(t *testing.T) {
 	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
 
+	inputOneItemWriteFilesSetPermissions := []CloudConfigItem{
+		NewCloudConfigItemWriteFiles("/tmp/cdi.cert", "###begin cert",
+			SetCustomPermissions(os.FileMode(0400)))}
+
 	testCases := []struct {
 		action          func()
 		name            string
@@ -534,6 +538,14 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
 			input:           inputOneItemWriteFilesExe,
 			expectedStr:     expectedStr2WriteExe,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 9: add one item to section 'write_files' with custom permissions ",
+			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
+			input:           inputOneItemWriteFilesSetPermissions,
+			expectedStr:     expectedStr2WriteSetPermissions,
 			nrExpectedItems: 2,
 			expectedError:   nil,
 		},
