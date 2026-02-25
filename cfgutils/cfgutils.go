@@ -238,5 +238,6 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 		}
 
 	}
-	return nil
+
+	return osWriteFile(sc.userDataFile, trimmed, os.FileMode(0644))
 }

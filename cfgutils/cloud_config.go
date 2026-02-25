@@ -5,10 +5,23 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"fmt"
+	"io/fs"
 	"os"
 )
 
-const writeFilePermissions = os.FileMode(0644)
+const defaultWriteFilePermissions = os.FileMode(0644)
+
+type options func(*config)
+type config struct {
+	encoding    string
+	permissions fs.FileMode
+}
+
+func IsExecutable() options {
+	return func(c *config) {
+		c.permissions = os.FileMode(0744)
+	}
+}
 
 type CloudConfigItem interface {
 	getModuleName() string
@@ -46,13 +59,22 @@ type cloudConfigItemWriteFiles struct {
 	path        string
 }
 
-func NewCloudConfigItemWriteFiles(path, content string) cloudConfigItemWriteFiles {
-	return cloudConfigItemWriteFiles{
-		encoding:    "gzip+b64",
-		content:     content,
-		permissions: fmt.Sprintf("%04o", writeFilePermissions),
+func NewCloudConfigItemWriteFiles(path, content string, opts ...options) cloudConfigItemWriteFiles {
 
-		path: path,
+	cfg := &config{
+		encoding:    "gzip+b64",
+		permissions: defaultWriteFilePermissions,
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	return cloudConfigItemWriteFiles{
+		encoding:    cfg.encoding,
+		content:     content,
+		permissions: fmt.Sprintf("%04o", cfg.permissions),
+		path:        path,
 	}
 }
 

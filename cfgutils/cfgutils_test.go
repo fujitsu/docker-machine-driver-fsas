@@ -529,6 +529,14 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			nrExpectedItems: 0,
 			expectedError:   expectedErrorWritingToFile,
 		},
+
+		{name: "case 8: add one item to section 'write_files' with executable attribute ",
+			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
+			input:           inputOneItemWriteFilesExe,
+			expectedStr:     expectedStr2WriteExe,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
 	}
 
 	var expected, observed map[string][]any
