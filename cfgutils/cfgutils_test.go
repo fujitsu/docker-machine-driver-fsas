@@ -2,7 +2,6 @@ package cfgutils
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -208,406 +207,23 @@ func Test_prepareRke2ConfigNodeLabels_FromExactJSON(t *testing.T) {
 	t.Logf("Generated GPU label: %s", labels)
 }
 
-var (
-	osStatErrorMessage = ""
-	osStatMock         = func(name string) (os.FileInfo, error) {
-		if osStatErrorMessage != "" {
-			if osStatErrorMessage == "no such file" {
-				return nil, &os.PathError{
-					Op:   "stat",
-					Path: name,
-					Err:  fs.ErrNotExist,
-				}
-			} else {
-				return nil, errors.New(osStatErrorMessage)
-			}
-		} else {
-			return nil, nil
-		}
-	}
-	mockOsReadFileContent  = []byte{}
-	osReadFileMock         = func(name string) ([]byte, error) { return mockOsReadFileContent, nil }
-	mockOsWriteFileContent = []byte{}
-	osWriteFileMock        = func(name string, data []byte, perm os.FileMode) error {
-		mockOsWriteFileContent = data
-		return nil
-	}
-)
-
-func resetOsMocks(userdataContent string) {
-	osStatErrorMessage = ""
-	osStatMock = func(name string) (os.FileInfo, error) {
-		if osStatErrorMessage != "" {
-			if osStatErrorMessage == "no such file" {
-				return nil, &os.PathError{
-					Op:   "stat",
-					Path: name,
-					Err:  fs.ErrNotExist,
-				}
-			} else {
-				return nil, errors.New(osStatErrorMessage)
-			}
-		} else {
-			return nil, nil
-		}
-	}
-	mockOsReadFileContent = []byte{}
-	osReadFileMock = func(name string) ([]byte, error) { return mockOsReadFileContent, nil }
-	mockOsWriteFileContent = []byte{}
-	osWriteFileMock = func(name string, data []byte, perm os.FileMode) error {
-		mockOsWriteFileContent = data
-		return nil
-	}
-
-	osStat = osStatMock
-	mockOsReadFileContent = []byte(userdataContent)
-	osReadFile = osReadFileMock
-	osWriteFile = osWriteFileMock
-
-}
-
-func TestExtendUserdataRunCmd(t *testing.T) {
-	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
-
-	testCases := []struct {
-		action          func()
-		name            string
-		input           []string
-		expectedStr     string
-		nrExpectedItems int
-		expectedError   error
-	}{
-		{name: "case 1: input as empty list",
-			action:          func() { resetOsMocks(userdataSampleContent) },
-			input:           []string{},
-			expectedStr:     userdataSampleContent,
-			nrExpectedItems: 1,
-			expectedError:   nil,
-		},
-
-		{name: "case 2: add one item to section 'runcmd'",
-			action:          func() { resetOsMocks(userdataSampleContent) },
-			input:           inputOneItemRunCmd,
-			expectedStr:     expectedStr2Cmd,
-			nrExpectedItems: 2,
-			expectedError:   nil,
-		},
-
-		{name: "case 3: add two items to section 'runcmd'",
-			action:          func() { resetOsMocks(userdataSampleContent) },
-			input:           inputTwoItemsRunCmd,
-			expectedStr:     expectedStr3Cmd,
-			nrExpectedItems: 3,
-			expectedError:   nil,
-		},
-
-		{name: "case 4: section 'runcmd' does not exist",
-			action: func() {
-				resetOsMocks(userdataSampleContentNoSections)
-			},
-			input:           inputOneItemRunCmd,
-			expectedStr:     expectedStr1Cmd,
-			nrExpectedItems: 1,
-			expectedError:   nil,
-		},
-
-		{name: "case 5: no usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContent)
-				osStatErrorMessage = "no such file"
-			},
-			input:           nil,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   fs.ErrNotExist,
-		},
-
-		{name: "case 6: error while reading from usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContent)
-				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, expectedErrorReadingFromFile }
-				osReadFile = osReadFileMock
-			},
-			input:           nil,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorReadingFromFile,
-		},
-
-		{name: "case 7: error while writing to usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContent)
-				osWriteFileMock = func(name string, data []byte, perm os.FileMode) error {
-					mockOsWriteFileContent = nil
-					return expectedErrorWritingToFile
-				}
-				osWriteFile = osWriteFileMock
-			},
-			input:           inputOneItemRunCmd,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorWritingToFile,
-		},
-	}
-
-	var expected, observed map[string][]any
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.action != nil {
-				tc.action()
-			}
-			err := sc.ExtendUserdataRunCmd(tc.input)
-
-			if tc.expectedError != nil {
-				if !errors.Is(err, tc.expectedError) {
-					t.Fatalf("expected: %v, but got: %v", tc.expectedError, err)
-				}
-			} else {
-
-				/* convert to YAML objects;
-				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail. Thus compare YAML semantically and not textually.
-				*/
-				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
-					t.Fatalf("failed to unmarshal expected: %v", err)
-				}
-
-				if err := yaml.Unmarshal(mockOsWriteFileContent, &observed); err != nil {
-					t.Fatalf("failed to unmarshal observed: %v", err)
-				}
-
-				assert.Equal(t, expected, observed)
-				assert.Equal(t, len(observed["runcmd"]), tc.nrExpectedItems)
-			}
-		})
-	}
-
-}
-
-func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
-	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
-
-	testCases := []struct {
-		action           func()
-		name             string
-		expectedErrorStr []string
-	}{
-		{name: "case 1: invalid yaml file - random ascii chars",
-			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRandomAscii) },
-			expectedErrorStr: []string{
-				"yaml: unmarshal errors",
-				"line 1: cannot unmarshal !!str",
-			},
-		},
-		{name: "case 2: invalid yaml file - runcmd is not list but integer",
-			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsInteger) },
-			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
-			},
-		},
-		{name: "case 3: invalid yaml file - runcmd is not list but string",
-			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsString) },
-			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
-			},
-		},
-		{name: "case 4: invalid yaml file - runcmd is not list but bool",
-			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsBool) },
-			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
-			},
-		},
-		{name: "case 5: invalid yaml file - runcmd is not list but map",
-			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsMap) },
-			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
-			},
-		},
-		{name: "case 6: invalid yaml file - runcmd is not list but nil",
-			action: func() { resetOsMocks(userdataSampleInvalidYamlContentRunCmdIsNil) },
-			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.action != nil {
-				tc.action()
-			}
-			err := sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles)
-
-			if err == nil {
-				t.Fatal("expected error but got nil")
-			} else {
-				for _, errMsg := range tc.expectedErrorStr {
-					assert.Contains(t, err.Error(), errMsg)
-				}
-			}
-		})
-	}
-}
-
-func TestExtendUserdataWriteFiles(t *testing.T) {
-	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
-
-	inputOneItemWriteFilesSetPermissions := []CloudConfigItem{
-		NewCloudConfigItemWriteFiles("/tmp/cdi.cert", "###begin cert",
-			SetCustomPermissions(os.FileMode(0400)))}
-
-	testCases := []struct {
-		action          func()
-		name            string
-		input           []CloudConfigItem
-		expectedStr     string
-		nrExpectedItems int
-		expectedError   error
-	}{
-		{name: "case 1: input as empty list",
-			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
-			input:           []CloudConfigItem{},
-			expectedStr:     userdataSampleContentWriteFiles,
-			nrExpectedItems: 1,
-			expectedError:   nil,
-		},
-
-		{name: "case 2: add one item to section 'write_files'",
-			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
-			input:           inputOneItemWriteFiles,
-			expectedStr:     expectedStr2Write,
-			nrExpectedItems: 2,
-			expectedError:   nil,
-		},
-
-		{name: "case 3: add two items to section 'write_files'",
-			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
-			input:           inputTwoItemsWriteFiles,
-			expectedStr:     expectedStr3Write,
-			nrExpectedItems: 3,
-			expectedError:   nil,
-		},
-
-		{name: "case 4: section 'write_files' does not exist",
-			action:          func() { resetOsMocks(userdataSampleContentNoSections) },
-			input:           inputOneItemWriteFiles,
-			expectedStr:     expectedStr1Write,
-			nrExpectedItems: 1,
-			expectedError:   nil,
-		},
-
-		{name: "case 5: no usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContentWriteFiles)
-				osStatErrorMessage = "no such file"
-			},
-			input:           nil,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   fs.ErrNotExist,
-		},
-
-		{name: "case 6: error while reading from usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContentWriteFiles)
-				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, expectedErrorReadingFromFile }
-				osReadFile = osReadFileMock
-			},
-			input:           nil,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorReadingFromFile,
-		},
-
-		{name: "case 7: error while writing to usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContentWriteFiles)
-				osWriteFileMock = func(name string, data []byte, perm os.FileMode) error {
-					mockOsWriteFileContent = nil
-					return expectedErrorWritingToFile
-				}
-				osWriteFile = osWriteFileMock
-			},
-			input:           inputOneItemWriteFiles,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorWritingToFile,
-		},
-
-		{name: "case 8: add one item to section 'write_files' with executable attribute ",
-			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
-			input:           inputOneItemWriteFilesExe,
-			expectedStr:     expectedStr2WriteExe,
-			nrExpectedItems: 2,
-			expectedError:   nil,
-		},
-
-		{name: "case 9: add one item to section 'write_files' with custom permissions ",
-			action:          func() { resetOsMocks(userdataSampleContentWriteFiles) },
-			input:           inputOneItemWriteFilesSetPermissions,
-			expectedStr:     expectedStr2WriteSetPermissions,
-			nrExpectedItems: 2,
-			expectedError:   nil,
-		},
-	}
-
-	var expected, observed map[string][]any
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.action != nil {
-				tc.action()
-			}
-			err := sc.ExtendUserdataWriteFiles(tc.input)
-
-			if tc.expectedError != nil {
-				if !errors.Is(err, tc.expectedError) {
-					t.Fatalf("expected: %v, but got: %v", tc.expectedError, err)
-				}
-			} else {
-
-				/* convert to YAML objects;
-				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail. Thus compare YAML semantically and not textually.
-				*/
-				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
-					t.Fatalf("failed to unmarshal expected: %v", err)
-				}
-
-				if err := yaml.Unmarshal(mockOsWriteFileContent, &observed); err != nil {
-					t.Fatalf("failed to unmarshal observed: %v", err)
-				}
-
-				assert.Equal(t, expected, observed)
-				assert.Equal(t, len(observed["write_files"]), tc.nrExpectedItems)
-			}
-		})
-	}
-
-}
-
 func TestExtendUserdata(t *testing.T) {
-	sc := NewStandardCfgManager("", "/tmp/userdata.yaml")
+	var writeFileContent = []byte{}
 
 	testCases := []struct {
 		action            func()
 		name              string
+		readFileContent   []byte
+		readFileErr       error
+		writeFileErr      error
 		input             []CloudConfigItem
 		expectedStr       string
 		nrExpectedItemsWF int
 		nrExpectedItemsRC int
 		expectedError     error
 	}{
-		{name: "case 1: input as empty list",
-			action:            func() { resetOsMocks(userdataSampleContentBothSections) },
-			input:             []CloudConfigItem{},
-			expectedStr:       userdataSampleContentBothSections,
-			nrExpectedItemsWF: 1,
-			nrExpectedItemsRC: 1,
-			expectedError:     nil,
-		},
-
-		{name: "case 2: add 1 item to section 'runcmd'",
-			action:            func() { resetOsMocks(userdataSampleContentBothSections) },
+		{name: "case 1: add 1 item to section 'runcmd'",
+			readFileContent:   []byte(userdataSampleContentBothSections),
 			input:             input1ItemRunCmdCast,
 			expectedStr:       expectedStr2Cmd1Write,
 			nrExpectedItemsRC: 2,
@@ -615,8 +231,8 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     nil,
 		},
 
-		{name: "case 3: add 1 item to section 'runcmd' and 1 item to 'write_files'",
-			action:            func() { resetOsMocks(userdataSampleContentBothSections) },
+		{name: "case 2: add 1 item to section 'runcmd' and 1 item to 'write_files'",
+			readFileContent:   []byte(userdataSampleContentBothSections),
 			input:             input1ItemRunCmdCast1ItemWriteFiles,
 			expectedStr:       expectedStr2Cmd2Write,
 			nrExpectedItemsRC: 2,
@@ -624,8 +240,8 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     nil,
 		},
 
-		{name: "case 4: add 2 items to section 'runcmd' and 2 items to 'write_files'",
-			action:            func() { resetOsMocks(userdataSampleContentBothSections) },
+		{name: "case 3: add 2 items to section 'runcmd' and 2 items to 'write_files'",
+			readFileContent:   []byte(userdataSampleContentBothSections),
 			input:             input2ItemsRunCmdCast2ItemsWriteFiles,
 			expectedStr:       expectedStr3Cmd3Write,
 			nrExpectedItemsRC: 3,
@@ -633,8 +249,8 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     nil,
 		},
 
-		{name: "case 5: no section 'runcmd' available section 'write_files' 1 item cmd, 1 item write",
-			action:            func() { resetOsMocks(userdataSampleContentCmdNoWriteYes) },
+		{name: "case 4: no section 'runcmd' available section 'write_files' 1 item cmd, 1 item write",
+			readFileContent:   []byte(userdataSampleContentCmdNoWriteYes),
 			input:             input1ItemRunCmdCast1ItemWriteFiles,
 			expectedStr:       expectedStr1Cmd2Write,
 			nrExpectedItemsRC: 1,
@@ -642,8 +258,8 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     nil,
 		},
 
-		{name: "case 6: no section 'write_files' available section 'runcmd' 1 item cmd, 1 item write",
-			action:            func() { resetOsMocks(userdataSampleContentCmdYesWriteNo) },
+		{name: "case 5: no section 'write_files' available section 'runcmd' 1 item cmd, 1 item write",
+			readFileContent:   []byte(userdataSampleContentCmdYesWriteNo),
 			input:             input1ItemRunCmdCast1ItemWriteFiles,
 			expectedStr:       expectedStr2Cmd1WriteBis,
 			nrExpectedItemsRC: 2,
@@ -651,8 +267,8 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     nil,
 		},
 
-		{name: "case 7: no section 'write_files' neither 'runcmd' 1 item cmd, 1 item write",
-			action:            func() { resetOsMocks(userdataSampleContentNoSections) },
+		{name: "case 6: no section 'write_files' neither 'runcmd' 1 item cmd, 1 item write",
+			readFileContent:   []byte(userdataSampleContentNoSections),
 			input:             input1ItemRunCmdCast1ItemWriteFiles,
 			expectedStr:       expectedStr1Cmd1Write,
 			nrExpectedItemsRC: 1,
@@ -660,11 +276,19 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     nil,
 		},
 
-		{name: "case 8: no usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContentNoSections)
-				osStatErrorMessage = "no such file"
-			},
+		{name: "case 7: input as empty list",
+			action:            func() { writeFileContent = []byte(userdataSampleContentBothSections) },
+			readFileContent:   []byte(userdataSampleContentBothSections),
+			input:             []CloudConfigItem{},
+			expectedStr:       userdataSampleContentBothSections,
+			nrExpectedItemsWF: 1,
+			nrExpectedItemsRC: 1,
+			expectedError:     nil,
+		},
+
+		{name: "case 8: no userdata file",
+			readFileContent:   []byte(userdataSampleContentNoSections),
+			readFileErr:       fs.ErrNotExist,
 			input:             nil,
 			expectedStr:       "",
 			nrExpectedItemsRC: 0,
@@ -672,12 +296,9 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     fs.ErrNotExist,
 		},
 
-		{name: "case 9: error while reading from usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContentNoSections)
-				osReadFileMock = func(name string) ([]byte, error) { return []byte{}, expectedErrorReadingFromFile }
-				osReadFile = osReadFileMock
-			},
+		{name: "case 9: error while reading from userdata file",
+			readFileContent:   []byte(userdataSampleContentNoSections),
+			readFileErr:       expectedErrorReadingFromFile,
 			input:             nil,
 			expectedStr:       "",
 			nrExpectedItemsRC: 0,
@@ -685,15 +306,9 @@ func TestExtendUserdata(t *testing.T) {
 			expectedError:     expectedErrorReadingFromFile,
 		},
 
-		{name: "case 10: error while writing to usedata file",
-			action: func() {
-				resetOsMocks(userdataSampleContentNoSections)
-				osWriteFileMock = func(name string, data []byte, perm os.FileMode) error {
-					mockOsWriteFileContent = nil
-					return expectedErrorWritingToFile
-				}
-				osWriteFile = osWriteFileMock
-			},
+		{name: "case 10: error while writing to userdata file",
+			readFileContent:   []byte(userdataSampleContentNoSections),
+			writeFileErr:      expectedErrorWritingToFile,
 			input:             input1ItemRunCmdCast1ItemWriteFiles,
 			expectedStr:       "",
 			nrExpectedItemsRC: 0,
@@ -709,29 +324,375 @@ func TestExtendUserdata(t *testing.T) {
 			if tc.action != nil {
 				tc.action()
 			}
+			sc := &StandardCfgManager{resources: nil,
+				userDataFile: "/tmp/userdata.yaml",
+				readFile: func(string) ([]byte, error) {
+					return []byte(tc.readFileContent), tc.readFileErr
+				},
+				writeFile: func(_ string, data []byte, _ os.FileMode) error {
+					writeFileContent = data
+					return tc.writeFileErr
+				},
+			}
+
 			err := sc.extendUserdata(tc.input)
 
 			if tc.expectedError != nil {
-				if !errors.Is(err, tc.expectedError) {
-					t.Fatalf("expected: %v, but got: %v", tc.expectedError, err)
-				}
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
 			} else {
 
 				/* convert to YAML objects;
-				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail. Thus compare YAML semantically and not textually.
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
 				*/
 				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
 					t.Fatalf("failed to unmarshal expected: %v", err)
 				}
 
-				if err := yaml.Unmarshal(mockOsWriteFileContent, &observed); err != nil {
+				if err := yaml.Unmarshal(writeFileContent, &observed); err != nil {
 					t.Fatalf("failed to unmarshal observed: %v", err)
 				}
 
 				assert.Equal(t, expected, observed)
-				assert.Equal(t, len(observed["runcmd"]), tc.nrExpectedItemsRC)
-				assert.Equal(t, len(observed["write_files"]), tc.nrExpectedItemsWF)
+				assert.Equal(t, tc.nrExpectedItemsRC, len(observed["runcmd"]))
+				assert.Equal(t, tc.nrExpectedItemsWF, len(observed["write_files"]))
 			}
+
+		})
+	}
+
+}
+
+func TestExtendUserdataRunCmd(t *testing.T) {
+	var writeFileContent = []byte{}
+
+	testCases := []struct {
+		action          func()
+		name            string
+		readFileContent []byte
+		readFileErr     error
+		writeFileErr    error
+		input           []string
+		expectedStr     string
+		nrExpectedItems int
+		expectedError   error
+	}{
+		{name: "case 1: add one item to section 'runcmd'",
+			readFileContent: []byte(userdataSampleContent),
+			input:           inputOneItemRunCmd,
+			expectedStr:     expectedStr2Cmd,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 2: add two items to section 'runcmd'",
+			readFileContent: []byte(userdataSampleContent),
+			input:           inputTwoItemsRunCmd,
+			expectedStr:     expectedStr3Cmd,
+			nrExpectedItems: 3,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: section 'runcmd' does not exist",
+			readFileContent: []byte(userdataSampleContentNoSections),
+			input:           inputOneItemRunCmd,
+			expectedStr:     expectedStr1Cmd,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 4: no content in userdata file",
+			readFileContent: []byte{},
+			input:           inputOneItemRunCmd,
+			expectedStr:     expectedStr1Cmd,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 5: error while reading from userdata file",
+			readFileContent: []byte{},
+			readFileErr:     expectedErrorReadingFromFile,
+			input:           nil,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorReadingFromFile,
+		},
+
+		{name: "case 6: error while writing to userdata file",
+			readFileContent: []byte{},
+			writeFileErr:    expectedErrorWritingToFile,
+			input:           inputOneItemRunCmd,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorWritingToFile,
+		},
+
+		{name: "case 7: input as empty list",
+			action:          func() { writeFileContent = []byte(userdataSampleContentBothSections) },
+			readFileContent: []byte(userdataSampleContent),
+			input:           nil,
+			expectedStr:     userdataSampleContent,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+	}
+
+	var expected, observed map[string][]any
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.action != nil {
+				tc.action()
+			}
+			sc := &StandardCfgManager{resources: nil,
+				userDataFile: "/tmp/userdata.yaml",
+				readFile: func(string) ([]byte, error) {
+					return []byte(tc.readFileContent), tc.readFileErr
+				},
+				writeFile: func(_ string, data []byte, _ os.FileMode) error {
+					writeFileContent = data
+					return tc.writeFileErr
+				},
+			}
+
+			err := sc.ExtendUserdataRunCmd(tc.input)
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				if err := yaml.Unmarshal(writeFileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+				assert.Equal(t, tc.nrExpectedItems, len(observed["runcmd"]))
+			}
+
+		})
+	}
+}
+
+func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
+
+	testCases := []struct {
+		name             string
+		readFileContent  []byte
+		expectedErrorStr []string
+	}{
+		{name: "case 1: invalid yaml file - random ascii chars",
+			readFileContent: []byte(userdataSampleInvalidYamlContentRandomAscii),
+			expectedErrorStr: []string{
+				"yaml: unmarshal errors",
+				"line 1: cannot unmarshal !!str",
+			},
+		},
+		{name: "case 2: invalid yaml file - runcmd is not list but integer",
+			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsInteger),
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 3: invalid yaml file - runcmd is not list but string",
+			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsString),
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 4: invalid yaml file - runcmd is not list but bool",
+			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsBool),
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 5: invalid yaml file - runcmd is not list but map",
+			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsMap),
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+		{name: "case 6: invalid yaml file - runcmd is not list but nil",
+			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsNil),
+			expectedErrorStr: []string{
+				"module runcmd exists but is not a list",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+
+		t.Run(tc.name, func(t *testing.T) {
+			sc := &StandardCfgManager{resources: nil,
+				userDataFile: "/tmp/userdata.yaml",
+				readFile: func(string) ([]byte, error) {
+					return []byte(tc.readFileContent), nil
+				},
+				writeFile: func(_ string, data []byte, _ os.FileMode) error {
+					return nil
+				},
+			}
+
+			err := sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles)
+
+			if err == nil {
+				t.Fatal("expected error but got nil")
+			} else {
+				for _, errMsg := range tc.expectedErrorStr {
+					assert.Contains(t, err.Error(), errMsg)
+				}
+			}
+
+		})
+	}
+}
+
+func TestExtendUserdataWriteFiles(t *testing.T) {
+	var writeFileContent = []byte{}
+
+	inputOneItemWriteFilesSetPermissions := []CloudConfigItem{
+		NewCloudConfigItemWriteFiles("/tmp/cdi.cert", "###begin cert",
+			SetCustomPermissions(os.FileMode(0400)))}
+
+	testCases := []struct {
+		action          func()
+		name            string
+		readFileContent []byte
+		readFileErr     error
+		writeFileErr    error
+		input           []CloudConfigItem
+		expectedStr     string
+		nrExpectedItems int
+		expectedError   error
+	}{
+
+		{name: "case 2: add one item to section 'write_files'",
+			readFileContent: []byte(userdataSampleContentWriteFiles),
+			input:           inputOneItemWriteFiles,
+			expectedStr:     expectedStr2Write,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: add two items to section 'write_files'",
+			readFileContent: []byte(userdataSampleContentWriteFiles),
+			input:           inputTwoItemsWriteFiles,
+			expectedStr:     expectedStr3Write,
+			nrExpectedItems: 3,
+			expectedError:   nil,
+		},
+
+		{name: "case 4: section 'write_files' does not exist",
+			readFileContent: []byte(userdataSampleContentNoSections),
+			input:           inputOneItemWriteFiles,
+			expectedStr:     expectedStr1Write,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 5: input as empty list",
+			action:          func() { writeFileContent = []byte(userdataSampleContentWriteFiles) },
+			readFileContent: []byte(userdataSampleContentWriteFiles),
+			input:           []CloudConfigItem{},
+			expectedStr:     userdataSampleContentWriteFiles,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 6: no userdata file",
+			readFileContent: []byte{},
+			readFileErr:     fs.ErrNotExist,
+			input:           nil,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   fs.ErrNotExist,
+		},
+
+		{name: "case 7: error while reading from userdata file",
+			readFileContent: []byte{},
+			readFileErr:     expectedErrorReadingFromFile,
+			input:           nil,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorReadingFromFile,
+		},
+
+		{name: "case 8: error while writing to userdata file",
+			readFileContent: []byte{},
+			writeFileErr:    expectedErrorWritingToFile,
+			input:           inputOneItemWriteFiles,
+			expectedStr:     "",
+			nrExpectedItems: 0,
+			expectedError:   expectedErrorWritingToFile,
+		},
+
+		{name: "case 9: add one item to section 'write_files' with executable attribute ",
+			readFileContent: []byte(userdataSampleContentWriteFiles),
+			input:           inputOneItemWriteFilesExe,
+			expectedStr:     expectedStr2WriteExe,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 10: add one item to section 'write_files' with custom permissions ",
+			readFileContent: []byte(userdataSampleContentWriteFiles),
+			input:           inputOneItemWriteFilesSetPermissions,
+			expectedStr:     expectedStr2WriteSetPermissions,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+	}
+
+	var expected, observed map[string][]any
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.action != nil {
+				tc.action()
+			}
+			sc := &StandardCfgManager{resources: nil,
+				userDataFile: "/tmp/userdata.yaml",
+				readFile: func(string) ([]byte, error) {
+					return []byte(tc.readFileContent), tc.readFileErr
+				},
+				writeFile: func(_ string, data []byte, _ os.FileMode) error {
+					writeFileContent = data
+					return tc.writeFileErr
+				},
+			}
+
+			err := sc.ExtendUserdataWriteFiles(tc.input)
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				if err := yaml.Unmarshal(writeFileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+				assert.Equal(t, tc.nrExpectedItems, len(observed["write_files"]))
+			}
+
 		})
 	}
 

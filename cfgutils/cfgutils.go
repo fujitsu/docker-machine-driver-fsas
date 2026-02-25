@@ -3,8 +3,9 @@ package cfgutils
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -15,14 +16,7 @@ import (
 )
 
 var (
-	isInit      = false
-	osWriteFile = os.WriteFile
-	osReadFile  = os.ReadFile
-	osStat      = os.Stat
-	isInit      = false
-	osWriteFile = os.WriteFile
-	osReadFile  = os.ReadFile
-	osStat      = os.Stat
+	isInit = false
 )
 
 // CfgManager interface defines the methods for interacting with the Configuration Manager.
@@ -40,8 +34,8 @@ type CfgManager interface {
 type StandardCfgManager struct {
 	resources    []models.Resource
 	userDataFile string
-	resources    []models.Resource
-	userDataFile string
+	readFile     func(string) ([]byte, error)
+	writeFile    func(string, []byte, os.FileMode) error
 }
 
 var _ CfgManager = (*StandardCfgManager)(nil)
@@ -57,8 +51,8 @@ func NewStandardCfgManager(devicesSpecJson, userDataFile string) *StandardCfgMan
 
 
 	isInit = true
-	return &StandardCfgManager{resources: resources, userDataFile: userDataFile}
-	return &StandardCfgManager{resources: resources, userDataFile: userDataFile}
+	return &StandardCfgManager{resources: resources, userDataFile: userDataFile,
+		readFile: os.ReadFile, writeFile: os.WriteFile}
 }
 
 // IsInit Returns true if constructor succeed else false
@@ -193,23 +187,26 @@ func (sc *StandardCfgManager) ExtendUserdataWriteFiles(fileObjects []CloudConfig
 // extendUserdata Extends cloud config userdata file
 func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 
-	userDataFile := sc.userDataFile
-	if userDataFile != "" {
-		if _, err := osStat(userDataFile); os.IsNotExist(err) {
-			slog.Error("User data file does not exist: ", "path", userDataFile, "err", err)
-			return err
+	userdata, err := sc.readFile(sc.userDataFile)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			slog.Error("User data file does not exist", "path", sc.userDataFile, "err", err)
+		} else {
+			slog.Error("User data cannot be read", "path", sc.userDataFile, "err", err)
 		}
+		return err
+	}
 
-		var userdata []byte
-		userdata, err := osReadFile(userDataFile)
-		if err != nil {
-			return err
-		}
+	if len(cci) == 0 {
+		slog.Warn("No items were passed for extending user data")
+		return nil
+	}
 
-		cloudConfig := make(map[any]any)
-		if err = yaml.Unmarshal(userdata, &cloudConfig); err != nil {
-			return err
-		}
+	cloudConfig := make(map[string]interface{})
+	if err := yaml.Unmarshal(userdata, &cloudConfig); err != nil {
+		slog.Error("Failed to parse user data as YAML:", "path", sc.userDataFile, "err", err)
+		return err
+	}
 
 		for _, i := range cci {
 			newContent, err := i.addToCloudConfigFile()
@@ -237,7 +234,15 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 			return err
 		}
 
+	trimmed := bytes.TrimSpace(yamlBytes)
+
+	if !bytes.HasPrefix(trimmed, []byte("#cloud-config")) {
+		trimmed = append([]byte("#cloud-config\n"), trimmed...)
 	}
 
-	return osWriteFile(sc.userDataFile, trimmed, os.FileMode(0644))
+	if err := sc.writeFile(sc.userDataFile, trimmed, os.FileMode(0644)); err != nil {
+		slog.Error("Failed to write userdata file", "path", sc.userDataFile, "err", err)
+		return err
+	}
+	return nil
 }
