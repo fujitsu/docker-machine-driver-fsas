@@ -547,6 +547,10 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 func TestExtendUserdataWriteFiles(t *testing.T) {
 	var writeFileContent = []byte{}
 
+	inputOneItemWriteFilesExe := []CloudConfigItem{
+		NewCloudConfigItemWriteFiles("/tmp/run.sh", "#!/bin/bash",
+			SetCustomPermissions(os.FileMode(0744)))}
+
 	inputOneItemWriteFilesSetPermissions := []CloudConfigItem{
 		NewCloudConfigItemWriteFiles("/tmp/cdi.cert", "###begin cert",
 			SetCustomPermissions(os.FileMode(0400)))}

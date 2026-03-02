@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-const defaultWriteFilePermissions = os.FileMode(0644)
+const defaultFilePermissions = os.FileMode(0644)
 
 type options func(*config)
 type config struct {
@@ -21,11 +21,6 @@ func SetCustomPermissions(permissions fs.FileMode) options {
 	return func(c *config) {
 		c.permissions = permissions
 	}
-}
-
-func SetExecutablePermission() options {
-	return SetCustomPermissions(os.FileMode(0744))
-
 }
 
 type CloudConfigItem interface {
@@ -68,7 +63,7 @@ func NewCloudConfigItemWriteFiles(path, content string, opts ...options) cloudCo
 
 	cfg := &config{
 		encoding:    "gzip+b64",
-		permissions: defaultWriteFilePermissions,
+		permissions: defaultFilePermissions,
 	}
 
 	for _, opt := range opts {

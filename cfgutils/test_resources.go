@@ -65,10 +65,6 @@ write_files:
 	inputOneItemWriteFiles = []CloudConfigItem{
 		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files")}
 
-	inputOneItemWriteFilesExe = []CloudConfigItem{
-		NewCloudConfigItemWriteFiles("/tmp/run.sh", "#!/bin/bash",
-			SetExecutablePermission())}
-
 	inputTwoItemsWriteFiles = []CloudConfigItem{
 		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
 		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files-2.log", "Cloud config succeeded for write_files part 2"),
