@@ -20,7 +20,6 @@ func TestIsInit_Fail(t *testing.T) {
 
 func TestIsInit_Success(t *testing.T) {
 	manager := NewStandardCfgManager("[]", "")
-	manager := NewStandardCfgManager("[]", "")
 	observed := manager.IsInit()
 	assert.Equal(t, true, observed)
 }
@@ -49,7 +48,6 @@ hostname: `,
 	for _, tc := range testCases {
 		t.Run(tc.hostname, func(t *testing.T) {
 			manager := NewStandardCfgManager("[]", "")
-			manager := NewStandardCfgManager("[]", "")
 			observed := manager.PrepareMetadata(tc.instanceId, tc.hostname)
 			assert.Equal(t, tc.expected, observed)
 		})
@@ -68,7 +66,6 @@ func Test_prepareRke2ConfigProviderId(t *testing.T) {
 	}
 
 	manager := NewStandardCfgManager("[]", "")
-	manager := NewStandardCfgManager("[]", "")
 
 	for _, tc := range testCases {
 		t.Run(tc.machineUUID, func(t *testing.T) {
@@ -86,8 +83,6 @@ func Test_prepareRke2ConfigNodeLabelsForGpu(t *testing.T) {
 		{name: "no GPU resources",
 			expected: ""},
 	}
-
-	manager := NewStandardCfgManager("[]", "")
 
 	manager := NewStandardCfgManager("[]", "")
 
@@ -126,8 +121,6 @@ func Test_prepareRke2ConfigNodeLabels_Dynamic(t *testing.T) {
 
 	manager := NewStandardCfgManager(devicesSpecJson, "")
 
-	manager := NewStandardCfgManager(devicesSpecJson, "")
-
 	labelStr := manager.prepareRke2ConfigNodeLabelsForGpu()
 	expected := `kubelet-arg+: "node-labels=cohdi.io/nvidia-l40s-size-min=2,cohdi.io/nvidia-l40s-size-max=3"`
 	assert.Equal(t, expected, labelStr)
@@ -141,19 +134,18 @@ func TestPrepareRke2ConfigScript(t *testing.T) {
 	}{
 		{machineUUID: "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`),
+				`kubelet-arg+: "provider-id=fsas-cdi://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`),
 		},
 		{machineUUID: "1234",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas://1234"`),
+				`kubelet-arg+: "provider-id=fsas-cdi://1234"`),
 		},
 		{machineUUID: "",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas://"`),
+				`kubelet-arg+: "provider-id=fsas-cdi://"`),
 		},
 	}
 
-	manager := NewStandardCfgManager("[]", "")
 	manager := NewStandardCfgManager("[]", "")
 
 	for _, tc := range testCases {
@@ -180,8 +172,6 @@ func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
 	]`
 	manager := NewStandardCfgManager(devicesSpecJson, "")
 
-	manager := NewStandardCfgManager(devicesSpecJson, "")
-
 	configName := "100-gpu-labels"
 	script := manager.PrepareRke2ConfigScript(configName, "my-machine-uuid")
 
@@ -198,8 +188,6 @@ func Test_prepareRke2ConfigNodeLabels_FromExactJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(devicesSpecJson), &resources); err != nil {
 		t.Logf("Failed to unmarshal JSON: %v", err)
 	}
-
-	manager := NewStandardCfgManager(devicesSpecJson, "")
 
 	manager := NewStandardCfgManager(devicesSpecJson, "")
 
