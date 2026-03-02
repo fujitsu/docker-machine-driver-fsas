@@ -9,6 +9,7 @@ import (
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -196,14 +197,9 @@ func Test_prepareRke2ConfigNodeLabels_FromExactJSON(t *testing.T) {
 }
 
 func TestExtendUserdata(t *testing.T) {
-	var writeFileContent = []byte{}
-
 	testCases := []struct {
-		action            func()
 		name              string
 		readFileContent   []byte
-		readFileErr       error
-		writeFileErr      error
 		input             []CloudConfigItem
 		expectedStr       string
 		nrExpectedItemsWF int
@@ -265,7 +261,6 @@ func TestExtendUserdata(t *testing.T) {
 		},
 
 		{name: "case 7: input as empty list",
-			action:            func() { writeFileContent = []byte(userdataSampleContentBothSections) },
 			readFileContent:   []byte(userdataSampleContentBothSections),
 			input:             []CloudConfigItem{},
 			expectedStr:       userdataSampleContentBothSections,
@@ -273,57 +268,26 @@ func TestExtendUserdata(t *testing.T) {
 			nrExpectedItemsRC: 1,
 			expectedError:     nil,
 		},
-
-		{name: "case 8: no userdata file",
-			readFileContent:   []byte(userdataSampleContentNoSections),
-			readFileErr:       fs.ErrNotExist,
-			input:             nil,
-			expectedStr:       "",
-			nrExpectedItemsRC: 0,
-			nrExpectedItemsWF: 0,
-			expectedError:     fs.ErrNotExist,
-		},
-
-		{name: "case 9: error while reading from userdata file",
-			readFileContent:   []byte(userdataSampleContentNoSections),
-			readFileErr:       expectedErrorReadingFromFile,
-			input:             nil,
-			expectedStr:       "",
-			nrExpectedItemsRC: 0,
-			nrExpectedItemsWF: 0,
-			expectedError:     expectedErrorReadingFromFile,
-		},
-
-		{name: "case 10: error while writing to userdata file",
-			readFileContent:   []byte(userdataSampleContentNoSections),
-			writeFileErr:      expectedErrorWritingToFile,
-			input:             input1ItemRunCmdCast1ItemWriteFiles,
-			expectedStr:       "",
-			nrExpectedItemsRC: 0,
-			nrExpectedItemsWF: 0,
-			expectedError:     expectedErrorWritingToFile,
-		},
 	}
 
 	var expected, observed map[string][]any
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.action != nil {
-				tc.action()
-			}
-			sc := &StandardCfgManager{resources: nil,
-				userDataFile: "/tmp/userdata.yaml",
-				readFile: func(string) ([]byte, error) {
-					return []byte(tc.readFileContent), tc.readFileErr
-				},
-				writeFile: func(_ string, data []byte, _ os.FileMode) error {
-					writeFileContent = data
-					return tc.writeFileErr
-				},
+
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
 			}
 
-			err := sc.extendUserdata(tc.input)
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+			err = sc.extendUserdata(tc.input)
 
 			if tc.expectedError != nil {
 				assert.ErrorIs(t, err, tc.expectedError,
@@ -338,7 +302,9 @@ func TestExtendUserdata(t *testing.T) {
 					t.Fatalf("failed to unmarshal expected: %v", err)
 				}
 
-				if err := yaml.Unmarshal(writeFileContent, &observed); err != nil {
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
 					t.Fatalf("failed to unmarshal observed: %v", err)
 				}
 
@@ -353,14 +319,9 @@ func TestExtendUserdata(t *testing.T) {
 }
 
 func TestExtendUserdataRunCmd(t *testing.T) {
-	var writeFileContent = []byte{}
-
 	testCases := []struct {
-		action          func()
 		name            string
 		readFileContent []byte
-		readFileErr     error
-		writeFileErr    error
 		input           []string
 		expectedStr     string
 		nrExpectedItems int
@@ -398,26 +359,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 			expectedError:   nil,
 		},
 
-		{name: "case 5: error while reading from userdata file",
-			readFileContent: []byte{},
-			readFileErr:     expectedErrorReadingFromFile,
-			input:           nil,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorReadingFromFile,
-		},
-
-		{name: "case 6: error while writing to userdata file",
-			readFileContent: []byte{},
-			writeFileErr:    expectedErrorWritingToFile,
-			input:           inputOneItemRunCmd,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorWritingToFile,
-		},
-
 		{name: "case 7: input as empty list",
-			action:          func() { writeFileContent = []byte(userdataSampleContentBothSections) },
 			readFileContent: []byte(userdataSampleContent),
 			input:           nil,
 			expectedStr:     userdataSampleContent,
@@ -430,21 +372,20 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.action != nil {
-				tc.action()
-			}
-			sc := &StandardCfgManager{resources: nil,
-				userDataFile: "/tmp/userdata.yaml",
-				readFile: func(string) ([]byte, error) {
-					return []byte(tc.readFileContent), tc.readFileErr
-				},
-				writeFile: func(_ string, data []byte, _ os.FileMode) error {
-					writeFileContent = data
-					return tc.writeFileErr
-				},
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
 			}
 
-			err := sc.ExtendUserdataRunCmd(tc.input)
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+
+			err = sc.ExtendUserdataRunCmd(tc.input)
 
 			if tc.expectedError != nil {
 				assert.ErrorIs(t, err, tc.expectedError,
@@ -459,7 +400,9 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 					t.Fatalf("failed to unmarshal expected: %v", err)
 				}
 
-				if err := yaml.Unmarshal(writeFileContent, &observed); err != nil {
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
 					t.Fatalf("failed to unmarshal observed: %v", err)
 				}
 
@@ -520,17 +463,19 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 	for _, tc := range testCases {
 
 		t.Run(tc.name, func(t *testing.T) {
-			sc := &StandardCfgManager{resources: nil,
-				userDataFile: "/tmp/userdata.yaml",
-				readFile: func(string) ([]byte, error) {
-					return []byte(tc.readFileContent), nil
-				},
-				writeFile: func(_ string, data []byte, _ os.FileMode) error {
-					return nil
-				},
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
 			}
 
-			err := sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles)
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+			err = sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles)
 
 			if err == nil {
 				t.Fatal("expected error but got nil")
@@ -545,7 +490,6 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 }
 
 func TestExtendUserdataWriteFiles(t *testing.T) {
-	var writeFileContent = []byte{}
 
 	inputOneItemWriteFilesExe := []CloudConfigItem{
 		NewCloudConfigItemWriteFiles("/tmp/run.sh", "#!/bin/bash",
@@ -556,18 +500,15 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			SetCustomPermissions(os.FileMode(0400)))}
 
 	testCases := []struct {
-		action          func()
 		name            string
 		readFileContent []byte
-		readFileErr     error
-		writeFileErr    error
 		input           []CloudConfigItem
 		expectedStr     string
 		nrExpectedItems int
 		expectedError   error
 	}{
 
-		{name: "case 2: add one item to section 'write_files'",
+		{name: "case 1: add one item to section 'write_files'",
 			readFileContent: []byte(userdataSampleContentWriteFiles),
 			input:           inputOneItemWriteFiles,
 			expectedStr:     expectedStr2Write,
@@ -575,7 +516,7 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			expectedError:   nil,
 		},
 
-		{name: "case 3: add two items to section 'write_files'",
+		{name: "case 2: add two items to section 'write_files'",
 			readFileContent: []byte(userdataSampleContentWriteFiles),
 			input:           inputTwoItemsWriteFiles,
 			expectedStr:     expectedStr3Write,
@@ -583,7 +524,7 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			expectedError:   nil,
 		},
 
-		{name: "case 4: section 'write_files' does not exist",
+		{name: "case 3: section 'write_files' does not exist",
 			readFileContent: []byte(userdataSampleContentNoSections),
 			input:           inputOneItemWriteFiles,
 			expectedStr:     expectedStr1Write,
@@ -591,8 +532,7 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			expectedError:   nil,
 		},
 
-		{name: "case 5: input as empty list",
-			action:          func() { writeFileContent = []byte(userdataSampleContentWriteFiles) },
+		{name: "case 4: input as empty list",
 			readFileContent: []byte(userdataSampleContentWriteFiles),
 			input:           []CloudConfigItem{},
 			expectedStr:     userdataSampleContentWriteFiles,
@@ -600,34 +540,7 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			expectedError:   nil,
 		},
 
-		{name: "case 6: no userdata file",
-			readFileContent: []byte{},
-			readFileErr:     fs.ErrNotExist,
-			input:           nil,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   fs.ErrNotExist,
-		},
-
-		{name: "case 7: error while reading from userdata file",
-			readFileContent: []byte{},
-			readFileErr:     expectedErrorReadingFromFile,
-			input:           nil,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorReadingFromFile,
-		},
-
-		{name: "case 8: error while writing to userdata file",
-			readFileContent: []byte{},
-			writeFileErr:    expectedErrorWritingToFile,
-			input:           inputOneItemWriteFiles,
-			expectedStr:     "",
-			nrExpectedItems: 0,
-			expectedError:   expectedErrorWritingToFile,
-		},
-
-		{name: "case 9: add one item to section 'write_files' with executable attribute ",
+		{name: "case 5: add one item to section 'write_files' with executable attribute ",
 			readFileContent: []byte(userdataSampleContentWriteFiles),
 			input:           inputOneItemWriteFilesExe,
 			expectedStr:     expectedStr2WriteExe,
@@ -635,7 +548,7 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			expectedError:   nil,
 		},
 
-		{name: "case 10: add one item to section 'write_files' with custom permissions ",
+		{name: "case 6: add one item to section 'write_files' with custom permissions ",
 			readFileContent: []byte(userdataSampleContentWriteFiles),
 			input:           inputOneItemWriteFilesSetPermissions,
 			expectedStr:     expectedStr2WriteSetPermissions,
@@ -648,21 +561,20 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.action != nil {
-				tc.action()
-			}
-			sc := &StandardCfgManager{resources: nil,
-				userDataFile: "/tmp/userdata.yaml",
-				readFile: func(string) ([]byte, error) {
-					return []byte(tc.readFileContent), tc.readFileErr
-				},
-				writeFile: func(_ string, data []byte, _ os.FileMode) error {
-					writeFileContent = data
-					return tc.writeFileErr
-				},
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
 			}
 
-			err := sc.ExtendUserdataWriteFiles(tc.input)
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+
+			err = sc.ExtendUserdataWriteFiles(tc.input)
 
 			if tc.expectedError != nil {
 				assert.ErrorIs(t, err, tc.expectedError,
@@ -677,7 +589,9 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 					t.Fatalf("failed to unmarshal expected: %v", err)
 				}
 
-				if err := yaml.Unmarshal(writeFileContent, &observed); err != nil {
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
 					t.Fatalf("failed to unmarshal observed: %v", err)
 				}
 
@@ -685,6 +599,50 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 				assert.Equal(t, tc.nrExpectedItems, len(observed["write_files"]))
 			}
 
+		})
+	}
+
+}
+
+func Test_userdataFile_not_exists(t *testing.T) {
+
+	testCases := []struct {
+		name           string
+		testedFunction func() error
+	}{
+
+		{name: "case 1: method 'extendUserdata'",
+			testedFunction: func() error {
+				sc := NewStandardCfgManager("[]", "some-non-existing-file")
+				err := sc.extendUserdata([]CloudConfigItem{})
+				return err
+			},
+		},
+		{name: "case 2: method 'ExtendUserdataWriteFiles'",
+			testedFunction: func() error {
+				sc := NewStandardCfgManager("[]", "some-non-existing-file")
+				err := sc.ExtendUserdataWriteFiles([]CloudConfigItem{})
+				return err
+			},
+		},
+		{name: "case 3: method 'ExtendUserdataRunCmd'",
+			testedFunction: func() error {
+				sc := NewStandardCfgManager("[]", "some-non-existing-file")
+				err := sc.ExtendUserdataRunCmd([]string{})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.testedFunction()
+			if err == nil {
+				t.Fatal("expected error bot got nil")
+			} else {
+				assert.ErrorIs(t, err, fs.ErrNotExist,
+					fmt.Sprintf("expected: %v, but got: %v", fs.ErrNotExist, err))
+			}
 		})
 	}
 

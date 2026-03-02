@@ -31,8 +31,6 @@ type CfgManager interface {
 type StandardCfgManager struct {
 	resources    []models.Resource
 	userDataFile string
-	readFile     func(string) ([]byte, error)
-	writeFile    func(string, []byte, os.FileMode) error
 }
 
 var _ CfgManager = (*StandardCfgManager)(nil)
@@ -46,8 +44,7 @@ func NewStandardCfgManager(devicesSpecJson, userDataFile string) *StandardCfgMan
 	}
 
 	isInit = true
-	return &StandardCfgManager{resources: resources, userDataFile: userDataFile,
-		readFile: os.ReadFile, writeFile: os.WriteFile}
+	return &StandardCfgManager{resources: resources, userDataFile: userDataFile}
 }
 
 // IsInit Returns true if constructor succeed else false
@@ -171,7 +168,7 @@ func (sc *StandardCfgManager) ExtendUserdataWriteFiles(fileObjects []CloudConfig
 // extendUserdata Extends cloud config userdata file
 func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 
-	userdata, err := sc.readFile(sc.userDataFile)
+	userdata, err := os.ReadFile(sc.userDataFile)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			slog.Error("User data file does not exist", "path", sc.userDataFile, "err", err)
@@ -225,7 +222,7 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 		trimmed = append([]byte("#cloud-config\n"), trimmed...)
 	}
 
-	if err := sc.writeFile(sc.userDataFile, trimmed, os.FileMode(0644)); err != nil {
+	if err := os.WriteFile(sc.userDataFile, trimmed, os.FileMode(0644)); err != nil {
 		slog.Error("Failed to write userdata file", "path", sc.userDataFile, "err", err)
 		return err
 	}
