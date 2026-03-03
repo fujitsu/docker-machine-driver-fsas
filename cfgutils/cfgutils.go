@@ -171,9 +171,9 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 	userdata, err := os.ReadFile(sc.userDataFile)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			slog.Error("User data file does not exist", "path", sc.userDataFile, "err", err)
+			slog.Error("User data file does not exist:", "path", sc.userDataFile, "err", err)
 		} else {
-			slog.Error("User data cannot be read", "path", sc.userDataFile, "err", err)
+			slog.Error("User data cannot be read:", "path", sc.userDataFile, "err", err)
 		}
 		return err
 	}
@@ -183,7 +183,7 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 		return nil
 	}
 
-	cloudConfig := make(map[string]interface{})
+	cloudConfig := make(map[string]any)
 	if err := yaml.Unmarshal(userdata, &cloudConfig); err != nil {
 		slog.Error("Failed to parse user data as YAML:", "path", sc.userDataFile, "err", err)
 		return err

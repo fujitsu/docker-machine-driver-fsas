@@ -11,14 +11,14 @@ import (
 
 const defaultFilePermissions = os.FileMode(0644)
 
-type options func(*config)
-type config struct {
+type writeFilesConfig struct {
 	encoding    string
 	permissions fs.FileMode
 }
+type options func(*writeFilesConfig)
 
 func SetCustomPermissions(permissions fs.FileMode) options {
-	return func(c *config) {
+	return func(c *writeFilesConfig) {
 		c.permissions = permissions
 	}
 }
@@ -38,8 +38,8 @@ func NewCloudConfigItemRunCmd(cmds []string) cloudConfigItemRunCmd {
 	return cloudConfigItemRunCmd{cmds}
 }
 
-func (c cloudConfigItemRunCmd) getNewCloudConfigContent() ([]interface{}, error) {
-	ccItems := make([]interface{}, len(c.commands))
+func (c cloudConfigItemRunCmd) getNewCloudConfigContent() ([]any, error) {
+	ccItems := make([]any, len(c.commands))
 	for i, cmd := range c.commands {
 		ccItems[i] = cmd
 	}
@@ -61,7 +61,7 @@ type cloudConfigItemWriteFiles struct {
 
 func NewCloudConfigItemWriteFiles(path, content string, opts ...options) cloudConfigItemWriteFiles {
 
-	cfg := &config{
+	cfg := &writeFilesConfig{
 		encoding:    "gzip+b64",
 		permissions: defaultFilePermissions,
 	}
@@ -78,13 +78,13 @@ func NewCloudConfigItemWriteFiles(path, content string, opts ...options) cloudCo
 	}
 }
 
-func (c cloudConfigItemWriteFiles) getNewCloudConfigContent() ([]interface{}, error) {
+func (c cloudConfigItemWriteFiles) getNewCloudConfigContent() ([]any, error) {
 	zippedContent, err := gzipEncode([]byte(c.content))
 	if err != nil {
 		return nil, err
 	}
 	b64Encoded := base64.StdEncoding.EncodeToString(zippedContent)
-	return []interface{}{
+	return []any{
 
 		map[string]string{
 			"encoding":    c.encoding,
