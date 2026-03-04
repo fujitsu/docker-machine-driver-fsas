@@ -25,7 +25,7 @@ func SetCustomPermissions(permissions fs.FileMode) options {
 
 type CloudConfigItem interface {
 	getModuleName() string
-	getNewCloudConfigContent() ([]interface{}, error)
+	getNewCloudConfigContent() ([]any, error)
 }
 
 // structure for storing items that correspond to cloud config userdata file items from module 'runcmd'

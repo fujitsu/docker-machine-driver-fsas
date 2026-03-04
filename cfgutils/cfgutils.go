@@ -39,7 +39,7 @@ var _ CfgManager = (*StandardCfgManager)(nil)
 func NewStandardCfgManager(devicesSpecJson, userDataFile string) *StandardCfgManager {
 	var resources []models.Resource
 	if err := json.Unmarshal([]byte(devicesSpecJson), &resources); err != nil {
-		slog.Warn("Failed to parse DevicesSpecJson, proceeding with empty resources: ", "err", err)
+		slog.Warn("Failed to parse DevicesSpecJson, proceeding with empty resources:", "err", err)
 		resources = []models.Resource{}
 	}
 
@@ -203,7 +203,7 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 			continue
 		}
 
-		slice, ok := existing.([]interface{})
+		slice, ok := existing.([]any)
 		if !ok {
 			return fmt.Errorf("module %s exists but is not a list", moduleName)
 		}
@@ -223,7 +223,7 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 	}
 
 	if err := os.WriteFile(sc.userDataFile, trimmed, os.FileMode(0644)); err != nil {
-		slog.Error("Failed to write userdata file", "path", sc.userDataFile, "err", err)
+		slog.Error("Failed to write userdata file:", "path", sc.userDataFile, "err", err)
 		return err
 	}
 	return nil

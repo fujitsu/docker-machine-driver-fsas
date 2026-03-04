@@ -280,6 +280,8 @@ func TestExtendUserdata(t *testing.T) {
 			defer func() {
 				err := tempFile.Close()
 				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
 			}()
 
 			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
@@ -359,7 +361,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 			expectedError:   nil,
 		},
 
-		{name: "case 7: input as empty list",
+		{name: "case 5: input as empty list",
 			readFileContent: []byte(userdataSampleContent),
 			input:           nil,
 			expectedStr:     userdataSampleContent,
@@ -377,6 +379,8 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 			defer func() {
 				err := tempFile.Close()
 				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
 			}()
 
 			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
@@ -468,6 +472,8 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 			defer func() {
 				err := tempFile.Close()
 				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
 			}()
 
 			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
@@ -566,6 +572,8 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			defer func() {
 				err := tempFile.Close()
 				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
 			}()
 
 			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
