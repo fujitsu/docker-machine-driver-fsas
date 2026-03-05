@@ -19,6 +19,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/keycloak"
 	keycloakMock "github.com/fujitsu/docker-machine-driver-fsas/keycloak/mock"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
+	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	sshMock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	timeutilsmock "github.com/fujitsu/docker-machine-driver-fsas/timeutils/mock"
@@ -707,6 +708,76 @@ func TestInitFabricManagerFail(t *testing.T) {
 	assert.ErrorContains(t, err, fm.ErrMissingParams)
 }
 
+func TestInitSshManagerAlreadyInitialized(t *testing.T) {
+	mockSSH := sshMock.NewMockSshManager(t)
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{},
+		SshManager: mockSSH,
+	}
+
+	mockSSH.On("IsInit").Return(true)
+
+	err := driver.initSshManager()
+	assert.NoError(t, err)
+}
+
+func TestInitSshManagerSuccess(t *testing.T) {
+	mockSSH := sshMock.NewMockSshManager(t)
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			SSHUser:    "rancher",
+			SSHKeyPath: "/tmp/test-key",
+			IPAddress:  "192.168.1.10",
+		},
+		SSHPassword:          "rancher",
+		OsImageSshHostPubKey: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8=",
+		SshManager:           mockSSH,
+	}
+
+	mockSSH.On("IsInit").Return(false)
+
+	err := driver.initSshManager()
+	assert.NoError(t, err)
+	// After successful init, SshManager should have been replaced with a real StandardSshManager
+	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
+}
+
+func TestInitSshManagerFailEmptyIPAddress(t *testing.T) {
+	mockSSH := sshMock.NewMockSshManager(t)
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			IPAddress: "",
+		},
+		SshManager: mockSSH,
+	}
+
+	mockSSH.On("IsInit").Return(false)
+
+	err := driver.initSshManager()
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "IPAddress is empty")
+}
+
+func TestInitSshManagerFailNewStandardSshManager(t *testing.T) {
+	mockSSH := sshMock.NewMockSshManager(t)
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			SSHUser:    "",
+			SSHKeyPath: "",
+			IPAddress:  "192.168.1.10",
+		},
+		SSHPassword:          "",
+		OsImageSshHostPubKey: "",
+		SshManager:           mockSSH,
+	}
+
+	mockSSH.On("IsInit").Return(false)
+
+	err := driver.initSshManager()
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, sshutils.ErrNoneOfConstructorArgsCanBeEmpty)
+}
+
 func TestWaitForStatusCorrectStatus(t *testing.T) {
 	mockClock := timeutilsmock.NewMockClock(t)
 	statusClock = mockClock
@@ -1085,11 +1156,13 @@ func TestCreateWaitForStatusFail(t *testing.T) {
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	mockSSH := sshMock.NewMockSshManager(t)
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	driver := &Driver{
 		BaseDriver:            &drivers.BaseDriver{},
 		FabricManager:         mockFM,
 		Keycloak:              mockKeycloak,
+		SshManager:            mockSSH,
 		MachineUUID:           testMachineUUID,
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
@@ -1124,6 +1197,8 @@ func TestCreateWaitForStatusFail(t *testing.T) {
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", int(UNBUILDED), nil)
+	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("DeregisterOS").Return(nil)
 
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mockClock.On("Now").Return(mock_now_time)
@@ -1183,6 +1258,8 @@ func TestCreateGetMachineDetailsFail(t *testing.T) {
 	testError := fmt.Errorf("GetMachineDetails unsucessfull")
 	// bootSSD call
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, testError).Once()
+	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// waitForStatus call in RemoveMachine
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
@@ -1194,12 +1271,14 @@ func TestCreateGetMachineDetailsFail(t *testing.T) {
 func TestCreateImageInstallFail(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	mockSSH := sshMock.NewMockSshManager(t)
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
 	driver := &Driver{
 		BaseDriver:            &drivers.BaseDriver{},
 		FabricManager:         mockFM,
 		Keycloak:              mockKeycloak,
+		SshManager:            mockSSH,
 		MachineUUID:           testMachineUUID,
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
@@ -1236,6 +1315,8 @@ func TestCreateImageInstallFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
 	testError := fmt.Errorf("ImageInstall unsucessfull")
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(testError)
+	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// Call in Remove
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
@@ -1247,12 +1328,14 @@ func TestCreateImageInstallFail(t *testing.T) {
 func TestCreateStartFail(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	mockSSH := sshMock.NewMockSshManager(t)
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
 	driver := &Driver{
 		BaseDriver:            &drivers.BaseDriver{},
 		FabricManager:         mockFM,
 		Keycloak:              mockKeycloak,
+		SshManager:            mockSSH,
 		MachineUUID:           testMachineUUID,
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
@@ -1294,6 +1377,8 @@ func TestCreateStartFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
 	testError := fmt.Errorf("PowerOn unsucessfull")
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(testError)
+	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// last waitForStatus in Remove
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
@@ -1306,12 +1391,14 @@ func TestCreateStartFail(t *testing.T) {
 func TestCreateGetMachineDetailsFailSecond(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	mockSSH := sshMock.NewMockSshManager(t)
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
 	driver := &Driver{
 		BaseDriver:            &drivers.BaseDriver{},
 		FabricManager:         mockFM,
 		Keycloak:              mockKeycloak,
+		SshManager:            mockSSH,
 		MachineUUID:           testMachineUUID,
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
@@ -1356,6 +1443,8 @@ func TestCreateGetMachineDetailsFailSecond(t *testing.T) {
 	// IP addresses call
 	testError := fmt.Errorf("GetMachineDetails unsucessfull")
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, testError).Once()
+	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// Remove call
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)

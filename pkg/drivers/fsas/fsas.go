@@ -447,6 +447,27 @@ func (d *Driver) initFabricManager() error {
 	return nil
 }
 
+// initSshManager Initialize SSH Manager client
+func (d *Driver) initSshManager() error {
+	if !d.SshManager.IsInit() {
+		slog.Warn("SSH Manager is NOT initialized then start init procedure")
+		hostName, err := d.GetSSHHostname()
+		if err != nil {
+			slog.Error("Could not acquire target SSH hostname because of an error: ", "err", err)
+			return err
+		}
+		slog.Info("Acquired SSH hostname: ", "hostname", hostName)
+		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
+		if err != nil {
+			slog.Error("Could not create SSH Manager because of an error: ", "err", err)
+			return err
+		}
+		d.SshManager = sshManager
+	}
+
+	return nil
+}
+
 // checkConfig Verify if mandatory flags are set
 func (d *Driver) checkConfig() error {
 	slog.Debug("check config from mandatory flags")
@@ -584,20 +605,9 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	hostName, err := d.GetSSHHostname()
-	if err != nil {
-		slog.Error("Could not acquire target SSH hostname because of an error: ", "err", err)
+	if err := d.initSshManager(); err != nil {
+		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
-	}
-	slog.Info("Acquired ssh hostname: ", "hostname", hostName)
-
-	if !d.SshManager.IsInit() {
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
-		if err != nil {
-			slog.Error("error while initializing Standard SSH Manager: ", "err", err)
-			return err
-		}
-		d.SshManager = sshManager
 	}
 
 	if err := d.SshManager.ExchangeKeys(); err != nil {
@@ -847,20 +857,11 @@ func (d *Driver) Remove() error {
 		return err
 	}
 
-	hostName, err := d.GetSSHHostname()
-	if err != nil {
-		// Similar as above - we must ignore hostname acquisition error to avoid perpetual loop
-		slog.Warn("Could not acquire target SSH hostname because of an error: ", "err", err)
+	// Check if ssh manager is available for e.g. OS deregistration, if not - proceed with machine removal anyway
+	if err := d.initSshManager(); err != nil {
+		// If ssh manager cannot be initialized then do not return error and proceed with machine removal
+		slog.Warn("error while initializing SSH Manager, proceeding with machine removal: ", "err", err)
 	} else {
-		slog.Info("Acquired SSH hostname: ", "hostname", hostName)
-		if !d.SshManager.IsInit() {
-			sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
-			if err != nil {
-				slog.Error("error while initializing Standard SSH Manager: ", "err", err)
-				return err
-			}
-			d.SshManager = sshManager
-		}
 		if err := d.SshManager.DeregisterOS(); err != nil {
 			slog.Warn("Could not deregister SLES OS, manual action might be required: ", "err", err)
 		}
