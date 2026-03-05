@@ -99,19 +99,45 @@ type StandardSshManager struct {
 
 var _ SshManager = (*StandardSshManager)(nil)
 
-// NewStandardSshManager Returns new instance of Standard SSH Manager and error
-func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath, hostPublicKey string) (*StandardSshManager, error) {
+// ParseSSHPublicKey parses an SSH public key string in authorized_keys format
+// and returns the parsed PublicKey. This can be used to validate the key early
+// (e.g. during configuration) before passing it to NewStandardSshManager.
+func ParseSSHPublicKey(key string) (gossh.PublicKey, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return nil, fmt.Errorf("SSH public key string is empty")
+	}
+
+	// Validate that the first field is the key type (e.g. "ecdsa-sha2-nistp256").
+	// ParseAuthorizedKey is lenient and treats unrecognized prefixes as authorized_keys
+	// options, which would silently accept malformed input like "test AAAA...".
+	fields := strings.Fields(key)
+	if len(fields) < 2 {
+		return nil, fmt.Errorf("SSH public key must have at least key-type and base64 data, got %d field(s)", len(fields))
+	}
+
+	publicKey, _, _, _, err := gossh.ParseAuthorizedKey([]byte(key))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse host public key: %w", err)
+	}
+
+	if fields[0] != publicKey.Type() {
+		return nil, fmt.Errorf("SSH public key type mismatch: declared %q but parsed key is %q", fields[0], publicKey.Type())
+	}
+
+	slog.Debug("Successfully parsed SSH host public key:", "type", publicKey.Type())
+	return publicKey, nil
+}
+
+// NewStandardSshManager Returns new instance of Standard SSH Manager and error.
+// The hostPublicKey parameter must be a pre-parsed gossh.PublicKey (use ParseSSHPublicKey to obtain one).
+func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
 	slog.Debug("Standard SSH Manager constructor: ", "host", hostName, "user", userName)
 
-	if hostName == "" || userName == "" || sshPassword == "" || hostPublicKey == "" || sshKeyPath == "" {
+	if hostName == "" || userName == "" || sshPassword == "" || sshKeyPath == "" || hostPublicKey == nil {
 
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
-	}
-
-	publicKey, _, _, _, err := gossh.ParseAuthorizedKey([]byte(hostPublicKey))
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse host public key: %w", err)
 	}
 
 	isInit = true
@@ -120,7 +146,7 @@ func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath, hostPubl
 		UserName:      userName,
 		SshPassword:   sshPassword,
 		Client:        &ssh.NativeClient{},
-		HostPublicKey: publicKey,
+		HostPublicKey: hostPublicKey,
 		SshKeyPath:    sshKeyPath,
 		keyParser:     NewFileSSHKeyParser(),
 	}, nil

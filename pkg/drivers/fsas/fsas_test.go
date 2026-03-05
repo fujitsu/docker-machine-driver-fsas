@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"os"
+	"strings"
 
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/rancher/machine/libmachine/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
@@ -56,6 +58,75 @@ func TestDriverName(t *testing.T) {
 	expected := "fsas"
 
 	assert.Equal(t, expected, observed, "Incorrect driver name")
+}
+
+func TestSetConfigFromFlagsTrimsWhitespace(t *testing.T) {
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	hostPublicKey := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+
+	driver := &Driver{
+		BaseDriver:    &drivers.BaseDriver{},
+		FabricManager: mockFM,
+		Keycloak:      mockKeycloak,
+	}
+
+	// Pre-initialize clients so initClients is skipped
+	mockFM.On("IsInit").Return(true)
+	mockKeycloak.On("IsInit").Return(true)
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("ValidateTenant", "cdi-test", models.AccessTokenExample).Return(nil)
+
+	flags := &drivers.CheckDriverOptions{
+		CreateFlags: driver.GetCreateFlags(),
+		FlagsValues: map[string]interface{}{
+			"fsas-ssh-user":                     "  user  ",
+			"fsas-ssh-password":                 "  secret-pass  ",
+			"fsas-tenant-uuid":                  "  cdi-test  ",
+			"fsas-credentials-username":         "  admin  ",
+			"fsas-credentials-password":         "  admin-pass  ",
+			"fsas-api-url":                      "  http://192.168.0.1  ",
+			"fsas-ntp-url":                      "  ntp.example.com  ",
+			"fsas-dns-ip":                       "  8.8.8.8  ",
+			"fsas-compute-conditions-json":      "  test  ",
+			"fsas-network-baremetal-port":       1,
+			"fsas-network-baremetal-uuid":       "  bm-uuid  ",
+			"fsas-network-baremetal-default-gw": "  192.168.0.254  ",
+			"fsas-network-provision-port":       1,
+			"fsas-network-provision-uuid":       "  prov-uuid  ",
+			"fsas-network-provision-default-gw": "  192.168.0.254  ",
+			"fsas-devices-spec-json":            models.DeviceSpecsValid,
+			"fsas-os-image-name":                "  Ubuntu  ",
+			"fsas-userdata":                     "  userData.json  ",
+			"fsas-image-os-ssh-host-pub-key":    "  " + hostPublicKey + "  ",
+			"fsas-sles-registration-code":       "",
+			"fsas-sles-registration-email":      "",
+		},
+	}
+
+	err := driver.SetConfigFromFlags(flags)
+	assert.NoError(t, err)
+
+	// Verify all string fields are trimmed
+	assert.Equal(t, "user", driver.SSHUser, "SSHUser should be trimmed")
+	assert.Equal(t, "cdi-test", driver.TenantUuid, "TenantUuid should be trimmed")
+	assert.Equal(t, "admin", driver.Username, "Username should be trimmed")
+	assert.Equal(t, "http://192.168.0.1", driver.ApiUrl, "ApiUrl should be trimmed")
+	assert.Equal(t, "ntp.example.com", driver.NtpUrl, "NtpUrl should be trimmed")
+	assert.Equal(t, "8.8.8.8", driver.DnsIp, "DnsIp should be trimmed")
+	assert.Equal(t, "test", driver.ComputeConditionsJson, "ComputeConditionsJson should be trimmed")
+	assert.Equal(t, "bm-uuid", driver.NetworkBaremetalUUID, "NetworkBaremetalUUID should be trimmed")
+	assert.Equal(t, "192.168.0.254", driver.NetworkBaremetalDefaultGW, "NetworkBaremetalDefaultGW should be trimmed")
+	assert.Equal(t, "prov-uuid", driver.NetworkProvisionUUID, "NetworkProvisionUUID should be trimmed")
+	assert.Equal(t, "192.168.0.254", driver.NetworkProvisionDefaultGW, "NetworkProvisionDefaultGW should be trimmed")
+	assert.Equal(t, strings.TrimSpace(models.DeviceSpecsValid), driver.DevicesSpecJson, "DevicesSpecJson should be trimmed")
+	assert.Equal(t, "Ubuntu", driver.OsImageName, "OsImageName should be trimmed")
+	assert.Equal(t, "userData.json", driver.UserDataFile, "UserDataFile should be trimmed")
+	assert.Equal(t, hostPublicKey, driver.OsImageSshHostPubKey, "OsImageSshHostPubKey should be trimmed")
+
+	// Verify passwords are NOT trimmed (whitespace may be intentional)
+	assert.Equal(t, "  secret-pass  ", driver.SSHPassword, "SSHPassword should NOT be trimmed")
+	assert.Equal(t, "  admin-pass  ", driver.Password, "Password should NOT be trimmed")
 }
 
 func TestGetSSHHostname(t *testing.T) {
@@ -222,7 +293,74 @@ func TestCheckConfigTenantSuccess(t *testing.T) {
 
 	err := driver.checkConfig()
 	assert.NoError(t, err)
+	assert.NotNil(t, driver.OsImageSshHostParsedKey, "OsImageSshHostParsedKey should be populated after checkConfig")
 	mockFM.AssertCalled(t, "ValidateTenant", "cdi-test", models.AccessTokenExample)
+}
+
+func TestCheckConfigEmptySshHostPubKey(t *testing.T) {
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+
+	driver := &Driver{
+		BaseDriver:                &drivers.BaseDriver{},
+		FabricManager:             mockFM,
+		Keycloak:                  mockKeycloak,
+		SSHPassword:               "pass",
+		ComputeConditionsJson:     "test",
+		NetworkBaremetalPort:      1,
+		NetworkBaremetalUUID:      "test",
+		NetworkBaremetalDefaultGW: "192.168.0.254",
+		NetworkProvisionPort:      1,
+		NetworkProvisionUUID:      "test",
+		NetworkProvisionDefaultGW: "192.168.0.254",
+		DevicesSpecJson:           models.DeviceSpecsValid,
+		ApiUrl:                    "http://192.168.0.1",
+		TenantUuid:                "cdi-test",
+		OsImageName:               "Ubuntu",
+		UserDataFile:              "userData.json",
+		OsImageSshHostPubKey:      "",
+	}
+	driver.SSHUser = "user"
+
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("ValidateTenant", "cdi-test", mockKeycloak.GetToken()).Return(nil)
+
+	err := driver.checkConfig()
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "--fsas-image-os-ssh-host-pub-key")
+}
+
+func TestCheckConfigInvalidSshHostPubKey(t *testing.T) {
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+
+	driver := &Driver{
+		BaseDriver:                &drivers.BaseDriver{},
+		FabricManager:             mockFM,
+		Keycloak:                  mockKeycloak,
+		SSHPassword:               "pass",
+		ComputeConditionsJson:     "test",
+		NetworkBaremetalPort:      1,
+		NetworkBaremetalUUID:      "test",
+		NetworkBaremetalDefaultGW: "192.168.0.254",
+		NetworkProvisionPort:      1,
+		NetworkProvisionUUID:      "test",
+		NetworkProvisionDefaultGW: "192.168.0.254",
+		DevicesSpecJson:           models.DeviceSpecsValid,
+		ApiUrl:                    "http://192.168.0.1",
+		TenantUuid:                "cdi-test",
+		OsImageName:               "Ubuntu",
+		UserDataFile:              "userData.json",
+		OsImageSshHostPubKey:      "not-a-valid ssh-key",
+	}
+	driver.SSHUser = "user"
+
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("ValidateTenant", "cdi-test", mockKeycloak.GetToken()).Return(nil)
+
+	err := driver.checkConfig()
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "invalid SSH host public key format")
 }
 
 func TestCheckConfig_SlesParamsFail(t *testing.T) {
@@ -723,23 +861,75 @@ func TestInitSshManagerAlreadyInitialized(t *testing.T) {
 
 func TestInitSshManagerSuccess(t *testing.T) {
 	mockSSH := sshMock.NewMockSshManager(t)
+	hostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+	parsedKey, err := sshutils.ParseSSHPublicKey(hostPubKeyStr)
+	require.NoError(t, err)
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			SSHUser:    "rancher",
 			SSHKeyPath: "/tmp/test-key",
 			IPAddress:  "192.168.1.10",
 		},
-		SSHPassword:          "rancher",
-		OsImageSshHostPubKey: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8=",
-		SshManager:           mockSSH,
+		SSHPassword:             "rancher",
+		OsImageSshHostPubKey:    hostPubKeyStr,
+		OsImageSshHostParsedKey: parsedKey,
+		SshManager:              mockSSH,
+	}
+
+	mockSSH.On("IsInit").Return(false)
+
+	err = driver.initSshManager()
+	assert.NoError(t, err)
+	// After successful init, SshManager should have been replaced with a real StandardSshManager
+	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
+}
+
+func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
+	// Simulates the Remove/JSON-restore path where OsImageSshHostParsedKey is nil
+	// (not serialized) but the raw string is available for lazy re-parsing.
+	mockSSH := sshMock.NewMockSshManager(t)
+	hostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			SSHUser:    "rancher",
+			SSHKeyPath: "/tmp/test-key",
+			IPAddress:  "192.168.1.10",
+		},
+		SSHPassword:             "rancher",
+		OsImageSshHostPubKey:    hostPubKeyStr,
+		OsImageSshHostParsedKey: nil,
+		SshManager:              mockSSH,
 	}
 
 	mockSSH.On("IsInit").Return(false)
 
 	err := driver.initSshManager()
 	assert.NoError(t, err)
-	// After successful init, SshManager should have been replaced with a real StandardSshManager
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
+	// The parsed key should have been populated by lazy parsing
+	assert.NotNil(t, driver.OsImageSshHostParsedKey)
+}
+
+func TestInitSshManagerFailInvalidPubKeyFormat(t *testing.T) {
+	// When restored from JSON with an invalid key string, initSshManager should fail gracefully.
+	mockSSH := sshMock.NewMockSshManager(t)
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			SSHUser:    "rancher",
+			SSHKeyPath: "/tmp/test-key",
+			IPAddress:  "192.168.1.10",
+		},
+		SSHPassword:             "rancher",
+		OsImageSshHostPubKey:    "not-a-valid ssh-key",
+		OsImageSshHostParsedKey: nil,
+		SshManager:              mockSSH,
+	}
+
+	mockSSH.On("IsInit").Return(false)
+
+	err := driver.initSshManager()
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "invalid SSH host public key format")
 }
 
 func TestInitSshManagerFailEmptyIPAddress(t *testing.T) {
@@ -766,9 +956,10 @@ func TestInitSshManagerFailNewStandardSshManager(t *testing.T) {
 			SSHKeyPath: "",
 			IPAddress:  "192.168.1.10",
 		},
-		SSHPassword:          "",
-		OsImageSshHostPubKey: "",
-		SshManager:           mockSSH,
+		SSHPassword:             "",
+		OsImageSshHostPubKey:    "",
+		OsImageSshHostParsedKey: nil,
+		SshManager:              mockSSH,
 	}
 
 	mockSSH.On("IsInit").Return(false)
