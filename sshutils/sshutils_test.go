@@ -29,6 +29,14 @@ var (
 	MOCK_ERROR_FOR_OUTPUT_METHOD = fmt.Errorf("mock error for Output method")
 )
 
+// parsedHostPublicKey returns the pre-parsed gossh.PublicKey for HOST_PUBLIC_KEY.
+func parsedHostPublicKey(t *testing.T) gossh.PublicKey {
+	t.Helper()
+	key, err := ParseSSHPublicKey(HOST_PUBLIC_KEY)
+	require.NoError(t, err)
+	return key
+}
+
 // MockSSHClient implements the ssh.Client interface
 type MockSSHClient struct {
 	ExecutedCommands []string
@@ -73,8 +81,83 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+func TestParseSSHPublicKeySuccess(t *testing.T) {
+	key, err := ParseSSHPublicKey(HOST_PUBLIC_KEY)
+	assert.NoError(t, err)
+	assert.NotNil(t, key)
+	assert.Equal(t, "ecdsa-sha2-nistp256", key.Type())
+}
+
+func TestParseSSHPublicKeyEmptyString(t *testing.T) {
+	key, err := ParseSSHPublicKey("")
+	assert.Error(t, err)
+	assert.Nil(t, key)
+	assert.ErrorContains(t, err, "SSH public key string is empty")
+}
+
+func TestParseSSHPublicKeyInvalidFormat(t *testing.T) {
+	key, err := ParseSSHPublicKey("not-a-valid-ssh-key format")
+	assert.Error(t, err)
+	assert.Nil(t, key)
+	assert.ErrorContains(t, err, "Failed to parse host public key")
+}
+
+func TestParseSSHPublicKeySingleField(t *testing.T) {
+	key, err := ParseSSHPublicKey("ecdsa-sha2-nistp256")
+	assert.Error(t, err)
+	assert.Nil(t, key)
+	assert.ErrorContains(t, err, "must have at least key-type and base64 data")
+}
+
+func TestParseSSHPublicKeyTypeMismatch(t *testing.T) {
+	// The base64 data encodes a valid ecdsa-sha2-nistp256 key, but the prefix says "test".
+	// ParseAuthorizedKey would silently accept this; our validation must reject it.
+	key, err := ParseSSHPublicKey("test AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHMl5neMPoM8XtWmsrSI1TxGe+iWUwfeA62gW0y7a5SM+vJ7WafERtBZJlWBgfOv+zVEPdUjkO0fnWoVbELLjSI=")
+	assert.Error(t, err)
+	assert.Nil(t, key)
+	assert.ErrorContains(t, err, "SSH public key type mismatch")
+}
+
+func TestParseSSHPublicKeyMissingTypePrefix(t *testing.T) {
+	// Valid base64 key data but without the key-type prefix (e.g. user pasted only the base64 part).
+	key, err := ParseSSHPublicKey("AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8=")
+	assert.Error(t, err)
+	assert.Nil(t, key)
+	assert.ErrorContains(t, err, "must have at least key-type and base64 data")
+}
+
+func TestParseSSHPublicKeyDoubleQuoted(t *testing.T) {
+	// Key enclosed in double quotes, as might happen when copy-pasting from a JSON or UI field.
+	quotedKey := `"ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="`
+	key, err := ParseSSHPublicKey(quotedKey)
+	assert.Error(t, err)
+	assert.Nil(t, key)
+}
+
+func TestParseSSHPublicKeySingleQuoted(t *testing.T) {
+	// Key enclosed in single quotes.
+	quotedKey := `'ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8='`
+	key, err := ParseSSHPublicKey(quotedKey)
+	assert.Error(t, err)
+	assert.Nil(t, key)
+}
+
+func TestParseSSHPublicKeyBase64PartDoubleQuoted(t *testing.T) {
+	// Only the base64 key value is enclosed in double quotes, type prefix is correct.
+	quotedKey := `ecdsa-sha2-nistp256 "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="`
+	key, err := ParseSSHPublicKey(quotedKey)
+	assert.Error(t, err)
+	assert.Nil(t, key)
+}
+
+func TestNewStandardSshManagerNilHostPublicKey(t *testing.T) {
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", nil)
+	assert.Nil(t, manager)
+	assert.ErrorIs(t, err, ErrNoneOfConstructorArgsCanBeEmpty)
+}
+
 func Test_runCommand_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
@@ -90,7 +173,7 @@ func Test_runCommand_Success(t *testing.T) {
 }
 
 func Test_runCommand_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -108,7 +191,7 @@ func Test_runCommand_Fail(t *testing.T) {
 }
 
 func Test_runCommand_Success_Missing_Exit(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -149,7 +232,7 @@ func Test_createSSHKey(t *testing.T) {
 }
 
 func Test_transferSSHKeyToMachineOpenFail(t *testing.T) {
-	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", HOST_PUBLIC_KEY)
+	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	err = sc.transferSSHKeyToMachine()
@@ -159,7 +242,7 @@ func Test_transferSSHKeyToMachineOpenFail(t *testing.T) {
 }
 
 func Test_transferSSHKeyToMachine(t *testing.T) {
-	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", HOST_PUBLIC_KEY)
+	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{}
@@ -185,7 +268,7 @@ func Test_transferSSHKeyToMachine(t *testing.T) {
 }
 
 func TestWriteFileOnRemoteMachine_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.Client = &MockSSHClient{}
 	manager.SshKeyPath = ""
@@ -195,7 +278,7 @@ func TestWriteFileOnRemoteMachine_Success(t *testing.T) {
 }
 
 func Test_executeRemoteFile_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
@@ -208,7 +291,7 @@ func Test_executeRemoteFile_Success(t *testing.T) {
 }
 
 func Test_executeRemoteFile_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{
 		OutputFunc: func(command string) (string, error) {
@@ -225,7 +308,7 @@ func Test_executeRemoteFile_Fail(t *testing.T) {
 }
 
 func Test_removeRemoteFile_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
@@ -238,7 +321,7 @@ func Test_removeRemoteFile_Success(t *testing.T) {
 }
 
 func Test_removeRemoteFile_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{
 		OutputFunc: func(command string) (string, error) {
@@ -268,7 +351,7 @@ func TestGenerateSecureRandomInt_InvalidRange(t *testing.T) {
 }
 
 func Test_ExecuteScript_RemovesScriptAndDirectory(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -296,7 +379,7 @@ func Test_ExecuteScript_RemovesScriptAndDirectory(t *testing.T) {
 }
 
 func Test_createRemoteDir(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
@@ -309,7 +392,7 @@ func Test_createRemoteDir(t *testing.T) {
 }
 
 func Test_getRandomScriptPath(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
@@ -323,7 +406,7 @@ func Test_getRandomScriptPath(t *testing.T) {
 }
 
 func Test_removeRemoteDir(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{}
@@ -337,7 +420,7 @@ func Test_removeRemoteDir(t *testing.T) {
 }
 
 func Test_DisablePasswordSSHLogin_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{}
@@ -357,7 +440,7 @@ func Test_DisablePasswordSSHLogin_Success(t *testing.T) {
 }
 
 func Test_DisablePasswordSSHLogin_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -379,7 +462,7 @@ func Test_DisablePasswordSSHLogin_Fail(t *testing.T) {
 }
 
 func Test_RebootCloudInit_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{}
@@ -394,7 +477,7 @@ func Test_RebootCloudInit_Success(t *testing.T) {
 }
 
 func Test_RebootCloudInit_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -410,7 +493,7 @@ func Test_RebootCloudInit_Fail(t *testing.T) {
 }
 
 func TestRegisterOS_SuccessWithUnregisteredModules(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.SshKeyPath = ""
 
@@ -449,7 +532,7 @@ func TestRegisterOS_SuccessWithUnregisteredModules(t *testing.T) {
 }
 
 func TestRegisterOS_SuccessAllModulesRegistered(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.SshKeyPath = ""
 
@@ -480,7 +563,7 @@ func TestRegisterOS_SuccessAllModulesRegistered(t *testing.T) {
 }
 
 func TestRegisterOS_SkipWithNoRegcode(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.SshKeyPath = ""
 
@@ -494,7 +577,7 @@ func TestRegisterOS_SkipWithNoRegcode(t *testing.T) {
 }
 
 func TestRegisterOS_FailOnInitialRegistration(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.SshKeyPath = ""
 
@@ -513,7 +596,7 @@ func TestRegisterOS_FailOnInitialRegistration(t *testing.T) {
 }
 
 func TestRegisterOS_FailOnGetStatus(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.SshKeyPath = ""
 
@@ -534,7 +617,7 @@ func TestRegisterOS_FailOnGetStatus(t *testing.T) {
 }
 
 func TestRegisterOS_FailOnInvalidJSON(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.SshKeyPath = ""
 
@@ -557,7 +640,7 @@ func TestRegisterOS_FailOnInvalidJSON(t *testing.T) {
 }
 
 func TestRegisterOS_FailOnModuleRegistration(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.SshKeyPath = ""
 
@@ -710,7 +793,7 @@ func Test_getSshClientConfig_PassAndKey(t *testing.T) {
 }
 
 func Test_DeregisterOS_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	emptyProducts := []models.SuseProduct{}
 	jsonOutput, _ := json.Marshal(emptyProducts)
@@ -732,7 +815,7 @@ func Test_DeregisterOS_Success(t *testing.T) {
 }
 
 func Test_DeregisterOS_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	mockClient := &MockSSHClient{
 		OutputFunc: func(command string) (string, error) {
@@ -747,7 +830,7 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 }
 
 func Test_DeregisterOS_Skip_When_NoRegisteredProducts(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	products := []models.SuseProduct{
 		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Not Registered"},
@@ -772,7 +855,7 @@ func Test_DeregisterOS_Skip_When_NoRegisteredProducts(t *testing.T) {
 }
 
 func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	products := []models.SuseProduct{
 		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Registered"},

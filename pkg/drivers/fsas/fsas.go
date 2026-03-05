@@ -7,6 +7,7 @@ import (
 
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/cfgutils"
@@ -17,6 +18,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	"github.com/rancher/machine/libmachine/drivers"
+	gossh "golang.org/x/crypto/ssh"
 
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	"github.com/rancher/machine/libmachine/mcnflag"
@@ -57,6 +59,7 @@ type Driver struct {
 	PrivateIPAddress          string
 	OsImageName               string
 	OsImageSshHostPubKey      string
+	OsImageSshHostParsedKey   gossh.PublicKey `json:"-"`
 	MachineUUID               string
 	UserDataFile              string
 	SlesRegistrationCode      string
@@ -323,58 +326,58 @@ func (d *Driver) DriverName() string {
 func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	slog.Debug("Try to set config from flags")
 
-	d.SSHUser = flags.String("fsas-ssh-user")
+	d.SSHUser = strings.TrimSpace(flags.String("fsas-ssh-user"))
 	slog.Debug("Driver ", "ssh-user", d.SSHUser)
 
 	d.SSHPassword = flags.String("fsas-ssh-password")
 	slog.Debug("Driver ", "ssh-password", "<hidden-for-security-reasons>")
 
-	d.TenantUuid = flags.String("fsas-tenant-uuid")
+	d.TenantUuid = strings.TrimSpace(flags.String("fsas-tenant-uuid"))
 	slog.Debug("Driver ", "Tenant Uuid", d.TenantUuid)
 
-	d.Username = flags.String("fsas-credentials-username")
+	d.Username = strings.TrimSpace(flags.String("fsas-credentials-username"))
 	slog.Debug("Driver ", "Credentials Username", d.Username)
 
 	d.Password = flags.String("fsas-credentials-password")
 	slog.Debug("Driver ", "Credentials Password", "<hidden-for-security-reasons>")
 
-	d.ApiUrl = flags.String("fsas-api-url")
+	d.ApiUrl = strings.TrimSpace(flags.String("fsas-api-url"))
 	slog.Debug("Driver ", "FSAS API url", d.ApiUrl)
 
-	d.NtpUrl = flags.String("fsas-ntp-url")
+	d.NtpUrl = strings.TrimSpace(flags.String("fsas-ntp-url"))
 	slog.Debug("Driver ", "FSAS NTP Server url", d.NtpUrl)
 
-	d.DnsIp = flags.String("fsas-dns-ip")
+	d.DnsIp = strings.TrimSpace(flags.String("fsas-dns-ip"))
 	slog.Debug("Driver ", "FSAS DNS Server IP", d.DnsIp)
 
-	d.ComputeConditionsJson = flags.String("fsas-compute-conditions-json")
+	d.ComputeConditionsJson = strings.TrimSpace(flags.String("fsas-compute-conditions-json"))
 	slog.Debug("Driver ", "FSAS compute conditions JSON", d.ComputeConditionsJson)
 
 	d.NetworkBaremetalPort = flags.Int("fsas-network-baremetal-port")
 	slog.Debug("Driver ", "FSAS baremetal subnet LAN port index", d.NetworkBaremetalPort)
 
-	d.NetworkBaremetalUUID = flags.String("fsas-network-baremetal-uuid")
+	d.NetworkBaremetalUUID = strings.TrimSpace(flags.String("fsas-network-baremetal-uuid"))
 	slog.Debug("Driver ", "FSAS baremetal subnet UUID", d.NetworkBaremetalUUID)
 
-	d.NetworkBaremetalDefaultGW = flags.String("fsas-network-baremetal-default-gw")
+	d.NetworkBaremetalDefaultGW = strings.TrimSpace(flags.String("fsas-network-baremetal-default-gw"))
 	slog.Debug("Driver ", "FSAS baremetal subnet Default GW", d.NetworkBaremetalDefaultGW)
 
 	d.NetworkProvisionPort = flags.Int("fsas-network-provision-port")
 	slog.Debug("Driver ", "FSAS provosioning subnet LAN port index", d.NetworkProvisionPort)
 
-	d.NetworkProvisionUUID = flags.String("fsas-network-provision-uuid")
+	d.NetworkProvisionUUID = strings.TrimSpace(flags.String("fsas-network-provision-uuid"))
 	slog.Debug("Driver ", "FSAS provisioning subnet UUID", d.NetworkProvisionUUID)
 
-	d.NetworkProvisionDefaultGW = flags.String("fsas-network-provision-default-gw")
+	d.NetworkProvisionDefaultGW = strings.TrimSpace(flags.String("fsas-network-provision-default-gw"))
 	slog.Debug("Driver ", "FSAS provisioning subnet Default GW", d.NetworkBaremetalDefaultGW)
 
-	d.DevicesSpecJson = flags.String("fsas-devices-spec-json")
+	d.DevicesSpecJson = strings.TrimSpace(flags.String("fsas-devices-spec-json"))
 	slog.Debug("Driver ", "FSAS devices specification JSON", d.DevicesSpecJson)
 
-	d.OsImageName = flags.String("fsas-os-image-name")
+	d.OsImageName = strings.TrimSpace(flags.String("fsas-os-image-name"))
 	slog.Debug("Driver ", "FSAS OS image name", d.OsImageName)
 
-	d.UserDataFile = flags.String("fsas-userdata")
+	d.UserDataFile = strings.TrimSpace(flags.String("fsas-userdata"))
 	slog.Debug("Driver ", "FSAS user data file", d.UserDataFile)
 
 	if err := d.initClients(); err != nil {
@@ -382,13 +385,13 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		return err
 	}
 
-	d.OsImageSshHostPubKey = flags.String("fsas-image-os-ssh-host-pub-key")
+	d.OsImageSshHostPubKey = strings.TrimSpace(flags.String("fsas-image-os-ssh-host-pub-key"))
 	slog.Debug("Driver ", "FSAS OS image ssh host public key ", d.OsImageSshHostPubKey)
 
-	d.SlesRegistrationCode = flags.String("fsas-sles-registration-code")
+	d.SlesRegistrationCode = strings.TrimSpace(flags.String("fsas-sles-registration-code"))
 	slog.Debug("Driver ", "FSAS SLES registration code", "<hidden-for-security-reasons>")
 
-	d.SlesRegistrationEmail = flags.String("fsas-sles-registration-email")
+	d.SlesRegistrationEmail = strings.TrimSpace(flags.String("fsas-sles-registration-email"))
 	slog.Debug("Driver ", "FSAS SLES registration email", d.SlesRegistrationEmail)
 
 	return d.checkConfig()
@@ -447,6 +450,40 @@ func (d *Driver) initFabricManager() error {
 	return nil
 }
 
+// initSshManager Initialize SSH Manager client
+func (d *Driver) initSshManager() error {
+	if !d.SshManager.IsInit() {
+		slog.Warn("SSH Manager is NOT initialized then start init procedure")
+
+		// OsImageSshHostParsedKey may be nil when the driver was restored from JSON
+		// (e.g. during Remove, Start, Stop) because it is not serializable.
+		// In that case, re-parse from the raw string.
+		if d.OsImageSshHostParsedKey == nil && d.OsImageSshHostPubKey != "" {
+			parsedKey, err := sshutils.ParseSSHPublicKey(d.OsImageSshHostPubKey)
+			if err != nil {
+				slog.Error("Could not parse SSH host public key:", "err", err)
+				return fmt.Errorf("invalid SSH host public key format: %w", err)
+			}
+			d.OsImageSshHostParsedKey = parsedKey
+		}
+
+		hostName, err := d.GetSSHHostname()
+		if err != nil {
+			slog.Error("Could not acquire target SSH hostname because of an error: ", "err", err)
+			return err
+		}
+		slog.Info("Acquired SSH hostname: ", "hostname", hostName)
+		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostParsedKey)
+		if err != nil {
+			slog.Error("Could not create SSH Manager because of an error: ", "err", err)
+			return err
+		}
+		d.SshManager = sshManager
+	}
+
+	return nil
+}
+
 // checkConfig Verify if mandatory flags are set
 func (d *Driver) checkConfig() error {
 	slog.Debug("check config from mandatory flags")
@@ -488,6 +525,12 @@ func (d *Driver) checkConfig() error {
 	if d.OsImageSshHostPubKey == "" {
 		return fmt.Errorf(errorMandatoryOption, "OS image ssh host public key", "--fsas-image-os-ssh-host-pub-key")
 	}
+
+	parsedKey, err := sshutils.ParseSSHPublicKey(d.OsImageSshHostPubKey)
+	if err != nil {
+		return fmt.Errorf("invalid SSH host public key format: %w", err)
+	}
+	d.OsImageSshHostParsedKey = parsedKey
 
 	if d.SlesRegistrationCode != "" {
 		if d.SlesRegistrationEmail == "" {
@@ -584,20 +627,9 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	hostName, err := d.GetSSHHostname()
-	if err != nil {
-		slog.Error("Could not acquire target SSH hostname because of an error: ", "err", err)
+	if err := d.initSshManager(); err != nil {
+		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
-	}
-	slog.Info("Acquired ssh hostname: ", "hostname", hostName)
-
-	if !d.SshManager.IsInit() {
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
-		if err != nil {
-			slog.Error("error while initializing Standard SSH Manager: ", "err", err)
-			return err
-		}
-		d.SshManager = sshManager
 	}
 
 	if err := d.SshManager.ExchangeKeys(); err != nil {
@@ -847,20 +879,11 @@ func (d *Driver) Remove() error {
 		return err
 	}
 
-	hostName, err := d.GetSSHHostname()
-	if err != nil {
-		// Similar as above - we must ignore hostname acquisition error to avoid perpetual loop
-		slog.Warn("Could not acquire target SSH hostname because of an error: ", "err", err)
+	// Check if ssh manager is available for e.g. OS deregistration, if not - proceed with machine removal anyway
+	if err := d.initSshManager(); err != nil {
+		// If ssh manager cannot be initialized then do not return error and proceed with machine removal
+		slog.Warn("error while initializing SSH Manager, proceeding with machine removal: ", "err", err)
 	} else {
-		slog.Info("Acquired SSH hostname: ", "hostname", hostName)
-		if !d.SshManager.IsInit() {
-			sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
-			if err != nil {
-				slog.Error("error while initializing Standard SSH Manager: ", "err", err)
-				return err
-			}
-			d.SshManager = sshManager
-		}
 		if err := d.SshManager.DeregisterOS(); err != nil {
 			slog.Warn("Could not deregister SLES OS, manual action might be required: ", "err", err)
 		}
