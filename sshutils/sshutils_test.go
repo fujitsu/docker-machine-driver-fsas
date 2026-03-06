@@ -826,6 +826,8 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
+	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
+	assert.ErrorContains(t, err, "could not get SUSE product status before deregistration")
 	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
 }
 
@@ -879,5 +881,54 @@ func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
 	err = manager.DeregisterOS()
 	assert.NoError(t, err)
 
+	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
+}
+
+func Test_DeregisterOS_Fail_JsonParse(t *testing.T) {
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	assert.NoError(t, err)
+
+	mockClient := &MockSSHClient{
+		OutputFunc: func(cmd string) (string, error) {
+			if cmd == cmdGetStatusOS {
+				return "invalid-json", nil
+			}
+			return "", fmt.Errorf("unexpected command")
+		},
+	}
+	manager.Client = mockClient
+	manager.SshKeyPath = ""
+
+	err = manager.DeregisterOS()
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to parse SUSE status JSON before deregistration")
+	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
+}
+
+func Test_DeregisterOS_Fail_DeregistrationCommand(t *testing.T) {
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	assert.NoError(t, err)
+	products := []models.SuseProduct{
+		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Registered"},
+	}
+	jsonOutput, _ := json.Marshal(products)
+
+	mockClient := &MockSSHClient{
+		OutputFunc: func(cmd string) (string, error) {
+			if cmd == cmdGetStatusOS {
+				return string(jsonOutput), nil
+			}
+			if cmd == cmdDeregisterOS {
+				return "", MOCK_ERROR_FOR_OUTPUT_METHOD
+			}
+			return "", fmt.Errorf("unexpected command")
+		},
+	}
+	manager.Client = mockClient
+	manager.SshKeyPath = ""
+
+	err = manager.DeregisterOS()
+	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
+	assert.ErrorContains(t, err, "error executing SLES OS deregistration")
 	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
 }

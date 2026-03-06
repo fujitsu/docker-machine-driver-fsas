@@ -885,7 +885,7 @@ func (d *Driver) Remove() error {
 		slog.Warn("error while initializing SSH Manager, proceeding with machine removal: ", "err", err)
 	} else {
 		if err := d.SshManager.DeregisterOS(); err != nil {
-			slog.Warn("Could not deregister SLES OS, manual action might be required: ", "err", err)
+			slog.Warn("Could not deregister SLES OS, manual action might be required if node was previously registered:", "err", err)
 		}
 	}
 
