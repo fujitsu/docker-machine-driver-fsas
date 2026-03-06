@@ -590,14 +590,14 @@ func (sc *StandardSshManager) RegisterOS(regcode, email string) error {
 func (sc *StandardSshManager) DeregisterOS() error {
 	jsonOutput, err := sc.runCommand(cmdGetStatusOS)
 	if err != nil {
-		slog.Error("Could not get SUSE product status before deregistration: ", "err", err)
-		return err
+		slog.Error("Could not get SUSE product status before deregistration:", "err", err)
+		return fmt.Errorf("could not get SUSE product status before deregistration: %w", err)
 	}
 
 	var products []models.SuseProduct
 	if err := json.Unmarshal([]byte(jsonOutput), &products); err != nil {
-		slog.Error("Failed to parse SUSE status JSON before deregistration: ", "err", err)
-		return err
+		slog.Error("Failed to parse SUSE status JSON before deregistration:", "err", err)
+		return fmt.Errorf("failed to parse SUSE status JSON before deregistration: %w", err)
 	}
 
 	anyRegistered := false
@@ -616,8 +616,8 @@ func (sc *StandardSshManager) DeregisterOS() error {
 
 	_, err = sc.runCommand(cmdDeregisterOS)
 	if err != nil {
-		slog.Error("Error executing SLES OS deregistration: ", "err", err)
-		return err
+		slog.Error("Error executing SLES OS deregistration:", "err", err)
+		return fmt.Errorf("error executing SLES OS deregistration: %w", err)
 	}
 	slog.Info("SLES OS deregistered successfully")
 	return nil
