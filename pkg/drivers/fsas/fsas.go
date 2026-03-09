@@ -617,9 +617,8 @@ func (d *Driver) innerCreate() error {
 		d.CfgManager = cfgManager
 	}
 
-	removeOnFinish := true
-	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid", d.MachineUUID, removeOnFinish); err != nil {
-		slog.Error("Filed to implant RKE2 config via userdata:", "err", err)
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
 		return err
 	}
 

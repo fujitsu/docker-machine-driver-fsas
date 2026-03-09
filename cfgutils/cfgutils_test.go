@@ -127,25 +127,21 @@ func Test_prepareRke2ConfigNodeLabels_Dynamic(t *testing.T) {
 	assert.Equal(t, expected, labelStr)
 }
 
-func TestPrepareRke2ConfigScript(t *testing.T) {
-	configName := "100-kubelet-provider-id"
+func Test_getRke2ConfigFileContent(t *testing.T) {
 	testCases := []struct {
 		machineUUID string
 		expected    string
 	}{
 		{machineUUID: "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
-			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas-cdi://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`),
+			expected: fmt.Sprintf(sampleRke2ConfigFileContent, "cdd792f2-5591-4c18-a8bd-1c39e55dedfa"),
 		},
 
 		{machineUUID: "1234",
-			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas-cdi://1234"`),
+			expected: fmt.Sprintf(sampleRke2ConfigFileContent, "1234"),
 		},
 
 		{machineUUID: "",
-			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
-				`kubelet-arg+: "provider-id=fsas-cdi://"`),
+			expected: fmt.Sprintf(sampleRke2ConfigFileContent, ""),
 		},
 	}
 
@@ -153,13 +149,13 @@ func TestPrepareRke2ConfigScript(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.machineUUID, func(t *testing.T) {
-			observed := manager.prepareRke2ConfigScript(configName, tc.machineUUID)
+			observed := manager.getRke2ConfigFileContent(tc.machineUUID)
 			assert.Equal(t, tc.expected, observed)
 		})
 	}
 }
 
-func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
+func Test_getRke2ConfigFileContent_WithGPUResources(t *testing.T) {
 	devicesSpecJson := `[
 		{
 			"res_type": "gpu",
@@ -173,15 +169,13 @@ func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
 			"max_resource_count": 2
 		}
 	]`
+	template := `kubelet-arg+: "provider-id=fsas-cdi://%s"
+kubelet-arg+: "node-labels=cohdi.io/nvidia-l40s-size-min=1,cohdi.io/nvidia-l40s-size-max=2"`
 	manager := NewStandardCfgManager(devicesSpecJson, "")
+	observed := manager.getRke2ConfigFileContent("cdd792f2-5591-4c18-a8bd-1c39e55dedfa")
 
-	configName := "100-gpu-labels"
-	script := manager.prepareRke2ConfigScript(configName, "my-machine-uuid")
-
-	expected := fmt.Sprintf(rke2ConfigScriptContent, configName,
-		`kubelet-arg+: "provider-id=fsas-cdi://my-machine-uuid"
-kubelet-arg+: "node-labels=cohdi.io/nvidia-l40s-size-min=1,cohdi.io/nvidia-l40s-size-max=2"`)
-	assert.Equal(t, expected, script)
+	expected := fmt.Sprintf(template, "cdd792f2-5591-4c18-a8bd-1c39e55dedfa")
+	assert.Equal(t, expected, observed)
 }
 
 func Test_prepareRke2ConfigNodeLabels_FromExactJSON(t *testing.T) {
@@ -332,7 +326,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 		expectedError   error
 	}{
 		{name: "case 1: add one item to section 'runcmd'",
-			readFileContent: []byte(userdataSampleContent),
+			readFileContent: []byte(userdataSampleContent1rc),
 			input:           inputOneItemRunCmd,
 			expectedStr:     expectedStr2Cmd,
 			nrExpectedItems: 2,
@@ -340,7 +334,7 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 		},
 
 		{name: "case 2: add two items to section 'runcmd'",
-			readFileContent: []byte(userdataSampleContent),
+			readFileContent: []byte(userdataSampleContent1rc),
 			input:           inputTwoItemsRunCmd,
 			expectedStr:     expectedStr3Cmd,
 			nrExpectedItems: 3,
@@ -364,9 +358,9 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 		},
 
 		{name: "case 5: input as empty list",
-			readFileContent: []byte(userdataSampleContent),
+			readFileContent: []byte(userdataSampleContent1rc),
 			input:           nil,
-			expectedStr:     userdataSampleContent,
+			expectedStr:     userdataSampleContent1rc,
 			nrExpectedItems: 1,
 			expectedError:   nil,
 		},
@@ -664,26 +658,22 @@ func TestImplantRKE2Config(t *testing.T) {
 		readFileContent []byte
 		expectedStr     string
 		expectedError   error
-		removeOnFinish  bool
 	}{
-		{name: "case 1: cloud-init does not contain any sections; do not remove script on finish",
+		{name: "case 1: cloud-init does not contain any sections",
 			readFileContent: []byte(userdataSampleContentNoSections),
-			removeOnFinish:  false,
-			expectedStr:     expectedImplantRke2ConfigNoDeletion1rc1wf,
+			expectedStr:     expectedImplantRke2Config2wf,
 			expectedError:   nil,
 		},
 
-		{name: "case 2: cloud-init contains section 'run_cmd'; do not remove script on finish",
-			readFileContent: []byte(userdataSampleContent),
-			removeOnFinish:  false,
-			expectedStr:     expectedImplantRke2ConfigNoDeletion2rc1wf,
+		{name: "case 2: cloud-init contains section 'run_cmd'",
+			readFileContent: []byte(userdataSampleContent1rc),
+			expectedStr:     expectedImplantRke2Config1rc2wf,
 			expectedError:   nil,
 		},
 
-		{name: "case 3: cloud-init contains section 'run_cmd'; do remove script on finish",
-			readFileContent: []byte(userdataSampleContent),
-			removeOnFinish:  true,
-			expectedStr:     expectedImplantRke2ConfigWithDeletion2rc1wf,
+		{name: "case 3: cloud-init contains section 'write_files'",
+			readFileContent: []byte(userdataSampleContent1wf),
+			expectedStr:     expectedImplantRke2Config3wf,
 			expectedError:   nil,
 		},
 	}
@@ -706,7 +696,7 @@ func TestImplantRKE2Config(t *testing.T) {
 			}
 
 			sc := NewStandardCfgManager("[]", tempFile.Name())
-			err = sc.ImplantRKE2Config("100-fsas-providerid", "1892dc56-3bae-4e5a-9af0-2fcadaf24128", tc.removeOnFinish)
+			err = sc.ImplantRKE2Config(sampleRke2ConfigName, "1892dc56-3bae-4e5a-9af0-2fcadaf24128")
 
 			if tc.expectedError != nil {
 				assert.ErrorIs(t, err, tc.expectedError,

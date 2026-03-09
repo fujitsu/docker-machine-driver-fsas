@@ -3,10 +3,17 @@ package cfgutils
 import "errors"
 
 var (
-	userdataSampleContent = `#cloud-config
+	userdataSampleContent1rc = `#cloud-config
 runcmd:
   - timedatectl set-timezone Europe/Warsaw
 `
+
+	userdataSampleContent1wf = `#cloud-config
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"`
 
 	userdataSampleContentNoSections                 = `#cloud-config`
 	userdataSampleInvalidYamlContentRandomAscii     = `.32??#(&&)58ffo:bar`
@@ -236,33 +243,45 @@ write_files:
     encoding: "gzip+b64"
     permissions: "0644"`
 
-	expectedImplantRke2ConfigNoDeletion1rc1wf = `#cloud-config
-runcmd:
-  - sh /tmp/setup_rke2.sh
+	sampleRke2ConfigName         = "100-fsas-providerid.yaml"
+	expectedImplantRke2Config2wf = `#cloud-config
 write_files:
-  - path: /tmp/setup_rke2.sh
-    content: H4sIAAAAAAAA/wAAAP//hMrBTgJBDADQ+3xFRW+mdHcAA4je4Mo3dKcdaBZmSGc1McZ/NyHx7Pm98PhAgxVq55Crg4AVGBcNfNT4ClLDdRRzwBuQTomcSzqr09O3/FCqJdtp/sXXy1xC4gl2O9gfD/D+X6a+6zA3bnjz+mmibnKnMH4MetEJ2U/PW5j9MZq83X8S2xL1602UtHrBxcCKS10xbjh3GHNi4RyXfVzPwv54CFKLht8AAAD//06tloLlAAAA
+  - path: /etc/rancher/k3s/config.yaml.d/100-fsas-providerid.yaml
+    content: H4sIAAAAAAAA/wAAAP//BMBhCoUgDADgqzz8+xjm0lChw0y3hRQUWp2/b3+KHHID9e2ff+bq59tYOjReddCAyi1b62JCrmGBuZCAl0CQSCdArcSk6B1G8wUAAP//2sQU+UsAAAA=
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /etc/rancher/rke2/config.yaml.d/100-fsas-providerid.yaml
+    content: H4sIAAAAAAAA/wAAAP//BMBhCoUgDADgqzz8+xjm0lChw0y3hRQUWp2/b3+KHHID9e2ff+bq59tYOjReddCAyi1b62JCrmGBuZCAl0CQSCdArcSk6B1G8wUAAP//2sQU+UsAAAA=
     encoding: "gzip+b64"
     permissions: "0644"`
 
-	expectedImplantRke2ConfigNoDeletion2rc1wf = `#cloud-config
+	expectedImplantRke2Config1rc2wf = `#cloud-config
 runcmd:
   - timedatectl set-timezone Europe/Warsaw
-  - sh /tmp/setup_rke2.sh
 write_files:
-  - path: /tmp/setup_rke2.sh
-    content: H4sIAAAAAAAA/wAAAP//hMrBTgJBDADQ+3xFRW+mdHcAA4je4Mo3dKcdaBZmSGc1McZ/NyHx7Pm98PhAgxVq55Crg4AVGBcNfNT4ClLDdRRzwBuQTomcSzqr09O3/FCqJdtp/sXXy1xC4gl2O9gfD/D+X6a+6zA3bnjz+mmibnKnMH4MetEJ2U/PW5j9MZq83X8S2xL1602UtHrBxcCKS10xbjh3GHNi4RyXfVzPwv54CFKLht8AAAD//06tloLlAAAA
+  - path: /etc/rancher/k3s/config.yaml.d/100-fsas-providerid.yaml
+    content: H4sIAAAAAAAA/wAAAP//BMBhCoUgDADgqzz8+xjm0lChw0y3hRQUWp2/b3+KHHID9e2ff+bq59tYOjReddCAyi1b62JCrmGBuZCAl0CQSCdArcSk6B1G8wUAAP//2sQU+UsAAAA=
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /etc/rancher/rke2/config.yaml.d/100-fsas-providerid.yaml
+    content: H4sIAAAAAAAA/wAAAP//BMBhCoUgDADgqzz8+xjm0lChw0y3hRQUWp2/b3+KHHID9e2ff+bq59tYOjReddCAyi1b62JCrmGBuZCAl0CQSCdArcSk6B1G8wUAAP//2sQU+UsAAAA=
     encoding: "gzip+b64"
     permissions: "0644"`
 
-	expectedImplantRke2ConfigWithDeletion2rc1wf = `#cloud-config
-runcmd:
-  - timedatectl set-timezone Europe/Warsaw
-  - sh /tmp/setup_rke2.sh
-  - rm /tmp/setup_rke2.sh
+	expectedImplantRke2Config3wf = `#cloud-config
 write_files:
-  - path: /tmp/setup_rke2.sh
-    content: H4sIAAAAAAAA/wAAAP//hMrBTgJBDADQ+3xFRW+mdHcAA4je4Mo3dKcdaBZmSGc1McZ/NyHx7Pm98PhAgxVq55Crg4AVGBcNfNT4ClLDdRRzwBuQTomcSzqr09O3/FCqJdtp/sXXy1xC4gl2O9gfD/D+X6a+6zA3bnjz+mmibnKnMH4MetEJ2U/PW5j9MZq83X8S2xL1602UtHrBxcCKS10xbjh3GHNi4RyXfVzPwv54CFKLht8AAAD//06tloLlAAAA
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /etc/rancher/k3s/config.yaml.d/100-fsas-providerid.yaml
+    content: H4sIAAAAAAAA/wAAAP//BMBhCoUgDADgqzz8+xjm0lChw0y3hRQUWp2/b3+KHHID9e2ff+bq59tYOjReddCAyi1b62JCrmGBuZCAl0CQSCdArcSk6B1G8wUAAP//2sQU+UsAAAA=
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /etc/rancher/rke2/config.yaml.d/100-fsas-providerid.yaml
+    content: H4sIAAAAAAAA/wAAAP//BMBhCoUgDADgqzz8+xjm0lChw0y3hRQUWp2/b3+KHHID9e2ff+bq59tYOjReddCAyi1b62JCrmGBuZCAl0CQSCdArcSk6B1G8wUAAP//2sQU+UsAAAA=
     encoding: "gzip+b64"
     permissions: "0644"`
 )
+
+const sampleRke2ConfigFileContent = `kubelet-arg+: "provider-id=fsas-cdi://%s"`

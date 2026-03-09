@@ -112,17 +112,17 @@ func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) RunAndReturn(run func([]
 	return _c
 }
 
-// ImplantRKE2Config provides a mock function with given fields: configName, machineUUID, removeOnFinish
-func (_m *MockCfgManager) ImplantRKE2Config(configName string, machineUUID string, removeOnFinish bool) error {
-	ret := _m.Called(configName, machineUUID, removeOnFinish)
+// ImplantRKE2Config provides a mock function with given fields: configName, machineUUID
+func (_m *MockCfgManager) ImplantRKE2Config(configName string, machineUUID string) error {
+	ret := _m.Called(configName, machineUUID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImplantRKE2Config")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, bool) error); ok {
-		r0 = rf(configName, machineUUID, removeOnFinish)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(configName, machineUUID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -138,14 +138,13 @@ type MockCfgManager_ImplantRKE2Config_Call struct {
 // ImplantRKE2Config is a helper method to define mock.On call
 //   - configName string
 //   - machineUUID string
-//   - removeOnFinish bool
-func (_e *MockCfgManager_Expecter) ImplantRKE2Config(configName interface{}, machineUUID interface{}, removeOnFinish interface{}) *MockCfgManager_ImplantRKE2Config_Call {
-	return &MockCfgManager_ImplantRKE2Config_Call{Call: _e.mock.On("ImplantRKE2Config", configName, machineUUID, removeOnFinish)}
+func (_e *MockCfgManager_Expecter) ImplantRKE2Config(configName interface{}, machineUUID interface{}) *MockCfgManager_ImplantRKE2Config_Call {
+	return &MockCfgManager_ImplantRKE2Config_Call{Call: _e.mock.On("ImplantRKE2Config", configName, machineUUID)}
 }
 
-func (_c *MockCfgManager_ImplantRKE2Config_Call) Run(run func(configName string, machineUUID string, removeOnFinish bool)) *MockCfgManager_ImplantRKE2Config_Call {
+func (_c *MockCfgManager_ImplantRKE2Config_Call) Run(run func(configName string, machineUUID string)) *MockCfgManager_ImplantRKE2Config_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(bool))
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
@@ -155,7 +154,7 @@ func (_c *MockCfgManager_ImplantRKE2Config_Call) Return(_a0 error) *MockCfgManag
 	return _c
 }
 
-func (_c *MockCfgManager_ImplantRKE2Config_Call) RunAndReturn(run func(string, string, bool) error) *MockCfgManager_ImplantRKE2Config_Call {
+func (_c *MockCfgManager_ImplantRKE2Config_Call) RunAndReturn(run func(string, string) error) *MockCfgManager_ImplantRKE2Config_Call {
 	_c.Call.Return(run)
 	return _c
 }
