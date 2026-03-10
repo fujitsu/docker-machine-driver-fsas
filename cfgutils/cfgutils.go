@@ -27,7 +27,7 @@ type CfgManager interface {
 	PrepareRke2ConfigScript(configName, machineUUID string) string
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
-	ExchangeKeys(sshKeyPath, sshUser string) error
+	ImplantSSHKey(sshKeyPath, sshUser string) error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -237,7 +237,7 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 	return nil
 }
 
-func (sc *StandardCfgManager) ExchangeKeys(sshKeyPath, sshUser string) error {
+func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
 
 	if err := ssh.GenerateSSHKey(sshKeyPath); err != nil {
 		slog.Error("SSH key could not be generated because of an error:", "err", err)

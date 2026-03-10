@@ -20,53 +20,6 @@ func (_m *MockCfgManager) EXPECT() *MockCfgManager_Expecter {
 	return &MockCfgManager_Expecter{mock: &_m.Mock}
 }
 
-// ExchangeKeys provides a mock function with given fields: sshKeyPath, sshUser
-func (_m *MockCfgManager) ExchangeKeys(sshKeyPath string, sshUser string) error {
-	ret := _m.Called(sshKeyPath, sshUser)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ExchangeKeys")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(sshKeyPath, sshUser)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockCfgManager_ExchangeKeys_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExchangeKeys'
-type MockCfgManager_ExchangeKeys_Call struct {
-	*mock.Call
-}
-
-// ExchangeKeys is a helper method to define mock.On call
-//   - sshKeyPath string
-//   - sshUser string
-func (_e *MockCfgManager_Expecter) ExchangeKeys(sshKeyPath interface{}, sshUser interface{}) *MockCfgManager_ExchangeKeys_Call {
-	return &MockCfgManager_ExchangeKeys_Call{Call: _e.mock.On("ExchangeKeys", sshKeyPath, sshUser)}
-}
-
-func (_c *MockCfgManager_ExchangeKeys_Call) Run(run func(sshKeyPath string, sshUser string)) *MockCfgManager_ExchangeKeys_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockCfgManager_ExchangeKeys_Call) Return(_a0 error) *MockCfgManager_ExchangeKeys_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockCfgManager_ExchangeKeys_Call) RunAndReturn(run func(string, string) error) *MockCfgManager_ExchangeKeys_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ExtendUserdataRunCmd provides a mock function with given fields: commands
 func (_m *MockCfgManager) ExtendUserdataRunCmd(commands []string) error {
 	ret := _m.Called(commands)
@@ -155,6 +108,53 @@ func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) Return(_a0 error) *MockC
 }
 
 func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) RunAndReturn(run func([]cfgutils.CloudConfigItem) error) *MockCfgManager_ExtendUserdataWriteFiles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ImplantSSHKey provides a mock function with given fields: sshKeyPath, sshUser
+func (_m *MockCfgManager) ImplantSSHKey(sshKeyPath string, sshUser string) error {
+	ret := _m.Called(sshKeyPath, sshUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ImplantSSHKey")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(sshKeyPath, sshUser)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCfgManager_ImplantSSHKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ImplantSSHKey'
+type MockCfgManager_ImplantSSHKey_Call struct {
+	*mock.Call
+}
+
+// ImplantSSHKey is a helper method to define mock.On call
+//   - sshKeyPath string
+//   - sshUser string
+func (_e *MockCfgManager_Expecter) ImplantSSHKey(sshKeyPath interface{}, sshUser interface{}) *MockCfgManager_ImplantSSHKey_Call {
+	return &MockCfgManager_ImplantSSHKey_Call{Call: _e.mock.On("ImplantSSHKey", sshKeyPath, sshUser)}
+}
+
+func (_c *MockCfgManager_ImplantSSHKey_Call) Run(run func(sshKeyPath string, sshUser string)) *MockCfgManager_ImplantSSHKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockCfgManager_ImplantSSHKey_Call) Return(_a0 error) *MockCfgManager_ImplantSSHKey_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCfgManager_ImplantSSHKey_Call) RunAndReturn(run func(string, string) error) *MockCfgManager_ImplantSSHKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

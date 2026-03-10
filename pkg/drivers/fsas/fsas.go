@@ -599,7 +599,7 @@ func (d *Driver) innerCreate() error {
 		d.CfgManager = cfgManager
 	}
 
-	if err := d.CfgManager.ExchangeKeys(d.GetSSHKeyPath(), d.SSHUser); err != nil {
+	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {
 		return err
 	}
 

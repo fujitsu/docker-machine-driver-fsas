@@ -41,16 +41,12 @@ func (b cloudConfigItemBase) getNewCloudConfigContent() ([]any, error) {
 }
 
 type cloudConfigItemUsers struct {
-	users []cloudConfigUser
+	users []cloudConfigUser `yaml:"users"`
 }
 
 type cloudConfigUser struct {
 	Name              string                     `yaml:"name"`
 	SSHAuthorizedKeys cloudConfigItemSshAuthKeys `yaml:"ssh_authorized_keys"`
-}
-
-type cloudConfigUsersYaml struct {
-	Users []cloudConfigUser `yaml:"users"`
 }
 
 func NewCloudConfigItemUsers(name string, keys []string) cloudConfigItemUsers {
