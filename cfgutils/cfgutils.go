@@ -22,9 +22,9 @@ var (
 type CfgManager interface {
 	IsInit() bool
 	PrepareMetadata(instanceId, hostname string) string
-	PrepareRke2ConfigScript(configName, machineUUID string) string
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
+	ImplantRKE2Config(configName, machineUUID string) error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -61,34 +61,6 @@ func (sc *StandardCfgManager) PrepareMetadata(instanceId, hostname string) strin
 	content := fmt.Sprintf(metadataContent, instanceId, hostname)
 	return content
 }
-
-// prepareRke2ConfigScript Prepares script for RKE2
-func (sc *StandardCfgManager) PrepareRke2ConfigScript(configName, machineUUID string) string {
-	slog.Debug(fmt.Sprintf("Prepare RKE2 Config Script: %s", configName))
-	providerIdEntry := sc.prepareRke2ConfigProviderId(machineUUID)
-	nodeLabelEntry := sc.prepareRke2ConfigNodeLabelsForGpu()
-
-	var configContent string
-	if nodeLabelEntry != "" {
-		configContent = fmt.Sprintf("%s\n%s", providerIdEntry, nodeLabelEntry)
-	} else {
-		configContent = providerIdEntry
-	}
-	return fmt.Sprintf(rke2ConfigScriptContent, configName, configContent)
-}
-
-/*
-WARNING: const below (#!/bin/sh ...) must be aligned to left because otherwise it does not work.
-*/
-const rke2ConfigScriptContent = `
-#!/bin/sh
-for d in k3s rke2; do
-mkdir -p /etc/rancher/${d}/config.yaml.d
-cat << EOF > /etc/rancher/${d}/config.yaml.d/%s.yaml
-%s
-EOF
-done
-`
 
 // prepareRke2ConfigProviderId Returns string with provider ID containing machine UUID
 func (sc *StandardCfgManager) prepareRke2ConfigProviderId(MachineUUID string) string {
@@ -227,4 +199,33 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 		return err
 	}
 	return nil
+}
+
+// ImplantRKE2Config extends userdata cloud-config file and prepare files that configure rke2.
+func (sc *StandardCfgManager) ImplantRKE2Config(configName, machineUUID string) error {
+	rke2ConfigFileContent := sc.getRke2ConfigFileContent(machineUUID)
+	rke2ConfigScriptWriteFilesItems := []CloudConfigItem{
+		NewCloudConfigItemWriteFiles(fmt.Sprintf("/etc/rancher/k3s/config.yaml.d/%s", configName), rke2ConfigFileContent),
+		NewCloudConfigItemWriteFiles(fmt.Sprintf("/etc/rancher/rke2/config.yaml.d/%s", configName), rke2ConfigFileContent),
+	}
+
+	if err := sc.ExtendUserdataWriteFiles(rke2ConfigScriptWriteFilesItems); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getRke2ConfigFileContent prepares content of file with rke2 configuration that will be added to cloud config userdata file
+func (sc *StandardCfgManager) getRke2ConfigFileContent(machineUUID string) string {
+	providerIdEntry := sc.prepareRke2ConfigProviderId(machineUUID)
+	nodeLabelEntry := sc.prepareRke2ConfigNodeLabelsForGpu()
+
+	var configContent string
+	if nodeLabelEntry != "" {
+		configContent = fmt.Sprintf("%s\n%s", providerIdEntry, nodeLabelEntry)
+	} else {
+		configContent = providerIdEntry
+	}
+	return configContent
 }

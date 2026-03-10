@@ -617,15 +617,8 @@ func (d *Driver) innerCreate() error {
 		d.CfgManager = cfgManager
 	}
 
-	// Prepare scripts execution parameters
-	scriptPath := "" // Random paths
-	removeOnFinish := true
-	runSudo := true
-
-	// Generate script content for RKE2 setup
-	overrideProviderIdScriptContent := d.CfgManager.PrepareRke2ConfigScript("100-fsas-providerid", d.MachineUUID)
-
-	if err := d.SshManager.ExecuteScript(scriptPath, overrideProviderIdScriptContent, removeOnFinish, runSudo); err != nil {
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
 		return err
 	}
 
@@ -637,6 +630,9 @@ func (d *Driver) innerCreate() error {
 		slog.Error("Failed to disable password login: ", "err", err)
 		return err
 	}
+
+	slog.Info("Logging content of cloud config file at the end of Create")
+	logContentOfCloudConfigFile(d.UserDataFile)
 
 	return nil
 }
