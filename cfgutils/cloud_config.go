@@ -81,8 +81,8 @@ type cloudConfigItemSshAuthKeys struct {
 	cloudConfigItemBase
 }
 
-func NewCloudConfigItemSshAuthKeys(cmds []string) cloudConfigItemSshAuthKeys {
-	return cloudConfigItemSshAuthKeys{cloudConfigItemBase{lines: cmds}}
+func NewCloudConfigItemSshAuthKeys(keys []string) cloudConfigItemSshAuthKeys {
+	return cloudConfigItemSshAuthKeys{cloudConfigItemBase{lines: keys}}
 }
 
 /*

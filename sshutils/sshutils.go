@@ -77,7 +77,6 @@ var _ SSHKeyParser = (*fileSSHKeyParser)(nil)
 // SshManager interface defines the methods for interacting with the SSH Manager.
 type SshManager interface {
 	IsInit() bool
-	ExchangeKeys() error
 	ExecuteScript(scriptPath, scriptContent string, postRemove bool, runWithSudo bool) error
 	WriteFileOnRemoteMachine(path, fileContent string, fileMode os.FileMode) error
 	DisablePasswordSSHLogin() error
@@ -242,34 +241,6 @@ func (sc *StandardSshManager) runCommand(command string) (string, error) {
 	return output, nil
 }
 
-func (sc *StandardSshManager) ExchangeKeys() error {
-
-	if err := sc.createSSHKey(); err != nil {
-		slog.Error("Could not generate SSH keys because of an error: ", "err", err)
-		return err
-	}
-
-	if err := sc.transferSSHKeyToMachine(); err != nil {
-		slog.Error("Could not transfer SSH keys because of an error: ", "err", err)
-		return err
-	}
-
-	slog.Info("SSH key pair exchanged successfully")
-	return nil
-}
-
-// createSSHKey is responsible for generating new SSH key pair
-func (sc *StandardSshManager) createSSHKey() error {
-
-	if err := ssh.GenerateSSHKey(sc.SshKeyPath); err != nil {
-		slog.Error("SSH key could not be generated because of an error: ", "err", err)
-		return err
-	}
-	slog.Info("SSH key pair generated successfully: ", "path", sc.SshKeyPath)
-
-	return nil
-}
-
 // DisablePasswordSSHLogin disables password authentication for SSH on newly created machine
 func (sc *StandardSshManager) DisablePasswordSSHLogin() error {
 
@@ -299,28 +270,6 @@ func (sc *StandardSshManager) RebootCloudInit() error {
 		return err
 	}
 	slog.Info("Cloud-init reboot executed successfully")
-	return nil
-}
-
-// transferSSHKeyToMachine is responsible for transferring existing SSH key to newly created machine
-func (sc *StandardSshManager) transferSSHKeyToMachine() error {
-
-	pubSshKeyPath := sc.SshKeyPath + ".pub"
-	slog.Debug("Opening file: ", "file", pubSshKeyPath)
-
-	buffer, err := os.ReadFile(pubSshKeyPath)
-	if err != nil {
-		slog.Error("Error opening file: ", "sshKeyPath", pubSshKeyPath, "err", err)
-		return err
-	}
-
-	command := fmt.Sprintf(`echo "%s" >> $HOME/.ssh/authorized_keys`, string(buffer))
-	_, err = sc.runCommand(command)
-	if err != nil {
-		slog.Error("Error writing public key: ", "err", err)
-		return err
-	}
-
 	return nil
 }
 
