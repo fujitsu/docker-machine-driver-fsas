@@ -1,2 +1,5 @@
 docker-machine-driver-fsas
 *.log
+.idea/
+.vscode/
+.zed/
