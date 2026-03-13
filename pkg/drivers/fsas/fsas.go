@@ -17,6 +17,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	"github.com/rancher/machine/libmachine/drivers"
+	"github.com/rancher/machine/libmachine/ssh"
 
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	"github.com/rancher/machine/libmachine/mcnflag"
@@ -520,6 +521,8 @@ func (d *Driver) Create() error {
 	return nil
 }
 
+var generateSSHKey = ssh.GenerateSSHKey
+
 func (d *Driver) innerCreate() error {
 	slog.Debug("Attempting to create FSAS CDI machine instance.")
 	slog.Debug(fmt.Sprintf("BaseDriver struct: %+v", d.BaseDriver))
@@ -597,6 +600,10 @@ func (d *Driver) innerCreate() error {
 	if !d.CfgManager.IsInit() {
 		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
 		d.CfgManager = cfgManager
+	}
+
+	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
+		return err
 	}
 
 	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {

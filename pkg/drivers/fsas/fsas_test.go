@@ -37,10 +37,16 @@ func TestMain(m *testing.M) {
 	// Suppress slog output in test
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
+	// Replace with mock function
+	original := generateSSHKey
+	generateSSHKey = func(path string) error { return nil }
+
 	exitCode := m.Run() // run tests
 
 	/* tear-down code here */
 	statusClock = timeutils.RealClock{}
+
+	generateSSHKey = original
 
 	// Restore original logger
 	slog.SetDefault(originalLogger)
@@ -836,7 +842,6 @@ func TestWaitForStatusError(t *testing.T) {
 func TestCreate(t *testing.T) {
 	mockClock := timeutilsmock.NewMockClock(t)
 	statusClock = mockClock
-
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockSSH := sshMock.NewMockSshManager(t)

@@ -12,7 +12,6 @@ import (
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
-	"github.com/rancher/machine/libmachine/ssh"
 	"gopkg.in/yaml.v3"
 )
 
@@ -238,12 +237,6 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 }
 
 func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
-
-	if err := ssh.GenerateSSHKey(sshKeyPath); err != nil {
-		slog.Error("SSH key could not be generated because of an error:", "err", err)
-		return err
-	}
-	slog.Info("SSH key pair generated successfully:", "path", sshKeyPath)
 
 	sshPubKeyContent, err := getFileContent(fmt.Sprintf("%s.pub", sshKeyPath))
 	if err != nil {

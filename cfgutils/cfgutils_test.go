@@ -807,10 +807,11 @@ func TestImplantSSHKey(t *testing.T) {
 				require.NoError(t, err, "Failed to write to temp file")
 			}
 
-			sshPrivKeyPath := filepath.Join(t.TempDir(), "id_rsa")
+			tempDir := t.TempDir()
+			sshPrivKeyPath := filepath.Join(tempDir, "id_rsa")
+			sshPubKeyPath, err := os.Create(filepath.Join(tempDir, "id_rsa.pub"))
+			sshPubKeyPath.Write([]byte(string("ssh-rsa AAAAB3NzaC1yc")))
 			defer func() {
-				err = os.Remove(sshPrivKeyPath)
-				require.NoError(t, err, "Failed to delete temp file with ssh private key")
 				err = os.Remove(fmt.Sprintf("%s.pub", sshPrivKeyPath))
 				require.NoError(t, err, "Failed to delete temp file with ssh public key")
 			}()
