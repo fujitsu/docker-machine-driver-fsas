@@ -37,10 +37,16 @@ func TestMain(m *testing.M) {
 	// Suppress slog output in test
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
+	// Replace with mock function
+	original := generateSSHKey
+	generateSSHKey = func(path string) error { return nil }
+
 	exitCode := m.Run() // run tests
 
 	/* tear-down code here */
 	statusClock = timeutils.RealClock{}
+
+	generateSSHKey = original
 
 	// Restore original logger
 	slog.SetDefault(originalLogger)
@@ -836,7 +842,6 @@ func TestWaitForStatusError(t *testing.T) {
 func TestCreate(t *testing.T) {
 	mockClock := timeutilsmock.NewMockClock(t)
 	statusClock = mockClock
-
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockSSH := sshMock.NewMockSshManager(t)
@@ -894,7 +899,7 @@ func TestCreate(t *testing.T) {
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
 	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
-	mockSSH.On("ExchangeKeys").Return(nil)
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockRKE2ScriptContent := "script-content-rke2"
 	mockCfg.On("PrepareRke2ConfigScript", "100-fsas-providerid", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(mockRKE2ScriptContent)
 	mockSSH.On("ExecuteScript", "", mockRKE2ScriptContent, true, true).Return(nil).Once()
@@ -980,7 +985,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
 	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
-	mockSSH.On("ExchangeKeys").Return(nil)
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockRKE2ScriptContent := "script-content-rke2"
 	mockCfg.On("PrepareRke2ConfigScript", "100-fsas-providerid", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(mockRKE2ScriptContent)
 	mockSSH.On("ExecuteScript", "", mockRKE2ScriptContent, true, true).Return(nil).Once()
@@ -1364,10 +1369,11 @@ func TestCreateGetMachineDetailsFailSecond(t *testing.T) {
 	assert.EqualError(t, err, testError.Error())
 }
 
-func TestCreateExchangeKeysFail(t *testing.T) {
+func TestCreateImplantSSHKeyFail(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockSSH := sshMock.NewMockSshManager(t)
+	mockCfg := cfgMock.NewMockCfgManager(t)
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
 	driver := &Driver{
@@ -1375,6 +1381,7 @@ func TestCreateExchangeKeysFail(t *testing.T) {
 		FabricManager:         mockFM,
 		Keycloak:              mockKeycloak,
 		SshManager:            mockSSH,
+		CfgManager:            mockCfg,
 		MachineUUID:           testMachineUUID,
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
@@ -1415,9 +1422,9 @@ func TestCreateExchangeKeysFail(t *testing.T) {
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
-	testError := fmt.Errorf("ExchangeKeys unsuccessful")
-	mockSSH.On("IsInit").Return(true)
-	mockSSH.On("ExchangeKeys").Return(testError)
+	testError := fmt.Errorf("ImplantSSHKey unsuccessful")
+	mockCfg.On("IsInit").Return(true)
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(testError)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// waitForStatus in Remove call
@@ -1482,7 +1489,8 @@ func TestCreateOSRegistrationFail(t *testing.T) {
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
-	mockSSH.On("ExchangeKeys").Return(nil)
+	mockCfg.On("IsInit").Return(true)
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockError := fmt.Errorf("Registration failed")
 	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(mockError)
 	mockSSH.On("DeregisterOS").Return(nil)
@@ -1550,8 +1558,9 @@ func TestCreateExecuteScriptFail(t *testing.T) {
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockCfg.On("IsInit").Return(true)
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
-	mockSSH.On("ExchangeKeys").Return(nil)
 	mockRKE2ScriptContent := "test RKE2 script content"
 	mockCfg.On("PrepareRke2ConfigScript", "100-fsas-providerid", testMachineUUID).Return(mockRKE2ScriptContent)
 	mockError := fmt.Errorf("ExecuteScript unsuccessful")
@@ -1621,8 +1630,9 @@ func TestCreateFailRemoveFail(t *testing.T) {
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockCfg.On("IsInit").Return(true)
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
-	mockSSH.On("ExchangeKeys").Return(nil)
 	mockRKE2ScriptContent := "test RKE2 script content"
 	mockCfg.On("PrepareRke2ConfigScript", "100-fsas-providerid", testMachineUUID).Return(mockRKE2ScriptContent)
 	mockError := fmt.Errorf("ExecuteScript unsuccessful")

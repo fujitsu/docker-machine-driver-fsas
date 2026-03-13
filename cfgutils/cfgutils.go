@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
@@ -25,6 +26,7 @@ type CfgManager interface {
 	PrepareRke2ConfigScript(configName, machineUUID string) string
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
+	ImplantSSHKey(sshKeyPath, sshUser string) error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -161,6 +163,11 @@ func (sc *StandardCfgManager) ExtendUserdataRunCmd(commands []string) error {
 	return sc.extendUserdata(cloudConfigItems)
 }
 
+func (sc *StandardCfgManager) ExtendUserdataSshAuthKeys(commands []string) error {
+	cloudConfigItems := []CloudConfigItem{NewCloudConfigItemSshAuthKeys(commands)}
+	return sc.extendUserdata(cloudConfigItems)
+}
+
 func (sc *StandardCfgManager) ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error {
 	return sc.extendUserdata(fileObjects)
 }
@@ -227,4 +234,39 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 		return err
 	}
 	return nil
+}
+
+func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
+
+	sshPubKeyContent, err := getFileContent(fmt.Sprintf("%s.pub", sshKeyPath))
+	if err != nil {
+		return err
+	}
+	sshPubKeyContentTrimmed := strings.TrimSpace(string(sshPubKeyContent))
+
+	slog.Debug("ssh public key:", "keyName", fmt.Sprintf("%s.pub", filepath.Base(sshKeyPath)), "keyValue", sshPubKeyContentTrimmed)
+
+	items := []CloudConfigItem{
+		NewCloudConfigItemUsers(strings.TrimSpace(sshUser), []string{sshPubKeyContentTrimmed}),
+	}
+	if err := sc.extendUserdata(items); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getFileContent(pathToFile string) (fileContent []byte, err error) {
+
+	fileContent, err = os.ReadFile(pathToFile)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			slog.Error("File does not exist:", "path", pathToFile, "err", err)
+		} else {
+			slog.Error("File cannot be read:", "path", pathToFile, "err", err)
+		}
+		return nil, err
+	}
+
+	return fileContent, err
 }

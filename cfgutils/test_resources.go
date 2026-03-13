@@ -8,6 +8,11 @@ runcmd:
   - timedatectl set-timezone Europe/Warsaw
 `
 
+	userdataSampleContentSsh = `#cloud-config
+ssh_authorized_keys:
+  - ssh-rsa AAASampleContent
+`
+
 	userdataSampleContentNoSections                 = `#cloud-config`
 	userdataSampleInvalidYamlContentRandomAscii     = `.32??#(&&)58ffo:bar`
 	userdataSampleInvalidYamlContentRunCmdIsInteger = `#cloud-config
@@ -26,11 +31,40 @@ runcmd:
 		`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,
 	}
 
+	inputOneItemSshAuthKeys = []string{
+		`ssh-rsa AAAAB3NzaC1yc`,
+	}
+	inputTwoItemsSshAuthKeys = []string{
+		`ssh-rsa AAAAitem1`,
+		`ssh-rsa AAAAitem2`,
+	}
+
 	expectedStr2Cmd = `
 #cloud-config
 runcmd:
   - timedatectl set-timezone Europe/Warsaw
   - echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log
+`
+
+	expectedStr1Ssh = `
+#cloud-config
+ssh_authorized_keys:
+  - ssh-rsa AAAAB3NzaC1yc
+`
+
+	expectedStr2Ssh = `
+#cloud-config
+ssh_authorized_keys:
+  - ssh-rsa AAASampleContent
+  - ssh-rsa AAAAB3NzaC1yc
+`
+
+	expectedStr3Ssh = `
+#cloud-config
+ssh_authorized_keys:
+  - ssh-rsa AAASampleContent
+  - ssh-rsa AAAAitem1
+  - ssh-rsa AAAAitem2
 `
 
 	inputTwoItemsRunCmd = []string{
