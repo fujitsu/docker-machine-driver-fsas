@@ -17,6 +17,7 @@ runcmd:
 ssh_authorized_keys:
   - ssh-rsa AAASampleContent
 `
+
 	userdataSampleContent1wf = `#cloud-config
 write_files:
   - path: /tmp/foo
@@ -49,6 +50,44 @@ write_files:
 		`ssh-rsa AAAAitem1`,
 		`ssh-rsa AAAAitem2`,
 	}
+
+	expectedSuseProducts1rc1wf = `#cloud-config
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/register-suse-modules.sh
+    content: H4sIAAAAAAAA/wAAAP//fFJNb9NMEL7vr3jerf2mBdZW0lsrV6AKRA8UicAB1VXkeCfxRvauuztJWwj/HTlOQgICXzwaP18znpP/0qmx6bQIlQjEUCTYNBS4aNosOtUFE17GX1XcqFhPJvH7SfxhEo/PBD1RiSvIlJs29TQ3gcmrsAykGqeXNQUVfd9L/UhqN5cYXf0/FILKykGOufBs7BzjL+O3+LRR8AUbZ5MkkUKUjc5k9+3aWUslQ3kMh0M1Go3U+fk5FGHhKvtaO5JbyegKvxFedM8xNCobLcQJjA1c1DUWD5cwjEdT15gSLJEmDWNh6YkRmNrQZ/n23LbkoZR1VhnL5IuSzYrgaeYpVAcpOo+d07+5v1L8hR6W2h1PpQIXvAxYY/HQzThI7u6xhsxPE6PJspkZ8mc556dJj+zrwpdVX63IB+PsmRxgjcfK1ISbd+MsGuQ8gKdCd6pGY+vTEbEifwntBNCnNDqLjE6jFfk06hCvtvAs6t9SAGaGO8hdA1kGeet4+6/Jk5a4vwRXZAWwU35z/fnm4+3FHtWdSGS03ED+PIoWuTxOkkvIA739PrvWZqcA1YEOLetu6mf4fbCLneXMCO0s/QwAAP//qjVEjycDAAA=
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedSuseProduct2rc1wf = `#cloud-config
+runcmd:
+  - timedatectl set-timezone Europe/Warsaw
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/register-suse-modules.sh
+    content: H4sIAAAAAAAA/wAAAP//fFJNb9NMEL7vr3jerf2mBdZW0lsrV6AKRA8UicAB1VXkeCfxRvauuztJWwj/HTlOQgICXzwaP18znpP/0qmx6bQIlQjEUCTYNBS4aNosOtUFE17GX1XcqFhPJvH7SfxhEo/PBD1RiSvIlJs29TQ3gcmrsAykGqeXNQUVfd9L/UhqN5cYXf0/FILKykGOufBs7BzjL+O3+LRR8AUbZ5MkkUKUjc5k9+3aWUslQ3kMh0M1Go3U+fk5FGHhKvtaO5JbyegKvxFedM8xNCobLcQJjA1c1DUWD5cwjEdT15gSLJEmDWNh6YkRmNrQZ/n23LbkoZR1VhnL5IuSzYrgaeYpVAcpOo+d07+5v1L8hR6W2h1PpQIXvAxYY/HQzThI7u6xhsxPE6PJspkZ8mc556dJj+zrwpdVX63IB+PsmRxgjcfK1ISbd+MsGuQ8gKdCd6pGY+vTEbEifwntBNCnNDqLjE6jFfk06hCvtvAs6t9SAGaGO8hdA1kGeet4+6/Jk5a4vwRXZAWwU35z/fnm4+3FHtWdSGS03ED+PIoWuTxOkkvIA739PrvWZqcA1YEOLetu6mf4fbCLneXMCO0s/QwAAP//qjVEjycDAAA=
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedSuseProduct1rc2wf = `#cloud-config
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /tmp/register-suse-modules.sh
+    content: H4sIAAAAAAAA/wAAAP//fFJNb9NMEL7vr3jerf2mBdZW0lsrV6AKRA8UicAB1VXkeCfxRvauuztJWwj/HTlOQgICXzwaP18znpP/0qmx6bQIlQjEUCTYNBS4aNosOtUFE17GX1XcqFhPJvH7SfxhEo/PBD1RiSvIlJs29TQ3gcmrsAykGqeXNQUVfd9L/UhqN5cYXf0/FILKykGOufBs7BzjL+O3+LRR8AUbZ5MkkUKUjc5k9+3aWUslQ3kMh0M1Go3U+fk5FGHhKvtaO5JbyegKvxFedM8xNCobLcQJjA1c1DUWD5cwjEdT15gSLJEmDWNh6YkRmNrQZ/n23LbkoZR1VhnL5IuSzYrgaeYpVAcpOo+d07+5v1L8hR6W2h1PpQIXvAxYY/HQzThI7u6xhsxPE6PJspkZ8mc556dJj+zrwpdVX63IB+PsmRxgjcfK1ISbd+MsGuQ8gKdCd6pGY+vTEbEifwntBNCnNDqLjE6jFfk06hCvtvAs6t9SAGaGO8hdA1kGeet4+6/Jk5a4vwRXZAWwU35z/fnm4+3FHtWdSGS03ED+PIoWuTxOkkvIA739PrvWZqcA1YEOLetu6mf4fbCLneXMCO0s/QwAAP//qjVEjycDAAA=
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
 
 	expectedStr2Cmd = `
 #cloud-config

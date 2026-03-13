@@ -610,6 +610,27 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
+		return err
+	}
+
+	/*
+		disable proxy because original image has proxy enabled in yast2.
+		For synapse04 proxy is enabled in yast2 (in SLES image) and disabling here is necessery.
+		If not disabled, the command "SUSEConnect" does not work.
+		It must be added to cloud-init file before SLES registration (script that execute command SUSEconnect).
+	*/
+	// commandDisableProxy := `sed -i 's/PROXY_ENABLED="yes"/PROXY_ENABLED="no"/' /etc/sysconfig/proxy`
+	// if err := d.CfgManager.ExtendUserdataRunCmd([]string{commandDisableProxy}); err != nil {
+	// 	return fmt.Errorf("error while disabling proxy using userdata; %w", err)
+	// }
+
+	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
+		slog.Error("Failed to inject OS registration data into config file: ", "err", err)
+		return err
+	}
+
 	if !d.SshManager.IsInit() {
 		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
 		if err != nil {
@@ -617,16 +638,6 @@ func (d *Driver) innerCreate() error {
 			return err
 		}
 		d.SshManager = sshManager
-	}
-
-	if err := d.SshManager.RegisterOS(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
-		slog.Error("Failed to register OS via SSH using SUSEConnect: ", "err", err, "email", d.SlesRegistrationEmail)
-		return err
-	}
-
-	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
-		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
-		return err
 	}
 
 	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
