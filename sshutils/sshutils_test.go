@@ -126,64 +126,6 @@ func Test_runCommand_Success_Missing_Exit(t *testing.T) {
 	assert.Equal(t, command, output)
 }
 
-func Test_createSSHKey_error(t *testing.T) {
-	sc := &StandardSshManager{SshKeyPath: "example/path/to/key"}
-
-	err := sc.createSSHKey()
-
-	assert.EqualError(t, err, "Error writing keys to file(s): Unable to write file")
-}
-
-func Test_createSSHKey(t *testing.T) {
-	sc := &StandardSshManager{}
-
-	tempDir := t.TempDir()
-	sshKeyName := "newSshKey"
-	sshKeyPath := filepath.Join(tempDir, sshKeyName)
-	sc.SshKeyPath = sshKeyPath
-	err := sc.createSSHKey()
-
-	assert.NoError(t, err)
-	assert.FileExists(t, sshKeyPath)
-	assert.FileExists(t, sshKeyPath+".pub")
-}
-
-func Test_transferSSHKeyToMachineOpenFail(t *testing.T) {
-	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", HOST_PUBLIC_KEY)
-	require.NoError(t, err)
-
-	err = sc.transferSSHKeyToMachine()
-
-	assert.Error(t, err)
-	assert.True(t, os.IsNotExist(err))
-}
-
-func Test_transferSSHKeyToMachine(t *testing.T) {
-	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", HOST_PUBLIC_KEY)
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{}
-	sc.Client = mockClient
-
-	// Create a temporary public key file
-	tempDir := t.TempDir()
-	sshKeyName := "id_rsa"
-	pubKeyName := sshKeyName + ".pub"
-	pubKeyPath := filepath.Join(tempDir, pubKeyName)
-	keyContent := "ssh-rsa AAAA..."
-	err = os.WriteFile(pubKeyPath, []byte(keyContent), 0644)
-	require.NoError(t, err)
-
-	sshKeyPath := filepath.Join(tempDir, sshKeyName)
-	sc.SshKeyPath = sshKeyPath
-	err = sc.transferSSHKeyToMachine()
-
-	assert.NoError(t, err)
-	require.Len(t, mockClient.ExecutedCommands, 1)
-	expectedCommand := fmt.Sprintf(`echo "%s" >> $HOME/.ssh/authorized_keys`, keyContent)
-	assert.Equal(t, expectedCommand, mockClient.ExecutedCommands[0])
-}
-
 func TestWriteFileOnRemoteMachine_Success(t *testing.T) {
 	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", HOST_PUBLIC_KEY)
 	require.NoError(t, err)

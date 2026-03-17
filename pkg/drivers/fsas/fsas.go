@@ -17,6 +17,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	"github.com/rancher/machine/libmachine/drivers"
+	"github.com/rancher/machine/libmachine/ssh"
 
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	"github.com/rancher/machine/libmachine/mcnflag"
@@ -520,6 +521,8 @@ func (d *Driver) Create() error {
 	return nil
 }
 
+var generateSSHKey = ssh.GenerateSSHKey
+
 func (d *Driver) innerCreate() error {
 	slog.Debug("Attempting to create FSAS CDI machine instance.")
 	slog.Debug(fmt.Sprintf("BaseDriver struct: %+v", d.BaseDriver))
@@ -594,6 +597,19 @@ func (d *Driver) innerCreate() error {
 	}
 	slog.Info("Acquired ssh hostname: ", "hostname", hostName)
 
+	if !d.CfgManager.IsInit() {
+		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
+		d.CfgManager = cfgManager
+	}
+
+	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
+		return err
+	}
+
+	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {
+		return err
+	}
+
 	if !d.SshManager.IsInit() {
 		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
 		if err != nil {
@@ -603,18 +619,9 @@ func (d *Driver) innerCreate() error {
 		d.SshManager = sshManager
 	}
 
-	if err := d.SshManager.ExchangeKeys(); err != nil {
-		return err
-	}
-
 	if err := d.SshManager.RegisterOS(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
 		slog.Error("Failed to register OS via SSH using SUSEConnect: ", "err", err, "email", d.SlesRegistrationEmail)
 		return err
-	}
-
-	if !d.CfgManager.IsInit() {
-		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
-		d.CfgManager = cfgManager
 	}
 
 	// Prepare scripts execution parameters
@@ -637,6 +644,9 @@ func (d *Driver) innerCreate() error {
 		slog.Error("Failed to disable password login: ", "err", err)
 		return err
 	}
+
+	slog.Info("Logging content of cloud config file at the end of method innerCreate")
+	logContentOfCloudConfigFile(d.UserDataFile)
 
 	return nil
 }
