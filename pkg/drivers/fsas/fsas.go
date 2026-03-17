@@ -624,11 +624,6 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if !d.CfgManager.IsInit() {
-		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
-		d.CfgManager = cfgManager
-	}
-
 	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
 		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
 		return err
@@ -644,7 +639,6 @@ func (d *Driver) innerCreate() error {
 	}
 
 	slog.Info("Logging content of cloud config file at the end of method innerCreate")
-
 	logContentOfCloudConfigFile(d.UserDataFile)
 
 	return nil
