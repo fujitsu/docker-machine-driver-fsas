@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
@@ -137,10 +138,12 @@ func TestPrepareRke2ConfigScript(t *testing.T) {
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
 				`kubelet-arg+: "provider-id=fsas-cdi://cdd792f2-5591-4c18-a8bd-1c39e55dedfa"`),
 		},
+
 		{machineUUID: "1234",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
 				`kubelet-arg+: "provider-id=fsas-cdi://1234"`),
 		},
+
 		{machineUUID: "",
 			expected: fmt.Sprintf(rke2ConfigScriptContent, configName,
 				`kubelet-arg+: "provider-id=fsas-cdi://"`),
@@ -171,6 +174,7 @@ func TestPrepareRke2ConfigScript_WithGPUResources(t *testing.T) {
 			"max_resource_count": 2
 		}
 	]`
+
 	manager := NewStandardCfgManager(devicesSpecJson, "")
 
 	configName := "100-gpu-labels"
@@ -270,9 +274,8 @@ func TestExtendUserdata(t *testing.T) {
 		},
 	}
 
-	var expected, observed map[string][]any
-
 	for _, tc := range testCases {
+		var expected, observed map[string][]any
 		t.Run(tc.name, func(t *testing.T) {
 
 			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
@@ -370,9 +373,8 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 		},
 	}
 
-	var expected, observed map[string][]any
-
 	for _, tc := range testCases {
+		var expected, observed map[string][]any
 		t.Run(tc.name, func(t *testing.T) {
 			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
 			require.NoError(t, err, "Failed to create temp file")
@@ -563,9 +565,8 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 		},
 	}
 
-	var expected, observed map[string][]any
-
 	for _, tc := range testCases {
+		var expected, observed map[string][]any
 		t.Run(tc.name, func(t *testing.T) {
 			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
 			require.NoError(t, err, "Failed to create temp file")
@@ -654,4 +655,205 @@ func Test_userdataFile_not_exists(t *testing.T) {
 		})
 	}
 
+}
+
+func TestExtendUserdataSshAuthKeys(t *testing.T) {
+	testCases := []struct {
+		name            string
+		readFileContent []byte
+		input           []string
+		expectedStr     string
+		nrExpectedItems int
+		expectedError   error
+	}{
+		{name: "case 1: add one item to section 'ssh_authorized_keys'",
+			readFileContent: []byte(userdataSampleContentSsh),
+			input:           inputOneItemSshAuthKeys,
+			expectedStr:     expectedStr2Ssh,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 2: add two items to section 'ssh_authorized_keys'",
+			readFileContent: []byte(userdataSampleContentSsh),
+			input:           inputTwoItemsSshAuthKeys,
+			expectedStr:     expectedStr3Ssh,
+			nrExpectedItems: 3,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: section 'ssh_authorized_keys' does not exist",
+			readFileContent: []byte(userdataSampleContentNoSections),
+			input:           inputOneItemSshAuthKeys,
+			expectedStr:     expectedStr1Ssh,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 4: no content in userdata file",
+			readFileContent: []byte{},
+			input:           inputOneItemSshAuthKeys,
+			expectedStr:     expectedStr1Ssh,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 5: input as empty list",
+			readFileContent: []byte(userdataSampleContentSsh),
+			input:           nil,
+			expectedStr:     userdataSampleContentSsh,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		var expected, observed map[string][]any
+		t.Run(tc.name, func(t *testing.T) {
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
+			}
+
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+
+			err = sc.ExtendUserdataSshAuthKeys(tc.input)
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+				assert.Equal(t, tc.nrExpectedItems, len(observed["ssh_authorized_keys"]))
+			}
+
+		})
+	}
+}
+
+func TestImplantSSHKey(t *testing.T) {
+	testCases := []struct {
+		name              string
+		readFileContent   []byte
+		nrItemsRunCmd     int
+		nrItemsWriteFiles int
+		expectedError     error
+	}{
+		{name: "case 1: empty cloud-init file",
+			readFileContent:   []byte(userdataSampleContentNoSections),
+			nrItemsRunCmd:     0,
+			nrItemsWriteFiles: 0,
+			expectedError:     nil,
+		},
+
+		{name: "case 2: cloud-init file with single section 'runcmd'",
+			readFileContent:   []byte(userdataSampleContent),
+			nrItemsRunCmd:     1,
+			nrItemsWriteFiles: 0,
+			expectedError:     nil,
+		},
+
+		{name: "case 3: cloud-init file with single section 'write_files'",
+			readFileContent:   []byte(userdataSampleContentWriteFiles),
+			nrItemsRunCmd:     0,
+			nrItemsWriteFiles: 1,
+			expectedError:     nil,
+		},
+
+		{name: "case 4: cloud-init file with both sections 'runcmd' and 'write_files'",
+			readFileContent:   []byte(userdataSampleContentBothSections),
+			nrItemsRunCmd:     1,
+			nrItemsWriteFiles: 1,
+			expectedError:     nil,
+		},
+	}
+
+	sshUser := "rancher"
+
+	for _, tc := range testCases {
+		var observed map[string][]any
+		t.Run(tc.name, func(t *testing.T) {
+			userdataFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := userdataFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(userdataFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
+			}()
+
+			if _, err := userdataFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
+			}
+
+			tempDir := t.TempDir()
+			sshPrivKeyPath := filepath.Join(tempDir, "id_rsa")
+			sshPubKeyPath, err := os.Create(filepath.Join(tempDir, "id_rsa.pub"))
+			sshPubKeyPath.Write([]byte(string("ssh-rsa AAAAB3NzaC1yc")))
+			defer func() {
+				err = os.Remove(fmt.Sprintf("%s.pub", sshPrivKeyPath))
+				require.NoError(t, err, "Failed to delete temp file with ssh public key")
+			}()
+
+			sc := NewStandardCfgManager("[]", userdataFile.Name())
+			err = sc.ImplantSSHKey(sshPrivKeyPath, sshUser)
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				fileContent, err := os.ReadFile(userdataFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				username := observed["users"][0].(map[string]any)["name"].(string)
+				assert.Equal(t, sshUser, username)
+
+				assert.NotNil(t, observed["users"])
+				assert.Equal(t, len(observed["users"]), 1, "Expected exactly one user in the cloud-init config")
+				userMap := observed["users"][0].(map[string]any)
+
+				assert.NotNil(t, userMap["ssh_authorized_keys"])
+				sshKeys := userMap["ssh_authorized_keys"].([]any)
+				assert.Equal(t, len(sshKeys), 1)
+
+				if _, ok := observed["runcmd"]; ok {
+					assert.Equal(t, len(observed["runcmd"]), tc.nrItemsRunCmd, "Number of items differ for 'runcmd'")
+				}
+
+				if _, ok := observed["write_files"]; ok {
+					assert.Equal(t, len(observed["write_files"]), tc.nrItemsWriteFiles, "Number of items differ for 'write_files'")
+				}
+			}
+
+		})
+	}
 }
