@@ -52,27 +52,29 @@ func NewCustomHandler(writer io.Writer, opts *slog.HandlerOptions) slog.Handler 
 func (h *CustomHandler) Handle(ctx context.Context, r slog.Record) error {
 	timestamp := r.Time.Format("2006-01-02T15:04:05.000Z07:00")
 	level := r.Level.String()
-	message := r.Message
+	message := CensorTextWithRegex(r.Message)
 	var logLine string
 
 	if !h.opts.AddSource {
+		dataFromAllAttributes := CensorTextWithRegex(getDataFromAllAttributes(r))
+		if dataFromAllAttributes != "" {
+			message = fmt.Sprintf("%s: %s", message, dataFromAllAttributes)
+		}
 		logLine = fmt.Sprintf("%s; [%s]; %s", timestamp, level, message)
 	} else {
 		fileName, lineNumber := getLogCallInfo()
 		dataFromAllAttributes := getDataFromAllAttributes(r)
 		dataFromAllAttributes = CensorTextWithRegex(dataFromAllAttributes)
-		message = CensorTextWithRegex(message)
-		if dataFromAllAttributes == "" {
-			message = fmt.Sprintf("%s", message)
-		} else {
-			message = fmt.Sprintf("%s %s", message, dataFromAllAttributes)
+		
+		if dataFromAllAttributes != "" {
+			message = fmt.Sprintf("%s: %s", message, dataFromAllAttributes)
 		}
 
 		logLine = fmt.Sprintf("%s:%d; %s; [%s]; %s;",
 			fileName, lineNumber, timestamp, level, message)
 	}
 
-	_, err := h.writer.Write([]byte(fmt.Sprintf("%s \n", logLine)))
+	_, err := h.writer.Write([]byte(fmt.Sprintf("%s\n", logLine)))
 
 	if err != nil {
 		return fmt.Errorf("failed to write log: %v", err)
