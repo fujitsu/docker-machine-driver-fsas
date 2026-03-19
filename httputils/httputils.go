@@ -52,7 +52,7 @@ func NewStandardCdiHTTPClient(baseURI string) *StandardCdiHTTPClient {
 }
 
 func (c *StandardCdiHTTPClient) doRequest(method, endpoint string, payload []byte, queryParams map[string]string, responseAddress any, headers map[string]string) (int, error) {
-	slog.Debug(fmt.Sprintf("Initiating %s request: ", method), "endpoint", endpoint, "payload", string(payload))
+	slog.Debug(fmt.Sprintf("Initiating %s request", method), "endpoint", endpoint, "payload", string(payload))
 
 	// Construct full URL
 	u, err := url.Parse(c.BaseURI + endpoint)
@@ -66,12 +66,12 @@ func (c *StandardCdiHTTPClient) doRequest(method, endpoint string, payload []byt
 	}
 	u.RawQuery = q.Encode()
 
-	slog.Debug("Generated full URL: ", "url", u.String())
+	slog.Debug("Generated full URL", "url", u.String())
 
 	// Send the request
 	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(payload))
 	if err != nil {
-		slog.Error("Error creating request: ", "error", err)
+		slog.Error("Error creating request", "error", err)
 		return -1, fmt.Errorf("creating request failed: %w", err)
 	}
 
@@ -80,36 +80,36 @@ func (c *StandardCdiHTTPClient) doRequest(method, endpoint string, payload []byt
 		req.Header.Set(k, v)
 	}
 
-	slog.Debug(fmt.Sprintf("Sending %s request: ", method), "url", u.String(), "headers", req.Header)
+	slog.Debug(fmt.Sprintf("Sending %s request", method), "url", u.String(), "headers", req.Header)
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		slog.Error("Error sending request: ", "error", err)
+		slog.Error("Error sending request", "error", err)
 		return -1, fmt.Errorf("sending request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	slog.Debug("Received response: ", "status_code", resp.StatusCode)
+	slog.Debug("Received response", "status_code", resp.StatusCode)
 
 	// Handle response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("Error reading response body: ", "error", err)
+		slog.Error("Error reading response body", "error", err)
 		return resp.StatusCode, fmt.Errorf("reading response body: %w", err)
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		slog.Error("Request failed: ", "status_code", resp.StatusCode, "response_body", string(body))
+		slog.Error("Request failed", "status_code", resp.StatusCode, "response_body", string(body))
 		return resp.StatusCode, fmt.Errorf("request failed: %s", string(body))
 	}
 
-	slog.Debug("Received response: ", "status_code", resp.StatusCode, "response_body", string(body))
+	slog.Debug("Received response", "status_code", resp.StatusCode, "response_body", string(body))
 
 	if responseAddress != nil {
 		slog.Debug("Decoding response body")
 		err := json.Unmarshal(body, responseAddress)
 		if err != nil {
-			slog.Error("Error unmarshalling JSON response: ", "err", err)
+			slog.Error("Error unmarshalling JSON response", "err", err)
 			return resp.StatusCode, fmt.Errorf("unmarshalling JSON response: %w", err)
 		}
 	}

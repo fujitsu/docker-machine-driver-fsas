@@ -47,7 +47,7 @@ var _ FabricManager = (*FabricManagerClient)(nil)
 
 // NewFabricManagerClient creates a new FabricManagerClient instance.
 func NewFabricManagerClient(baseURI, endpoint, deviceSpecJsonString string) (*FabricManagerClient, error) {
-	slog.Debug("Creating FabricManagerClient: ", "baseURI", baseURI, "endpoint", endpoint)
+	slog.Debug("Creating FabricManagerClient", "baseURI", baseURI, "endpoint", endpoint)
 	if baseURI == "" || endpoint == "" {
 		return nil, errors.New(ErrMissingParams)
 	}
@@ -76,11 +76,11 @@ func (fmc *FabricManagerClient) ValidateTenant(tenantId, bearerToken string) err
 	_, err := fmc.cdiClient.Get(endpoint, queryParams, nil, headers)
 
 	if err != nil {
-		slog.Error("Tenant check failed because of an error: ", "endpoint", endpoint, "err", err)
+		slog.Error("Tenant check failed because of an error", "endpoint", endpoint, "err", err)
 		return err
 	}
 
-	slog.Info("Successfully validated tenant: ", "tenant_id", tenantId)
+	slog.Info("Successfully validated tenant", "tenant_id", tenantId)
 	return nil
 }
 
@@ -93,11 +93,11 @@ func (fmc *FabricManagerClient) PowerOn(machineUUID, tenantId, bearerToken strin
 
 	statusCode, err := fmc.cdiClient.Put(payload, endpoint, queryParams, nil, headers)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Request PUT %s failed: ", endpoint), "err", err)
+		slog.Error(fmt.Sprintf("Request PUT %s failed", endpoint), "err", err)
 		return err
 	}
 
-	slog.Info("Successfully requested machine power on: ", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
+	slog.Info("Successfully requested machine power on", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
 	return nil
 }
 
@@ -110,11 +110,11 @@ func (fmc *FabricManagerClient) PowerOff(machineUUID, tenantId, bearerToken stri
 
 	statusCode, err := fmc.cdiClient.Put(payload, endpoint, queryParams, nil, headers)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Request PUT %s failed: ", endpoint), "err", err)
+		slog.Error(fmt.Sprintf("Request PUT %s failed", endpoint), "err", err)
 		return err
 	}
 
-	slog.Info("Successfully requested machine power off: ", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
+	slog.Info("Successfully requested machine power off", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
 	return nil
 }
 
@@ -127,11 +127,11 @@ func (fmc *FabricManagerClient) GracefulShutdown(machineUUID, tenantId, bearerTo
 
 	statusCode, err := fmc.cdiClient.Put(payload, endpoint, queryParams, nil, headers)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Request PUT %s failed: ", endpoint), "err", err)
+		slog.Error(fmt.Sprintf("Request PUT %s failed", endpoint), "err", err)
 		return err
 	}
 
-	slog.Info("Successfully requested graceful shutdown: ", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
+	slog.Info("Successfully requested graceful shutdown", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
 
 	return nil
 }
@@ -149,7 +149,7 @@ func (fmc *FabricManagerClient) ImageInstall(tenantId, ssdId, imageFilename, bea
 
 	payload, err := json.Marshal(imageInstallation)
 	if err != nil {
-		slog.Error("Error marshalling PUT request payload to JSON: ", "err", err)
+		slog.Error("Error marshalling PUT request payload to JSON", "err", err)
 		return fmt.Errorf("failed to marshal payload to JSON: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func (fmc *FabricManagerClient) ImageInstall(tenantId, ssdId, imageFilename, bea
 		return err
 	}
 
-	slog.Info("Successfully requested image installation: ", "tenant_id", tenantId, "ssd_id", ssdId, "status_code", statusCode)
+	slog.Info("Successfully requested image installation", "tenant_id", tenantId, "ssd_id", ssdId, "status_code", statusCode)
 	return nil
 }
 
@@ -175,11 +175,11 @@ func (fmc *FabricManagerClient) RemoveMachine(machineUUID, tenantId, bearerToken
 
 	statusCode, err := fmc.cdiClient.Delete(endpoint, queryParams, nil, headers)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Request DELETE %s failed: ", endpoint), "err", err)
+		slog.Error(fmt.Sprintf("Request DELETE %s failed", endpoint), "err", err)
 		return err
 	}
 
-	slog.Info("Successfully removed machine: ", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
+	slog.Info("Successfully removed machine", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
 	return nil
 }
 
@@ -209,13 +209,13 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 
 	err := json.Unmarshal([]byte(machineSpecs.DevicesSpecJson), &devicesSpec)
 	if err != nil {
-		slog.Error("Error unmarshalling devices specification from JSON: ", "err", err, "machineSpecs.DevicesSpecJson", machineSpecs.DevicesSpecJson)
+		slog.Error("Error unmarshalling devices specification from JSON", "err", err, "machineSpecs.DevicesSpecJson", machineSpecs.DevicesSpecJson)
 		return nil, err
 	}
 
 	err = json.Unmarshal([]byte(machineSpecs.ComputeConditionsJson), &computeConditions)
 	if err != nil {
-		slog.Error("Error unmarshalling compute conditions from JSON: ", "err", err)
+		slog.Error("Error unmarshalling compute conditions from JSON", "err", err)
 		return nil, err
 	}
 
@@ -279,17 +279,17 @@ func (fmc *FabricManagerClient) CreateMachine(machineName, tenantId string, mach
 
 	createMachineRequest, err := fmc.populateCreateMachineRequest(machineName, tenantId, machineSpecs)
 	if err != nil {
-		slog.Error("Error while populating machine specs in populateCreateMachineRequest: ", "err", err)
+		slog.Error("Error while populating machine specs in populateCreateMachineRequest", "err", err)
 		return "", fmt.Errorf("failed to populate createMachineRequest: %w", err)
 	}
 
 	payload, err := json.Marshal(createMachineRequest)
 	if err != nil {
-		slog.Error("Error marshalling POST /machines/ request payload to JSON: ", "err", err)
+		slog.Error("Error marshalling POST /machines/ request payload to JSON", "err", err)
 		return "", fmt.Errorf("failed to marshal payload to JSON: %w", err)
 	}
 
-	slog.Debug("Request Payload: ", "payload", string(payload))
+	slog.Debug("Request Payload", "payload", string(payload))
 
 	var response models.MachinesRequestResponse
 
@@ -303,19 +303,19 @@ func (fmc *FabricManagerClient) CreateMachine(machineName, tenantId string, mach
 	}
 
 	if !(len(response.Data.Machines) > 0 && response.Data.Machines[0].MachineUUID != "") {
-		slog.Error("Error while getting machine UUID from POST response: ", "response", response)
+		slog.Error("Error while getting machine UUID from POST response", "response", response)
 		return "", ErrGetMachineUUIDFromPostResponse
 	}
 	machineUuid := response.Data.Machines[0].MachineUUID
 
-	slog.Info("New machine successfully created: ", "machineUuid", machineUuid)
+	slog.Info("New machine successfully created", "machineUuid", machineUuid)
 	return machineUuid, nil
 }
 
 // GetMachineDetails receives status on Machine from the Fabric Manager service.
 func (fmc *FabricManagerClient) GetMachineDetails(tenantId, machineUUID, bearerToken string) (lanports []models.Lanport, bootSsd string, status int, _ error) {
 	endpoint := fmt.Sprintf("/machines/%s", machineUUID)
-	slog.Debug("Getting status on Machine: ", "mach_uuid", machineUUID)
+	slog.Debug("Getting status on Machine", "mach_uuid", machineUUID)
 
 	var responseData models.MachinesRequestResponse
 
@@ -323,7 +323,7 @@ func (fmc *FabricManagerClient) GetMachineDetails(tenantId, machineUUID, bearerT
 	headers := httputils.GetAuthorizationHeader(bearerToken)
 
 	if _, err := fmc.cdiClient.Get(endpoint, queryParams, &responseData, headers); err != nil {
-		slog.Error(fmt.Sprintf("Request GET %s failed: ", endpoint), "err", err)
+		slog.Error(fmt.Sprintf("Request GET %s failed", endpoint), "err", err)
 		return lanports, bootSsd, status, err
 	}
 
@@ -334,7 +334,7 @@ func (fmc *FabricManagerClient) GetMachineDetails(tenantId, machineUUID, bearerT
 	}
 	status = responseData.Data.Machines[0].MachineStatus
 
-	slog.Info("Successfully received status on Machine: ",
+	slog.Info("Successfully received status on Machine",
 		"mach_uuid", machineUUID,
 		"lanports", lanports,
 		"boot_ssd", bootSsd,
@@ -354,7 +354,7 @@ func (fmc *FabricManagerClient) getSsdId(resource []models.Resource) (string, er
 		if r.ResourceType == "storage" {
 			if slices.Equal(r.ResourceSpec.Condition, fmc.bootStorageCondition) {
 				ssdId := r.ResourceUUID
-				slog.Info("Successfully found ssdId: ", "ssdId", ssdId)
+				slog.Info("Successfully found ssdId", "ssdId", ssdId)
 				return ssdId, nil
 			}
 		}
@@ -369,7 +369,7 @@ func CheckDeviceSpecJson(ds string) error {
 
 	err := json.Unmarshal([]byte(ds), &devicesSpec)
 	if err != nil {
-		slog.Error("Error unmarshalling devices specification from JSON: ", "err", err, "deviceSpecJson", ds)
+		slog.Error("Error unmarshalling devices specification from JSON", "err", err, "deviceSpecJson", ds)
 		return err
 	}
 
@@ -383,7 +383,7 @@ func CheckDeviceSpecJson(ds string) error {
 		}
 	}
 	if !flagIsBootStorageFound {
-		slog.Error("Mandatory field 'is_bootstorage' must be equal true in devices specification for at least one resource of type 'storage': ", "DevicesSpecJson", ds)
+		slog.Error("Mandatory field 'is_bootstorage' must be equal true in devices specification for at least one resource of type 'storage'", "DevicesSpecJson", ds)
 		return ErrBootStorageTags
 	}
 

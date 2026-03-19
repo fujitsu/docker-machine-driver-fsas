@@ -43,7 +43,7 @@ var _ CfgManager = (*StandardCfgManager)(nil)
 func NewStandardCfgManager(devicesSpecJson, userDataFile string) *StandardCfgManager {
 	var resources []models.Resource
 	if err := json.Unmarshal([]byte(devicesSpecJson), &resources); err != nil {
-		slog.Warn("Failed to parse DevicesSpecJson, proceeding with empty resources:", "err", err)
+		slog.Warn("Failed to parse DevicesSpecJson, proceeding with empty resources", "err", err)
 		resources = []models.Resource{}
 	}
 
@@ -102,25 +102,25 @@ func (sc *StandardCfgManager) prepareRke2ConfigNodeLabelsForGpu() string {
 
 		fullModel, ok := allowedGPUs[model]
 		if !ok {
-			slog.Warn("Skipping labels because GPU model not allowed: ", "value", model)
+			slog.Warn("Skipping labels because GPU model not allowed", "value", model)
 			continue
 		}
 
 		if res.MinResourceCount > res.MaxResourceCount {
-			slog.Warn("Invalid GPU config: MinResourceCount > MaxResourceCount ", "model", fullModel, "min", res.MinResourceCount, "max", res.MaxResourceCount)
+			slog.Warn("Invalid GPU config: MinResourceCount > MaxResourceCount", "model", fullModel, "min", res.MinResourceCount, "max", res.MaxResourceCount)
 			continue
 		}
 
 		if res.MinResourceCount > 0 {
 			labels = append(labels, fmt.Sprintf("cohdi.io/%s-size-min=%d", fullModel, res.MinResourceCount))
 		} else {
-			slog.Warn("MinResourceCount missing for GPU: ", "model", fullModel)
+			slog.Warn("MinResourceCount missing for GPU", "model", fullModel)
 		}
 
 		if res.MaxResourceCount > 0 {
 			labels = append(labels, fmt.Sprintf("cohdi.io/%s-size-max=%d", fullModel, res.MaxResourceCount))
 		} else {
-			slog.Warn("MaxResourceCount missing for GPU: ", "model", fullModel)
+			slog.Warn("MaxResourceCount missing for GPU", "model", fullModel)
 		}
 	}
 
