@@ -672,15 +672,8 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	// Prepare scripts execution parameters
-	scriptPath := "" // Random paths
-	removeOnFinish := true
-	runSudo := true
-
-	// Generate script content for RKE2 setup
-	overrideProviderIdScriptContent := d.CfgManager.PrepareRke2ConfigScript("100-fsas-providerid", d.MachineUUID)
-
-	if err := d.SshManager.ExecuteScript(scriptPath, overrideProviderIdScriptContent, removeOnFinish, runSudo); err != nil {
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
 		return err
 	}
 
