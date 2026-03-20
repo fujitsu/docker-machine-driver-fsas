@@ -53,23 +53,17 @@ func (h *CustomHandler) Handle(ctx context.Context, r slog.Record) error {
 	timestamp := r.Time.Format("2006-01-02T15:04:05.000Z07:00")
 	level := r.Level.String()
 	message := CensorTextWithRegex(r.Message)
-	var logLine string
 
+	dataFromAllAttributes := CensorTextWithRegex(getDataFromAllAttributes(r))
+	if dataFromAllAttributes != "" {
+		message = fmt.Sprintf("%s: %s", message, dataFromAllAttributes)
+	}
+
+	var logLine string
 	if !h.opts.AddSource {
-		dataFromAllAttributes := CensorTextWithRegex(getDataFromAllAttributes(r))
-		if dataFromAllAttributes != "" {
-			message = fmt.Sprintf("%s: %s", message, dataFromAllAttributes)
-		}
-		logLine = fmt.Sprintf("%s; [%s]; %s", timestamp, level, message)
+		logLine = fmt.Sprintf("%s; [%s]; %s;", timestamp, level, message)
 	} else {
 		fileName, lineNumber := getLogCallInfo()
-		dataFromAllAttributes := getDataFromAllAttributes(r)
-		dataFromAllAttributes = CensorTextWithRegex(dataFromAllAttributes)
-		
-		if dataFromAllAttributes != "" {
-			message = fmt.Sprintf("%s: %s", message, dataFromAllAttributes)
-		}
-
 		logLine = fmt.Sprintf("%s:%d; %s; [%s]; %s;",
 			fileName, lineNumber, timestamp, level, message)
 	}
