@@ -726,7 +726,7 @@ func (d *Driver) GetSSHHostname() (string, error) {
 
 // GetIP returns IP to use in communication
 func (d *Driver) GetIP() (string, error) {
-	slog.Info("IP ", "address", d.IPAddress)
+	slog.Info("IP", "address", d.IPAddress)
 	if d.IPAddress == "" {
 		return "", fmt.Errorf("IPAddress is empty")
 	}
@@ -789,7 +789,7 @@ func (d *Driver) mapMachineStatusToState(cdiState CdiMachineState) state.State {
 	case ERROR:
 		return state.Error
 	default:
-		slog.Warn("Unrecognized machine status: ", "machineStatus", cdiState)
+		slog.Warn("Unrecognized machine status", "machineStatus", cdiState)
 		return state.None
 	}
 }

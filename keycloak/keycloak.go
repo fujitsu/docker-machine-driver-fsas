@@ -145,7 +145,7 @@ func (k *KeycloakClient) InitConnection() error {
 	slog.Debug(fmt.Sprintf("keycloak authorization service structure: %+v", k))
 	accessToken, refreshToken, err := k.getTokens()
 	if err != nil {
-		slog.Error("Error while getting tokens ", "err", err)
+		slog.Error("Error while getting tokens", "err", err)
 		return err
 	}
 

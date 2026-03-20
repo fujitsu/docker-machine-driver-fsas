@@ -59,12 +59,12 @@ func (p *fileSSHKeyParser) Parse(keyPath string) gossh.Signer {
 	}
 	keyBytes, err := os.ReadFile(keyPath)
 	if err != nil {
-		slog.Warn("Could not read SSH key path: ", "path", keyPath, "err", err)
+		slog.Warn("Could not read SSH key path", "path", keyPath, "err", err)
 		return nil
 	}
 	privateKey, err := gossh.ParsePrivateKey(keyBytes)
 	if err != nil {
-		slog.Warn("Could not parse SSH key: ", "path", keyPath, "err", err)
+		slog.Warn("Could not parse SSH key", "path", keyPath, "err", err)
 		return nil
 	}
 	return privateKey
@@ -121,14 +121,14 @@ func ParseSSHPublicKey(key string) (gossh.PublicKey, error) {
 		return nil, fmt.Errorf("SSH public key type mismatch: declared %q but parsed key is %q", fields[0], publicKey.Type())
 	}
 
-	slog.Debug("Successfully parsed SSH host public key:", "type", publicKey.Type())
+	slog.Debug("Successfully parsed SSH host public key", "type", publicKey.Type())
 	return publicKey, nil
 }
 
 // NewStandardSshManager Returns new instance of Standard SSH Manager and error.
 // The hostPublicKey parameter must be a pre-parsed gossh.PublicKey (use ParseSSHPublicKey to obtain one).
 func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
-	slog.Debug("Standard SSH Manager constructor: ", "host", hostName, "user", userName)
+	slog.Debug("Standard SSH Manager constructor", "host", hostName, "user", userName)
 
 	if hostName == "" || userName == "" || sshPassword == "" || sshKeyPath == "" || hostPublicKey == nil {
 
@@ -190,18 +190,18 @@ func (sc *StandardSshManager) hostPublicKeyIsValid() error {
 	maxAttempts := 20
 	currentAttempt := 1
 	for {
-		slog.Debug("Attempt to dial: ", "currentAttempt", currentAttempt)
+		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
 		client, err := gossh.Dial("tcp", address, config)
 
 		if err != nil {
-			slog.Warn("Failed to dial SSH server: ", "err", err)
+			slog.Warn("Failed to dial SSH server", "err", err)
 
 			if currentAttempt > maxAttempts {
 				return fmt.Errorf("failed to dial SSH server: %w", err)
 			}
 
 			// sleep added to handle immediate connection refused response
-			slog.Info("Waiting for next attempt to dial: ", "sleepTime", SSH_CONNECT_ATTEMPT_DELAY)
+			slog.Info("Waiting for next attempt to dial", "sleepTime", SSH_CONNECT_ATTEMPT_DELAY)
 			time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
 
 			currentAttempt++
@@ -218,7 +218,7 @@ func (sc *StandardSshManager) hostPublicKeyIsValid() error {
 func (sc *StandardSshManager) initNativeClient() error {
 	if _, ok := sc.Client.(*ssh.NativeClient); ok {
 
-		slog.Debug("Authenticating using password and SSH key: ", "path", sc.SshKeyPath)
+		slog.Debug("Authenticating using password and SSH key", "path", sc.SshKeyPath)
 		auth := &ssh.Auth{
 			Passwords: []string{sc.SshPassword},
 			Keys:      []string{sc.SshKeyPath},
@@ -226,10 +226,10 @@ func (sc *StandardSshManager) initNativeClient() error {
 
 		nativeClient, err := ssh.NewNativeClient(sc.UserName, sc.HostName, port, auth)
 		if err != nil {
-			slog.Error("Error creating SSH client: ", "err", err)
+			slog.Error("Error creating SSH client", "err", err)
 			return err
 		}
-		slog.Info("SSH native client successfully initialized: ", "host", sc.HostName, "user", sc.UserName)
+		slog.Info("SSH native client successfully initialized", "host", sc.HostName, "user", sc.UserName)
 		sc.Client = nativeClient
 	}
 	return nil
@@ -245,7 +245,7 @@ func (sc *StandardSshManager) runCommand(command string) (string, error) {
 	if err := sc.initNativeClient(); err != nil {
 		return "", err
 	}
-	slog.Debug("Running command via SSH: ", "command", command, "host", sc.HostName, "user", sc.UserName)
+	slog.Debug("Running command via SSH", "command", command, "host", sc.HostName, "user", sc.UserName)
 	output, err := sc.Client.Output(command)
 
 	isReboot := strings.Contains(command, "reboot") || strings.Contains(command, "shutdown")
@@ -253,11 +253,11 @@ func (sc *StandardSshManager) runCommand(command string) (string, error) {
 	if err != nil {
 		var exitMissingErr *gossh.ExitMissingError
 		if errors.As(err, &exitMissingErr) && isReboot {
-			slog.Debug("Running command via SSH interrupted by restart: ", "command", command)
+			slog.Debug("Running command via SSH interrupted by restart", "command", command)
 			return output, nil // Treat as success for reboot scenarios
 		}
 
-		slog.Error("Error running command:", "command", command, "output", output, "err", err)
+		slog.Error("Error running command", "command", command, "output", output, "err", err)
 		return "", err
 	}
 	slog.Debug("Running command via SSH succeed")
@@ -276,11 +276,11 @@ func (sc *StandardSshManager) DisablePasswordSSHLogin() error {
 
 	for _, cmd := range commands {
 		if _, err := sc.runCommand(cmd); err != nil {
-			slog.Error("Failed to execute command: ", "cmd", cmd, "err", err)
+			slog.Error("Failed to execute command", "cmd", cmd, "err", err)
 			return fmt.Errorf("error running '%s': %w", cmd, err)
 		}
 	}
-	slog.Info("Password authentication disabled successfully.")
+	slog.Info("Password authentication disabled successfully")
 
 	return nil
 }
@@ -289,7 +289,7 @@ func (sc *StandardSshManager) DisablePasswordSSHLogin() error {
 func (sc *StandardSshManager) RebootCloudInit() error {
 	_, err := sc.runCommand(cmdRebootCloudInit)
 	if err != nil {
-		slog.Error("Error executing cloud-init reboot: ", "err", err)
+		slog.Error("Error executing cloud-init reboot", "err", err)
 		return err
 	}
 	slog.Info("Cloud-init reboot executed successfully")
@@ -315,12 +315,12 @@ func generateSecureRandomInt(min, max int64) (int64, error) {
 func (sc *StandardSshManager) getRandomScriptPath() (string, error) {
 	randInt, err := generateSecureRandomInt(1, 999)
 	if err != nil {
-		slog.Error("Failed to generate secure random number: ", "err", err)
+		slog.Error("Failed to generate secure random number", "err", err)
 		return "", err
 	}
 
 	path := fmt.Sprintf("%s/%s-via-ssh-%03d.sh", remoteScriptDir, sc.UserName, randInt)
-	slog.Debug("Generated random script path: ", "path", path)
+	slog.Debug("Generated random script path", "path", path)
 	return path, nil
 }
 
@@ -353,7 +353,7 @@ func (sc *StandardSshManager) ExecuteScript(scriptPath, scriptContent string, po
 	}
 	dir := filepath.Dir(absPath)
 	if err := sc.createRemoteDir(dir); err != nil {
-		slog.Warn("Failed to ensure directory permissions for custom path: ", "dir", dir, "err", err)
+		slog.Warn("Failed to ensure directory permissions for custom path", "dir", dir, "err", err)
 	}
 
 	if err := sc.WriteFileOnRemoteMachine(path, scriptContent, 0744); err != nil {
@@ -363,12 +363,12 @@ func (sc *StandardSshManager) ExecuteScript(scriptPath, scriptContent string, po
 	defer func() {
 		if postRemove {
 			if err := sc.removeRemoteFile(path, runWithSudo); err != nil {
-				slog.Error("Failed to remove remote script file: ", "err", err)
+				slog.Error("Failed to remove remote script file", "err", err)
 			}
 		}
 
 		if err := sc.removeRemoteDir(remoteScriptDir, runWithSudo); err != nil {
-			slog.Error("Failed to remove remote directory: ", "err", err)
+			slog.Error("Failed to remove remote directory", "err", err)
 		}
 	}()
 
@@ -387,38 +387,38 @@ func (sc *StandardSshManager) WriteFileOnRemoteMachine(path, fileContent string,
 		address := fmt.Sprintf("%s:%d", sc.HostName, port)
 		conn, err := gossh.Dial("tcp", address, config)
 		if err != nil {
-			slog.Error("Failed to dial SSH host: ", "host", sc.HostName, "err", err)
+			slog.Error("Failed to dial SSH host", "host", sc.HostName, "err", err)
 			return err
 		}
 
 		sftpClient, err := sftp.NewClient(conn)
 		if err != nil {
-			slog.Error("Failed to create SFTP client: ", "host", sc.HostName, "err", err)
+			slog.Error("Failed to create SFTP client", "host", sc.HostName, "err", err)
 			return err
 		}
 		defer sftpClient.Close()
 
 		dstFile, err := sftpClient.Create(path)
 		if err != nil {
-			slog.Error("Failed to create remote file: ", "host", sc.HostName, "path", path, "err", err)
+			slog.Error("Failed to create remote file", "host", sc.HostName, "path", path, "err", err)
 			return err
 		}
 		defer dstFile.Close()
 
 		err = dstFile.Chmod(fileMode)
 		if err != nil {
-			slog.Error("Failed to change permissions: ", "permissions", fileMode.String(), "err", err)
+			slog.Error("Failed to change permissions", "permissions", fileMode.String(), "err", err)
 			return err
 		}
-		slog.Info("Successfully added permissions to file: ", "file", dstFile.Name(), "permissions", fileMode.String())
+		slog.Info("Successfully added permissions to file", "file", dstFile.Name(), "permissions", fileMode.String())
 
 		srcBuffer := bytes.NewBuffer([]byte(fileContent))
 		_, err = io.Copy(dstFile, srcBuffer)
 		if err != nil {
-			slog.Error("Failed to copy data: ", "host", sc.HostName, "err", err)
+			slog.Error("Failed to copy data", "host", sc.HostName, "err", err)
 			return err
 		}
-		slog.Info("File content successfully written to remote destination: ", "dstFile", dstFile.Name())
+		slog.Info("File content successfully written to remote destination", "dstFile", dstFile.Name())
 	}
 
 	return nil
@@ -429,7 +429,7 @@ func (sc *StandardSshManager) createRemoteDir(path string) error {
 	command := fmt.Sprintf("mkdir -p %s && chmod 700 %s", path, path)
 	_, err := sc.runCommand(command)
 	if err != nil {
-		slog.Error("Failed to create secure remote directory: ", "path", path, "err", err)
+		slog.Error("Failed to create secure remote directory", "path", path, "err", err)
 	}
 	return err
 }
@@ -484,13 +484,13 @@ func (sc *StandardSshManager) removeRemoteFile(path string, runWithSudo bool) er
 func (sc *StandardSshManager) DeregisterOS() error {
 	jsonOutput, err := sc.runCommand(cmdGetStatusOS)
 	if err != nil {
-		slog.Error("Could not get SUSE product status before deregistration: ", "err", err)
+		slog.Error("Could not get SUSE product status before deregistration", "err", err)
 		return err
 	}
 
 	var products []models.SuseProduct
 	if err := json.Unmarshal([]byte(jsonOutput), &products); err != nil {
-		slog.Error("Failed to parse SUSE status JSON before deregistration: ", "err", err)
+		slog.Error("Failed to parse SUSE status JSON before deregistration", "err", err)
 		return err
 	}
 
@@ -504,13 +504,13 @@ func (sc *StandardSshManager) DeregisterOS() error {
 
 	// Only deregister if something was registered
 	if !anyRegistered {
-		slog.Info("Skipping OS deregistration: no products registered.")
+		slog.Info("Skipping OS deregistration: no products registered")
 		return nil
 	}
 
 	_, err = sc.runCommand(cmdDeregisterOS)
 	if err != nil {
-		slog.Error("Error executing SLES OS deregistration: ", "err", err)
+		slog.Error("Error executing SLES OS deregistration", "err", err)
 		return err
 	}
 	slog.Info("SLES OS deregistered successfully")
