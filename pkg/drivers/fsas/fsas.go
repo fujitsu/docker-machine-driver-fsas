@@ -390,7 +390,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	}
 
 	d.OsImageSshHostPubKey = strings.TrimSpace(flags.String("fsas-image-os-ssh-host-pub-key"))
-	slog.Debug("Driver", "FSAS OS image ssh host public key ", d.OsImageSshHostPubKey)
+	slog.Debug("Driver", "FSAS OS image ssh host public key", d.OsImageSshHostPubKey)
 
 	d.SlesRegistrationCode = strings.TrimSpace(flags.String("fsas-sles-registration-code"))
 	slog.Debug("Driver", "FSAS SLES registration code", "<hidden-for-security-reasons>")
