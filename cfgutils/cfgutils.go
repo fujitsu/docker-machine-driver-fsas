@@ -234,7 +234,7 @@ func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
 /*
 	InjectOSRegistration registers SUSE products by extending cloud config with SUSEConnect registration commands.
 
-It extends the section "runcmd" and "write_files" with commands for registration and commands for attaching products based on provided list.
+It extends the section "runcmd" and "write_files" with commands for registration and commands for attaching products.
 Simplified example:
 
 runcmd:
@@ -311,9 +311,23 @@ sudo SUSEConnect --status | jq -r '.[] | "\(.identifier)\t\(.status)\t\(.arch)\t
   echo "id=$id/$ver/$arch, status=$status"
   if [ "$status" == "Not Registered" ]; then
     echo "ACTION: Registering $id"
-    cmd="SUSEConnect -p \"$id/$ver/$arch\" "
-    echo "$> $cmd"
-    $cmd
+	for i in {1..4}; do
+        echo "Attempt $i for registering $id"
+        
+        # Try to register the module
+		cmd="SUSEConnect -p ${id}/${ver}/${arch}"
+		echo "$> $cmd"
+        if $cmd; then
+            echo "Successfully activated $id"
+            break
+        else
+            echo "Got Error for $id. Wait and retry"
+            cmd="sleep 30"
+			echo "$> $cmd"
+			$cmd
+        fi
+    done
+
   else
     echo "Already registered: $id"
   fi

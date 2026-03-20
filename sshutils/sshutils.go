@@ -24,9 +24,7 @@ import (
 const (
 	port                                    = 22
 	cmdRebootCloudInit                      = "sudo cloud-init clean --logs --reboot"
-	cmdRegisterOS                           = "sudo -E SUSEConnect -r %s -e %s"
 	cmdGetStatusOS                          = "sudo -E SUSEConnect -s"
-	cmdRegisterModuleOS                     = "sudo -E SUSEConnect -p %s"
 	cmdDeregisterOS                         = "sudo -E SUSEConnect -d"
 	remoteScriptDir                         = "/tmp/fsas-nodedriver"
 	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 5 * time.Second
