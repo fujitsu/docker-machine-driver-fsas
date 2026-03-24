@@ -668,15 +668,6 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if !d.SshManager.IsInit() {
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
-		if err != nil {
-			slog.Error("error while initializing Standard SSH Manager: ", "err", err)
-			return err
-		}
-		d.SshManager = sshManager
-	}
-
 	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
 		return err
 	}
