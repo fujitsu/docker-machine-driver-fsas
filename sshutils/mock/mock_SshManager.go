@@ -250,53 +250,6 @@ func (_c *MockSshManager_RebootCloudInit_Call) RunAndReturn(run func() error) *M
 	return _c
 }
 
-// RegisterOS provides a mock function with given fields: regcode, email
-func (_m *MockSshManager) RegisterOS(regcode string, email string) error {
-	ret := _m.Called(regcode, email)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RegisterOS")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(regcode, email)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockSshManager_RegisterOS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterOS'
-type MockSshManager_RegisterOS_Call struct {
-	*mock.Call
-}
-
-// RegisterOS is a helper method to define mock.On call
-//   - regcode string
-//   - email string
-func (_e *MockSshManager_Expecter) RegisterOS(regcode interface{}, email interface{}) *MockSshManager_RegisterOS_Call {
-	return &MockSshManager_RegisterOS_Call{Call: _e.mock.On("RegisterOS", regcode, email)}
-}
-
-func (_c *MockSshManager_RegisterOS_Call) Run(run func(regcode string, email string)) *MockSshManager_RegisterOS_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockSshManager_RegisterOS_Call) Return(_a0 error) *MockSshManager_RegisterOS_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockSshManager_RegisterOS_Call) RunAndReturn(run func(string, string) error) *MockSshManager_RegisterOS_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // WriteFileOnRemoteMachine provides a mock function with given fields: path, fileContent, fileMode
 func (_m *MockSshManager) WriteFileOnRemoteMachine(path string, fileContent string, fileMode fs.FileMode) error {
 	ret := _m.Called(path, fileContent, fileMode)

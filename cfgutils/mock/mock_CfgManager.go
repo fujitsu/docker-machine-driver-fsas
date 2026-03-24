@@ -206,6 +206,53 @@ func (_c *MockCfgManager_ImplantSSHKey_Call) RunAndReturn(run func(string, strin
 	return _c
 }
 
+// InjectOSRegistration provides a mock function with given fields: regcode, email
+func (_m *MockCfgManager) InjectOSRegistration(regcode string, email string) error {
+	ret := _m.Called(regcode, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InjectOSRegistration")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(regcode, email)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCfgManager_InjectOSRegistration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InjectOSRegistration'
+type MockCfgManager_InjectOSRegistration_Call struct {
+	*mock.Call
+}
+
+// InjectOSRegistration is a helper method to define mock.On call
+//   - regcode string
+//   - email string
+func (_e *MockCfgManager_Expecter) InjectOSRegistration(regcode interface{}, email interface{}) *MockCfgManager_InjectOSRegistration_Call {
+	return &MockCfgManager_InjectOSRegistration_Call{Call: _e.mock.On("InjectOSRegistration", regcode, email)}
+}
+
+func (_c *MockCfgManager_InjectOSRegistration_Call) Run(run func(regcode string, email string)) *MockCfgManager_InjectOSRegistration_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockCfgManager_InjectOSRegistration_Call) Return(_a0 error) *MockCfgManager_InjectOSRegistration_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCfgManager_InjectOSRegistration_Call) RunAndReturn(run func(string, string) error) *MockCfgManager_InjectOSRegistration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsInit provides a mock function with no fields
 func (_m *MockCfgManager) IsInit() bool {
 	ret := _m.Called()

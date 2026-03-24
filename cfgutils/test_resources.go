@@ -17,6 +17,7 @@ runcmd:
 ssh_authorized_keys:
   - ssh-rsa AAASampleContent
 `
+
 	userdataSampleContent1wf = `#cloud-config
 write_files:
   - path: /tmp/foo
@@ -49,6 +50,44 @@ write_files:
 		`ssh-rsa AAAAitem1`,
 		`ssh-rsa AAAAitem2`,
 	}
+
+	expectedSuseProducts1rc1wf = `#cloud-config
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/register-suse-modules.sh
+    content: H4sIAAAAAAAA/wAAAP//fFJdb9s4EHwWf8WcIp+Tu5N8tvuUwEGLIG3z0BSoUxRFHBiyuIqZSqRCrp24jv97QctyYveDL1pQM7Mz3D34qzNRujNJ3VQ4YsQkWJXkOC2rQXQoUyb82/oat8q4Jcfj1vtx68O4NTwS9EgZThF2uKw6lm6VY7KxmzmKSyNnBbk4Wm6lVklhbkP0Tv/uCkHZ1CAccmpZ6VsMPw/P8WmtYFNWRidJEgqRlXIQ+n9nRmvKGLFFt9uNe71e3O/3ERPuzFS/lobCjWR0ij3CP/7sQqOslEIcQGnHaVHg7v4EivGgigITgiaSJKE0ND0yHFPlai/fF1VFFnGsjY6VZrJpxmpOsJRbctMXLnyPptOfuc8ufkN3M2l2U8WOU545POHu3mdsJ9c3eEI4OkyUJM0qV2SPRjw6TGpkXac2m9bVnKxTRh+FbTzhYaoKwsXb4SBqj7gNS6n0qkpi08cTMSd7AmkEULtUchAp2YnmZDuRR/y3gQ+i+hsKQOW4RthcYDBAeGl4M2uyJEPcnICnpAXQKL85u7r4eHm8RfkViZQMRZAbC+Uns+wmyavVxk99NlxmKitGpODBdl+iQW+LA1zZBdhsod4N6gUWQfDzDlaIlkquOtFyTtZ/fPZVKIJgb3pNB5WvL17E3LU8nGUZOZfPimKB9VKkTHLXrj8TS+m357iFo1+IvTOMc2uNXcePlEzwJVWMVEtYYrvY1VzHcwVRhf7/PsN+iCAI1lvYEHK1LqXRJMQLF5vXL/zyLLZvSfK4yZEr4Uk/AgAA//8Q5Z8zbgQAAA==
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedSuseProduct2rc1wf = `#cloud-config
+runcmd:
+  - timedatectl set-timezone Europe/Warsaw
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/register-suse-modules.sh
+    content: H4sIAAAAAAAA/wAAAP//fFJdb9s4EHwWf8WcIp+Tu5N8tvuUwEGLIG3z0BSoUxRFHBiyuIqZSqRCrp24jv97QctyYveDL1pQM7Mz3D34qzNRujNJ3VQ4YsQkWJXkOC2rQXQoUyb82/oat8q4Jcfj1vtx68O4NTwS9EgZThF2uKw6lm6VY7KxmzmKSyNnBbk4Wm6lVklhbkP0Tv/uCkHZ1CAccmpZ6VsMPw/P8WmtYFNWRidJEgqRlXIQ+n9nRmvKGLFFt9uNe71e3O/3ERPuzFS/lobCjWR0ij3CP/7sQqOslEIcQGnHaVHg7v4EivGgigITgiaSJKE0ND0yHFPlai/fF1VFFnGsjY6VZrJpxmpOsJRbctMXLnyPptOfuc8ufkN3M2l2U8WOU545POHu3mdsJ9c3eEI4OkyUJM0qV2SPRjw6TGpkXac2m9bVnKxTRh+FbTzhYaoKwsXb4SBqj7gNS6n0qkpi08cTMSd7AmkEULtUchAp2YnmZDuRR/y3gQ+i+hsKQOW4RthcYDBAeGl4M2uyJEPcnICnpAXQKL85u7r4eHm8RfkViZQMRZAbC+Uns+wmyavVxk99NlxmKitGpODBdl+iQW+LA1zZBdhsod4N6gUWQfDzDlaIlkquOtFyTtZ/fPZVKIJgb3pNB5WvL17E3LU8nGUZOZfPimKB9VKkTHLXrj8TS+m357iFo1+IvTOMc2uNXcePlEzwJVWMVEtYYrvY1VzHcwVRhf7/PsN+iCAI1lvYEHK1LqXRJMQLF5vXL/zyLLZvSfK4yZEr4Uk/AgAA//8Q5Z8zbgQAAA==
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedSuseProduct1rc2wf = `#cloud-config
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /tmp/register-suse-modules.sh
+    content: H4sIAAAAAAAA/wAAAP//fFJdb9s4EHwWf8WcIp+Tu5N8tvuUwEGLIG3z0BSoUxRFHBiyuIqZSqRCrp24jv97QctyYveDL1pQM7Mz3D34qzNRujNJ3VQ4YsQkWJXkOC2rQXQoUyb82/oat8q4Jcfj1vtx68O4NTwS9EgZThF2uKw6lm6VY7KxmzmKSyNnBbk4Wm6lVklhbkP0Tv/uCkHZ1CAccmpZ6VsMPw/P8WmtYFNWRidJEgqRlXIQ+n9nRmvKGLFFt9uNe71e3O/3ERPuzFS/lobCjWR0ij3CP/7sQqOslEIcQGnHaVHg7v4EivGgigITgiaSJKE0ND0yHFPlai/fF1VFFnGsjY6VZrJpxmpOsJRbctMXLnyPptOfuc8ufkN3M2l2U8WOU545POHu3mdsJ9c3eEI4OkyUJM0qV2SPRjw6TGpkXac2m9bVnKxTRh+FbTzhYaoKwsXb4SBqj7gNS6n0qkpi08cTMSd7AmkEULtUchAp2YnmZDuRR/y3gQ+i+hsKQOW4RthcYDBAeGl4M2uyJEPcnICnpAXQKL85u7r4eHm8RfkViZQMRZAbC+Uns+wmyavVxk99NlxmKitGpODBdl+iQW+LA1zZBdhsod4N6gUWQfDzDlaIlkquOtFyTtZ/fPZVKIJgb3pNB5WvL17E3LU8nGUZOZfPimKB9VKkTHLXrj8TS+m357iFo1+IvTOMc2uNXcePlEzwJVWMVEtYYrvY1VzHcwVRhf7/PsN+iCAI1lvYEHK1LqXRJMQLF5vXL/zyLLZvSfK4yZEr4Uk/AgAA//8Q5Z8zbgQAAA==
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
 
 	expectedStr2Cmd = `
 #cloud-config

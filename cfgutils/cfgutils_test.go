@@ -923,3 +923,76 @@ func TestImplantSSHKey(t *testing.T) {
 		})
 	}
 }
+
+func TestInjectOSRegistration(t *testing.T) {
+	testCases := []struct {
+		name            string
+		readFileContent []byte
+		expectedStr     string
+		expectedError   error
+	}{
+		{name: "case 1: cloud-init does not contain any sections",
+			readFileContent: []byte(userdataSampleContentNoSections),
+			expectedStr:     expectedSuseProducts1rc1wf,
+			expectedError:   nil,
+		},
+
+		{name: "case 2: cloud-init contains section 'run_cmd'",
+			readFileContent: []byte(userdataSampleContent1rc),
+			expectedStr:     expectedSuseProduct2rc1wf,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: cloud-init contains section 'write_files'",
+			readFileContent: []byte(userdataSampleContent1wf),
+			expectedStr:     expectedSuseProduct1rc2wf,
+			expectedError:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		var expected, observed map[string][]any
+
+		t.Run(tc.name, func(t *testing.T) {
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
+			}
+
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+
+			err = sc.InjectOSRegistration("111-222-333", "john@doe")
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+			}
+
+		})
+	}
+}

@@ -24,9 +24,7 @@ import (
 const (
 	port                                    = 22
 	cmdRebootCloudInit                      = "sudo cloud-init clean --logs --reboot"
-	cmdRegisterOS                           = "sudo -E SUSEConnect -r %s -e %s"
 	cmdGetStatusOS                          = "sudo -E SUSEConnect -s"
-	cmdRegisterModuleOS                     = "sudo -E SUSEConnect -p %s"
 	cmdDeregisterOS                         = "sudo -E SUSEConnect -d"
 	remoteScriptDir                         = "/tmp/fsas-nodedriver"
 	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 5 * time.Second
@@ -81,7 +79,6 @@ type SshManager interface {
 	WriteFileOnRemoteMachine(path, fileContent string, fileMode os.FileMode) error
 	DisablePasswordSSHLogin() error
 	RebootCloudInit() error
-	RegisterOS(regcode, email string) error
 	DeregisterOS() error
 }
 
@@ -479,58 +476,6 @@ func (sc *StandardSshManager) removeRemoteFile(path string, runWithSudo bool) er
 	if _, err := sc.runCommand(command); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// RegisterOS - Registers SLES OS license using SUSEConnect
-func (sc *StandardSshManager) RegisterOS(regcode, email string) error {
-	if regcode == "" {
-		slog.Info("OS registration skipped: no registration code provided.")
-		return nil
-	}
-
-	// Step 1: Perform the initial base registration.
-	slog.Info("Attempting initial OS registration: ", "email", email)
-	initialRegCommand := fmt.Sprintf(cmdRegisterOS, regcode, email)
-	if _, err := sc.runCommand(initialRegCommand); err != nil {
-		slog.Error("Error executing initial OS registration: ", "err", err)
-		return err
-	}
-	slog.Info("Initial OS registration successful")
-
-	// Step 2: Get the status of all products in JSON format.
-	slog.Info("Fetching status of all SUSE modules...")
-	jsonOutput, err := sc.runCommand(cmdGetStatusOS)
-	if err != nil {
-		slog.Error("Error fetching SUSE product status: ", "err", err)
-		return err
-	}
-
-	// Step 3: Parse the JSON response.
-	var products []models.SuseProduct
-	if err := json.Unmarshal([]byte(jsonOutput), &products); err != nil {
-		slog.Error("Error parsing SUSE product status JSON: ", "err", err)
-		return err
-	}
-
-	// Step 4: Loop through products and register any that are not registered.
-	slog.Info("Checking for unregistered modules...")
-	for _, product := range products {
-		if product.Status == "Not Registered" {
-			productString := fmt.Sprintf("%s/%s/%s", product.Identifier, product.Version, product.Arch)
-			slog.Info("Found unregistered module. Attempting to register: ", "module", productString)
-
-			moduleRegCommand := fmt.Sprintf(cmdRegisterModuleOS, productString)
-			if _, err := sc.runCommand(moduleRegCommand); err != nil {
-				slog.Error("Error registering module: ", "module", productString, "err", err)
-				return err
-			}
-			slog.Info("Successfully registered module: ", "module", productString)
-		}
-	}
-
-	slog.Info("OS and all modules registered successfully")
 
 	return nil
 }

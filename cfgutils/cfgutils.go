@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
@@ -27,6 +28,7 @@ type CfgManager interface {
 	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
 	ImplantSSHKey(sshKeyPath, sshUser string) error
 	ImplantRKE2Config(configName, machineUUID string) error
+	InjectOSRegistration(regcode, email string) error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -222,10 +224,135 @@ func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
 		NewCloudConfigItemUsers(strings.TrimSpace(sshUser), []string{sshPubKeyContentTrimmed}),
 	}
 	if err := sc.extendUserdata(items); err != nil {
+
 		return err
 	}
 
 	return nil
+}
+
+/*
+	InjectOSRegistration registers SUSE products by extending cloud config with SUSEConnect registration commands.
+
+It extends the section "runcmd" and "write_files" with commands for registration and commands for attaching products.
+Simplified example:
+
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+
+write_files:
+  - path: /tmp/register-suse-modules.sh
+    permissions: "0755"
+    content: |
+    #!/bin/bash
+    SUSEConnect -r 111-222-333 -e john@doe.com
+    SUSEConnect -p sles/15.7/x86_64
+    SUSEConnect -p sle-module-basesystem/15.7/x86_64
+    SUSEConnect -p sle-module-public-cloud/15.7/x86_64
+*/
+func (sc *StandardCfgManager) InjectOSRegistration(regCode, email string) error {
+
+	if regCode == "" {
+		slog.Info("OS registration skipped: no registration code provided.")
+		return nil
+	}
+
+	scriptPath := "/tmp/register-suse-modules.sh"
+
+	if err := sc.ExtendUserdataRunCmd([]string{
+		fmt.Sprintf("sh %s", scriptPath),
+		fmt.Sprintf("rm %s", scriptPath), // remove script because it contains sensitive data (registration code)
+	}); err != nil {
+		slog.Error("Failed to extend user data with OS registration commands (runcmd):", "err", err)
+		return err
+	}
+
+	writeFilesRegisteringScriptContent, err := getWriteFilesContentForSuseRegistration(regCode, email)
+	if err != nil {
+		return err
+	}
+
+	if err := sc.ExtendUserdataWriteFiles([]CloudConfigItem{
+		NewCloudConfigItemWriteFiles(scriptPath, writeFilesRegisteringScriptContent)}); err != nil {
+		slog.Error("Failed to extend user data with SUSE registration script (write_files):", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+/*
+getWriteFilesContentForSuseRegistration returns content for cloud config write_files section
+for SUSE registration script based on provided registration code, email and list of SUSE products to register.
+*/
+func getWriteFilesContentForSuseRegistration(regCode, email string) (string, error) {
+	templateForScript := `#!/bin/bash
+set -e
+timestamp=$(date +%Y-%m-%d__%H_%M_%S)
+exec > "/tmp/register-suse-modules-${timestamp}.log" 2>&1
+
+echo "Starting SUSE Registration..."
+
+cmd="SUSEConnect -r {{.RegCode}} -e {{.Email}}"
+echo "$> SUSEConnect -r ***** -e {{.Email}}"
+$cmd
+
+# install jq; it will be needed in next steps
+cmd="zypper --non-interactive refresh"
+echo "$> $cmd"
+$cmd
+
+cmd="zypper --non-interactive install jq"
+echo "$> $cmd"
+$cmd
+
+sudo SUSEConnect --status | jq -r '.[] | "\(.identifier)\t\(.status)\t\(.arch)\t\(.version)"' | while IFS=$'\t' read -r id status arch ver; do
+  echo "id=$id/$ver/$arch, status=$status"
+  if [ "$status" == "Not Registered" ]; then
+    echo "ACTION: Registering $id"
+	for i in {1..4}; do
+        echo "Attempt $i for registering $id"
+        
+        # Try to register the module
+		cmd="SUSEConnect -p ${id}/${ver}/${arch}"
+		echo "$> $cmd"
+        if $cmd; then
+            echo "Successfully activated $id"
+            break
+        else
+            echo "Got Error for $id. Wait and retry"
+            cmd="sleep 30"
+			echo "$> $cmd"
+			$cmd
+        fi
+    done
+
+  else
+    echo "Already registered: $id"
+  fi
+done`
+
+	var data = struct {
+		RegCode string
+		Email   string
+	}{
+		RegCode: regCode,
+		Email:   email,
+	}
+
+	t, err := template.New("script").Parse(templateForScript)
+	if err != nil {
+		return "", err
+	}
+
+	var buffer strings.Builder
+	if err := t.Execute(&buffer, data); err != nil {
+		slog.Error("Failed to execute template for SUSE registration script:", "err", err)
+		return "", err
+	}
+
+	return buffer.String(), nil
 }
 
 // ImplantRKE2Config extends userdata cloud-config file and prepare files that configure rke2.
@@ -270,5 +397,4 @@ func (sc *StandardCfgManager) getRke2ConfigFileContent(machineUUID string) strin
 		configContent = providerIdEntry
 	}
 	return configContent
-
 }

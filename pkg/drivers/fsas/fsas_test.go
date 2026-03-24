@@ -1160,13 +1160,14 @@ func TestCreate(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
-	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
+
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
-	mockRKE2ScriptContent := "script-content-rke2"
+	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
+	mockRKE2ScriptContent := "script-content-rke2"
 	mockSSH.On("WriteFileOnRemoteMachine", userdataPath, mockRKE2ScriptContent, fs.FileMode(0700)).Return(nil)
 	mockCfg.On("PrepareMetadata", testMachineUUID, driver.MachineName).Return("")
 	mockSSH.On("WriteFileOnRemoteMachine", metadataPath, "", fs.FileMode(0700)).Return(nil)
@@ -1245,9 +1246,9 @@ func TestCreateCloudInitFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
-	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
+	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	mockSSH.On("WriteFileOnRemoteMachine", userdataPath, "custom-user-data.yaml", fs.FileMode(0700)).Return(fmt.Errorf("WriteFileOnRemoteMachine failed"))
@@ -1768,8 +1769,9 @@ func TestCreateOSRegistrationFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
 	mockCfg.On("IsInit").Return(true)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
+	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	mockError := fmt.Errorf("Registration failed")
-	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(mockError)
+	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(mockError)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// waitForStatus in Remove call
@@ -1837,7 +1839,6 @@ func TestCreateExecuteScriptFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
 	mockCfg.On("IsInit").Return(true)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
-	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
 	mockError := fmt.Errorf("ExecuteScript unsuccessful")
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(mockError)
 	mockSSH.On("DeregisterOS").Return(nil)
@@ -1907,7 +1908,6 @@ func TestCreateFailRemoveFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
 	mockCfg.On("IsInit").Return(true)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
-	mockSSH.On("RegisterOS", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
 	mockError := fmt.Errorf("ExecuteScript unsuccessful")
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(mockError)
 	removeError := fmt.Errorf("Remove after failed inner Create failed as well")

@@ -658,6 +658,16 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
+		return err
+	}
+
+	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
+		slog.Error("Failed to inject OS registration data into config file: ", "err", err)
+		return err
+	}
+
 	if !d.SshManager.IsInit() {
 		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostPubKey)
 		if err != nil {
@@ -665,16 +675,6 @@ func (d *Driver) innerCreate() error {
 			return err
 		}
 		d.SshManager = sshManager
-	}
-
-	if err := d.SshManager.RegisterOS(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
-		slog.Error("Failed to register OS via SSH using SUSEConnect: ", "err", err, "email", d.SlesRegistrationEmail)
-		return err
-	}
-
-	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
-		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
-		return err
 	}
 
 	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
