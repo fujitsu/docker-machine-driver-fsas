@@ -341,7 +341,11 @@ done`
 		Email:   email,
 	}
 
-	t := template.Must(template.New("script").Parse(templateForScript))
+	t, err := template.New("script").Parse(templateForScript)
+	if err != nil {
+		return "", err
+	}
+
 	var buffer strings.Builder
 	if err := t.Execute(&buffer, data); err != nil {
 		slog.Error("Failed to execute template for SUSE registration script:", "err", err)
