@@ -74,7 +74,7 @@ var _ Keycloak = (*KeycloakClient)(nil)
 // NewKeycloak Creates and returns a new instance of the Keycloak
 func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*KeycloakClient, error) {
 	if realm == "" || userName == "" || userPassword == "" || baseURI == "" || endpoint == "" {
-		slog.Debug("Keycloak constructor: ", "realm", realm, "userName", userName,
+		slog.Debug("Keycloak constructor", "realm", realm, "userName", userName,
 			"userPassword", userPassword, "baseURI", baseURI, "endpoint", endpoint)
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
@@ -82,13 +82,13 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 
 	logAllEnvVars := func() {
 		envVars := os.Environ()
-		slog.Debug("All environment variables:")
+		slog.Debug("All environment variables")
 		for i, envVar := range envVars {
 			if strings.HasPrefix(envVar, "CLIENT_SECRET") {
-				slog.Debug("env var: ", "i", i, "envVar", "CLIENT_SECRET=<hidden-for-security-reasons>")
+				slog.Debug("env var", "i", i, "envVar", "CLIENT_SECRET=<hidden-for-security-reasons>")
 				continue
 			}
-			slog.Debug("env var: ", "i", i, "envVar", envVar)
+			slog.Debug("env var", "i", i, "envVar", envVar)
 		}
 	}
 
@@ -145,13 +145,13 @@ func (k *KeycloakClient) InitConnection() error {
 	slog.Debug(fmt.Sprintf("keycloak authorization service structure: %+v", k))
 	accessToken, refreshToken, err := k.getTokens()
 	if err != nil {
-		slog.Error("Error while getting tokens ", "err", err)
+		slog.Error("Error while getting tokens", "err", err)
 		return err
 	}
 
 	k.AccessToken = accessToken
 	k.RefreshToken = refreshToken
-	slog.Debug("The access and refresh tokens successfully initialized: ")
+	slog.Debug("The access and refresh tokens successfully initialized")
 
 	if err := k.updateUserPgcdiPrivileges(); err != nil {
 		return err
@@ -165,13 +165,13 @@ func (k *KeycloakClient) accessTokenIsValid() bool {
 	claims := jwt.MapClaims{}
 	_, _, err := jwt.NewParser().ParseUnverified(k.AccessToken, claims)
 	if err != nil {
-		slog.Error("Error while parsing jwt token ", "err", err)
+		slog.Error("Error while parsing jwt token", "err", err)
 		return false
 	}
 
 	expirationTime, err := claims.GetExpirationTime()
 	if err != nil {
-		slog.Error("Error while getting expiration time from claims ", "err", err)
+		slog.Error("Error while getting expiration time from claims", "err", err)
 		return false
 	}
 	slog.Debug(fmt.Sprintf("access token is valid from now %+v and next %+v",
@@ -196,7 +196,7 @@ func (k *KeycloakClient) getTokens() (accessToken, refreshToken string, er error
 	var data map[string]any
 	statusCode, err := k.cdiClient.Post(payload, endpoint, queryParams, &data, headers)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Request POST '%s' failed: ", endpoint), "err", err)
+		slog.Error(fmt.Sprintf("Request POST '%s' failed", endpoint), "err", err)
 		return accessToken, refreshToken, &KeycloakHttpError{
 			Message: err.Error(),
 			Code:    statusCode,
@@ -226,13 +226,13 @@ func getTokenFromResponse(tokenType string, responseData map[string]any) (string
 	case refreshTokenType:
 		err = ErrResponseBodyMapNotContainKeyRefreshToken
 	default:
-		slog.Error("Unknown token type: ", "tokenType", tokenType)
+		slog.Error("Unknown token type", "tokenType", tokenType)
 		return "", fmt.Errorf("unknown token type: '%s'", tokenType)
 	}
 
 	token, ok := responseData[tokenType].(string)
 	if !ok {
-		slog.Error("Response data does not contain token: ", "token", token)
+		slog.Error("Response data does not contain token", "token", token)
 		return "", err
 	}
 	return token, nil
@@ -259,20 +259,20 @@ func (k *KeycloakClient) refreshToken() error {
 
 	statusCode, err := k.cdiClient.Post(payload, endpoint, queryParams, &data, headers)
 	if err != nil || statusCode != http.StatusOK {
-		slog.Error(fmt.Sprintf("Error requesting refresh token; request POST '%s' failed: ", endpoint),
+		slog.Error(fmt.Sprintf("Error requesting refresh token; request POST '%s' failed", endpoint),
 			"statusCode", statusCode, "err", err)
 		return err
 	}
 	accessToken, err := getTokenFromResponse(accessTokenType, data)
 	if err != nil {
-		slog.Error("Error while getting access token from response: ", "err", err)
+		slog.Error("Error while getting access token from response", "err", err)
 		return err
 	}
 	k.AccessToken = accessToken
 
 	refreshToken, err := getTokenFromResponse(refreshTokenType, data)
 	if err != nil {
-		slog.Error("Error while getting refresh token from response: ", "err", err)
+		slog.Error("Error while getting refresh token from response", "err", err)
 		return err
 	}
 	k.RefreshToken = refreshToken
@@ -337,7 +337,7 @@ func (k *KeycloakClient) updateUserPgcdiPrivileges() error {
 		return err
 	}
 
-	slog.Debug("PG CDI privileges taken from keycloak: ",
+	slog.Debug("PG CDI privileges taken from keycloak",
 		"user", k.UserName, "roles", k.userRoles, "clusters",
 		k.userClusters, "tenant", k.userTenant)
 

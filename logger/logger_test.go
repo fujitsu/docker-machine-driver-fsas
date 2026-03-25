@@ -81,7 +81,7 @@ func Test_verifyLogFormat(t *testing.T) {
 			logLevel:      Debug,
 			message:       "Hello world!",
 			attributes:    []any{"foo", 11},
-			expectedPart2: "[DEBUG]; Hello world! foo=11;",
+			expectedPart2: "[DEBUG]; Hello world!: foo=11;",
 		},
 
 		{name: "level Info, no attributes",
@@ -94,7 +94,7 @@ func Test_verifyLogFormat(t *testing.T) {
 			logLevel:      Info,
 			message:       "Hello world!",
 			attributes:    []any{"foo", 11},
-			expectedPart2: "[INFO]; Hello world! foo=11;",
+			expectedPart2: "[INFO]; Hello world!: foo=11;",
 		},
 
 		{name: "level Warn, no attributes",
@@ -107,7 +107,7 @@ func Test_verifyLogFormat(t *testing.T) {
 			logLevel:      Warn,
 			message:       "Hello world!",
 			attributes:    []any{"foo", 11},
-			expectedPart2: "[WARN]; Hello world! foo=11;",
+			expectedPart2: "[WARN]; Hello world!: foo=11;",
 		},
 
 		{name: "level Error, no attributes",
@@ -120,13 +120,13 @@ func Test_verifyLogFormat(t *testing.T) {
 			logLevel:      Error,
 			message:       "Hello world!",
 			attributes:    []any{"foo", 11},
-			expectedPart2: "[ERROR]; Hello world! foo=11;",
+			expectedPart2: "[ERROR]; Hello world!: foo=11;",
 		},
 		{name: "level Error, with 4 attributes",
 			logLevel:      Error,
 			message:       "Hello world!",
 			attributes:    []any{"foo", 11, "pi", 3.14},
-			expectedPart2: "[ERROR]; Hello world! foo=11, pi=3.14",
+			expectedPart2: "[ERROR]; Hello world!: foo=11, pi=3.14",
 		},
 
 		{name: "level Info, with censored sensitive data",
@@ -137,17 +137,15 @@ func Test_verifyLogFormat(t *testing.T) {
 		},
 		{name: "level Info, with censored sensitive data in attributes",
 			logLevel:      Info,
-			message:       "hello world:",
+			message:       "hello world",
 			attributes:    []any{"foo", "password=supersecret&secret=topsecret&", "bar", `"access_token":"abc123"&"refresh_token":"r123"&"id_token":"i123"`},
 			expectedPart2: `[INFO]; hello world: foo=password=[REDACTED]&secret=[REDACTED]&, bar="access_token":[REDACTED]&"refresh_token":[REDACTED]&"id_token":[REDACTED];`,
 		},
 
 		{name: "level Debug, with censored sensitive data in attributes (real life example)",
 			logLevel: Debug,
-			message:  "Initiating POST request:",
-			attributes: []any{
-				"endpoint", "/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token/introspect",
-				"payload", "client_id=cdi&client_secret=topsecret&token=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJmT1VSOXpEcnZ2MFpnaEx2TUJPcEUzTT"},
+			message:  "Initiating POST request",
+			attributes: []any{"endpoint", "/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token/introspect", "payload", "client_id=cdi&client_secret=topsecret&token=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJmT1VSOXpEcnZ2MFpnaEx2TUJPcEUzTT"},
 			expectedPart2: `[DEBUG]; Initiating POST request: endpoint=/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token/introspect, payload=client_id=cdi&client_secret=[REDACTED]&token=[REDACTED]`,
 		},
 
@@ -203,4 +201,33 @@ func Test_enableDisableDebugLevel(t *testing.T) {
 	expected := "Hello world"
 
 	assert.Contains(t, output, expected, fmt.Sprintf("expected output to contain %q but got %q", expected, output))
+}
+
+func Test_logWithAttributes_AddsColonAutomatically(t *testing.T) {
+	err := os.Setenv(enableDebugLevel, "true")
+	if err != nil {
+		t.Fatalf("failed to set env var: %v", err)
+	}
+	defer os.Setenv(enableDebugLevel, "")
+
+	output := captureLogOutput(Info, "Tenant check failed because of an error", "endpoint", "/foo", "err", "boom")
+
+	assert.Contains(t, output, "error: ")
+	assert.NotContains(t, output, "::")
+	assert.NotContains(t, output, "  ")
+	assert.NotContains(t, output, ": : ")
+}
+
+func Test_logWithoutAttributes_DoesNotAddColonAutomatically(t *testing.T) {
+	err := os.Setenv(enableDebugLevel, "true")
+	if err != nil {
+		t.Fatalf("failed to set env var: %v", err)
+	}
+	defer os.Setenv(enableDebugLevel, "")
+
+	output := captureLogOutput(Info, "Not possible to read ssdId because of empty resource list")
+	
+	assert.NotContains(t, output, "list:")
+	assert.NotContains(t, output, ":;\n")
+	assert.NotContains(t, output, ";\n:")
 }
