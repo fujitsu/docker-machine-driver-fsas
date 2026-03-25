@@ -132,7 +132,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("OsImageName: %s, ", d.OsImageName) +
 		fmt.Sprintf("OsImageSshHostPubKey: %s, ", d.OsImageSshHostPubKey) +
 		fmt.Sprintf("MachineUUID: %s, ", d.MachineUUID) +
-		fmt.Sprintf("UserDataFile: %s", d.UserDataFile) +
+		fmt.Sprintf("UserDataFile: %s, ", d.UserDataFile) +
 		fmt.Sprintf("SlesRegistrationEmail: %s", d.SlesRegistrationEmail) +
 		"}"
 }
