@@ -69,7 +69,7 @@ type Driver struct {
 	Keycloak                  keycloak.Keycloak   `json:"-"`
 	SshManager                sshutils.SshManager `json:"-"`
 	CfgManager                cfgutils.CfgManager `json:"-"`
-	LoginSshKey               string
+	LoginSshKey               string              `json:"loginSshKey"` // Matches the name used in annotations
 }
 
 // NewDriver creates and returns a new instance of the FSAS CDI driver
@@ -252,7 +252,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-login-ssh-key",
-			Usage:  "First log in with SSH private key",
+			Usage:  "SSH private key for first log in",
 			EnvVar: "FSAS_LOGIN_SSH_KEY",
 		},
 	}

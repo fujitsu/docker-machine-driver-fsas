@@ -5,7 +5,7 @@ metadata:
     passwordFields: credentialsPassword,slesRegistrationCode
     privateCredentialFields: credentialsPassword,slesRegistrationCode
     publicCredentialFields: credentialsUsername,tenantUuid,apiUrl,ntpUrl,dnsIp,slesRegistrationEmail
-    nodedriver.cattle.io/file-to-field-aliases: "LoginSshKey:LoginSshKey"
+    nodedriver.cattle.io/file-to-field-aliases: loginSshKey:loginSshKey
   name: fsas
 spec:
   active: true
@@ -17,4 +17,3 @@ spec:
   externalId: ''
   uiUrl: ''
   url: <fsas_nodedriver_binary_url>
-
