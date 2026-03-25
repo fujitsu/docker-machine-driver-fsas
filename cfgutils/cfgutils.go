@@ -152,9 +152,9 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 	userdata, err := os.ReadFile(sc.userDataFile)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			slog.Error("User data file does not exist:", "path", sc.userDataFile, "err", err)
+			slog.Error("User data file does not exist", "path", sc.userDataFile, "err", err)
 		} else {
-			slog.Error("User data cannot be read:", "path", sc.userDataFile, "err", err)
+			slog.Error("User data cannot be read", "path", sc.userDataFile, "err", err)
 		}
 		return err
 	}
@@ -166,7 +166,7 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 
 	cloudConfig := make(map[string]any)
 	if err := yaml.Unmarshal(userdata, &cloudConfig); err != nil {
-		slog.Error("Failed to parse user data as YAML:", "path", sc.userDataFile, "err", err)
+		slog.Error("Failed to parse user data as YAML", "path", sc.userDataFile, "err", err)
 		return err
 	}
 
@@ -204,7 +204,7 @@ func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
 	}
 
 	if err := os.WriteFile(sc.userDataFile, trimmed, os.FileMode(0644)); err != nil {
-		slog.Error("Failed to write userdata file:", "path", sc.userDataFile, "err", err)
+		slog.Error("Failed to write userdata file", "path", sc.userDataFile, "err", err)
 		return err
 	}
 	return nil
@@ -218,7 +218,7 @@ func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
 	}
 	sshPubKeyContentTrimmed := strings.TrimSpace(string(sshPubKeyContent))
 
-	slog.Debug("ssh public key:", "keyName", fmt.Sprintf("%s.pub", filepath.Base(sshKeyPath)), "keyValue", sshPubKeyContentTrimmed)
+	slog.Debug("ssh public key", "keyName", fmt.Sprintf("%s.pub", filepath.Base(sshKeyPath)), "keyValue", sshPubKeyContentTrimmed)
 
 	items := []CloudConfigItem{
 		NewCloudConfigItemUsers(strings.TrimSpace(sshUser), []string{sshPubKeyContentTrimmed}),
@@ -254,7 +254,7 @@ write_files:
 func (sc *StandardCfgManager) InjectOSRegistration(regCode, email string) error {
 
 	if regCode == "" {
-		slog.Info("OS registration skipped: no registration code provided.")
+		slog.Info("OS registration skipped: no registration code provided")
 		return nil
 	}
 
@@ -264,7 +264,7 @@ func (sc *StandardCfgManager) InjectOSRegistration(regCode, email string) error 
 		fmt.Sprintf("sh %s", scriptPath),
 		fmt.Sprintf("rm %s", scriptPath), // remove script because it contains sensitive data (registration code)
 	}); err != nil {
-		slog.Error("Failed to extend user data with OS registration commands (runcmd):", "err", err)
+		slog.Error("Failed to extend user data with OS registration commands (runcmd)", "err", err)
 		return err
 	}
 
@@ -275,7 +275,7 @@ func (sc *StandardCfgManager) InjectOSRegistration(regCode, email string) error 
 
 	if err := sc.ExtendUserdataWriteFiles([]CloudConfigItem{
 		NewCloudConfigItemWriteFiles(scriptPath, writeFilesRegisteringScriptContent)}); err != nil {
-		slog.Error("Failed to extend user data with SUSE registration script (write_files):", "err", err)
+		slog.Error("Failed to extend user data with SUSE registration script (write_files)", "err", err)
 		return err
 	}
 
@@ -348,7 +348,7 @@ done`
 
 	var buffer strings.Builder
 	if err := t.Execute(&buffer, data); err != nil {
-		slog.Error("Failed to execute template for SUSE registration script:", "err", err)
+		slog.Error("Failed to execute template for SUSE registration script", "err", err)
 		return "", err
 	}
 
@@ -375,9 +375,9 @@ func getFileContent(pathToFile string) (fileContent []byte, err error) {
 	fileContent, err = os.ReadFile(pathToFile)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			slog.Error("File does not exist:", "path", pathToFile, "err", err)
+			slog.Error("File does not exist", "path", pathToFile, "err", err)
 		} else {
-			slog.Error("File cannot be read:", "path", pathToFile, "err", err)
+			slog.Error("File cannot be read", "path", pathToFile, "err", err)
 		}
 		return nil, err
 	}

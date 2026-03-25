@@ -643,7 +643,7 @@ func (d *Driver) innerCreate() error {
 		slog.Error("Could not acquire target SSH hostname because of an error", "err", err)
 		return err
 	}
-	slog.Info("Acquired ssh hostname: ", "hostname", hostName)
+	slog.Info("Acquired ssh hostname", "hostname", hostName)
 
 	if !d.CfgManager.IsInit() {
 		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
@@ -659,12 +659,12 @@ func (d *Driver) innerCreate() error {
 	}
 
 	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
-		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
+		slog.Error("Failed to implant RKE2 config via userdata", "err", err)
 		return err
 	}
 
 	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
-		slog.Error("Failed to inject OS registration data into config file: ", "err", err)
+		slog.Error("Failed to inject OS registration data into config file", "err", err)
 		return err
 	}
 
@@ -1007,7 +1007,7 @@ func (d *Driver) PreCreateCheck() error {
 
 // GetSSHUsername Returns username for use with ssh
 func (d *Driver) GetSSHUsername() string {
-	slog.Info("SSH ", "username", d.SSHUser)
+	slog.Info("SSH", "username", d.SSHUser)
 	return d.SSHUser
 }
 
