@@ -298,15 +298,6 @@ cmd="SUSEConnect -r {{.RegCode}} -e {{.Email}}"
 echo "$> SUSEConnect -r ***** -e {{.Email}}"
 $cmd
 
-# install jq; it will be needed in next steps
-cmd="zypper --non-interactive refresh"
-echo "$> $cmd"
-$cmd
-
-cmd="zypper --non-interactive install jq"
-echo "$> $cmd"
-$cmd
-
 sudo SUSEConnect --status | jq -r '.[] | "\(.identifier)\t\(.status)\t\(.arch)\t\(.version)"' | while IFS=$'\t' read -r id status arch ver; do
   echo "id=$id/$ver/$arch, status=$status"
   if [ "$status" == "Not Registered" ]; then
