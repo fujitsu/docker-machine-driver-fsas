@@ -69,6 +69,7 @@ type Driver struct {
 	Keycloak                  keycloak.Keycloak   `json:"-"`
 	SshManager                sshutils.SshManager `json:"-"`
 	CfgManager                cfgutils.CfgManager `json:"-"`
+	LoginSshKey               string
 }
 
 // NewDriver creates and returns a new instance of the FSAS CDI driver
@@ -249,6 +250,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Warning: this field should remain empty as custom userdata are not supported!",
 			EnvVar: "FSAS_USERDATA",
 		},
+		mcnflag.StringFlag{
+			Name:   "fsas-login-ssh-key",
+			Usage:  "First log in with SSH private key",
+			EnvVar: "FSAS_LOGIN_SSH_KEY",
+		},
 	}
 }
 
@@ -398,6 +404,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SlesRegistrationEmail = strings.TrimSpace(flags.String("fsas-sles-registration-email"))
 	slog.Debug("Driver", "FSAS SLES registration email", d.SlesRegistrationEmail)
 
+	d.LoginSshKey = strings.TrimSpace(flags.String("fsas-login-ssh-key"))
+	slog.Debug("Driver ", "FSAS Login SSH key", d.LoginSshKey)
+
 	return d.checkConfig()
 }
 
@@ -518,6 +527,10 @@ func (d *Driver) checkConfig() error {
 	}
 	if d.OsImageName == "" {
 		return fmt.Errorf(errorMandatoryOption, "OS image name", "--fsas-os-image-name")
+	}
+
+	if d.LoginSshKey == "" {
+		return fmt.Errorf(errorMandatoryOption, "Login SSH key", "--fsas-login-ssh-key")
 	}
 
 	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {
