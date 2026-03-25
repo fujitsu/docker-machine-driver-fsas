@@ -18,6 +18,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	"github.com/rancher/machine/libmachine/drivers"
+	"github.com/rancher/machine/libmachine/ssh"
 	gossh "golang.org/x/crypto/ssh"
 
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
@@ -563,6 +564,8 @@ func (d *Driver) Create() error {
 	return nil
 }
 
+var generateSSHKey = ssh.GenerateSSHKey
+
 func (d *Driver) innerCreate() error {
 	slog.Debug("Attempting to create FSAS CDI machine instance.")
 	slog.Debug(fmt.Sprintf("BaseDriver struct: %+v", d.BaseDriver))
@@ -635,29 +638,33 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.SshManager.ExchangeKeys(); err != nil {
+	hostName, err := d.GetSSHHostname()
+	if err != nil {
+		slog.Error("Could not acquire target SSH hostname because of an error: ", "err", err)
 		return err
 	}
-
-	if err := d.SshManager.RegisterOS(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
-		slog.Error("Failed to register OS via SSH using SUSEConnect: ", "err", err, "email", d.SlesRegistrationEmail)
-		return err
-	}
+	slog.Info("Acquired ssh hostname: ", "hostname", hostName)
 
 	if !d.CfgManager.IsInit() {
-		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson)
+		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
 		d.CfgManager = cfgManager
 	}
 
-	// Prepare scripts execution parameters
-	scriptPath := "" // Random paths
-	removeOnFinish := true
-	runSudo := true
+	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
+		return err
+	}
 
-	// Generate script content for RKE2 setup
-	overrideProviderIdScriptContent := d.CfgManager.PrepareRke2ConfigScript("100-fsas-providerid", d.MachineUUID)
+	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {
+		return err
+	}
 
-	if err := d.SshManager.ExecuteScript(scriptPath, overrideProviderIdScriptContent, removeOnFinish, runSudo); err != nil {
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata:", "err", err)
+		return err
+	}
+
+	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
+		slog.Error("Failed to inject OS registration data into config file: ", "err", err)
 		return err
 	}
 
@@ -669,6 +676,9 @@ func (d *Driver) innerCreate() error {
 		slog.Error("Failed to disable password login: ", "err", err)
 		return err
 	}
+
+	slog.Info("Logging content of cloud config file at the end of method innerCreate")
+	logContentOfCloudConfigFile(d.UserDataFile)
 
 	return nil
 }

@@ -24,9 +24,7 @@ import (
 const (
 	port                                    = 22
 	cmdRebootCloudInit                      = "sudo cloud-init clean --logs --reboot"
-	cmdRegisterOS                           = "sudo -E SUSEConnect -r %s -e %s"
 	cmdGetStatusOS                          = "sudo -E SUSEConnect -s"
-	cmdRegisterModuleOS                     = "sudo -E SUSEConnect -p %s"
 	cmdDeregisterOS                         = "sudo -E SUSEConnect -d"
 	remoteScriptDir                         = "/tmp/fsas-nodedriver"
 	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 5 * time.Second
@@ -77,12 +75,10 @@ var _ SSHKeyParser = (*fileSSHKeyParser)(nil)
 // SshManager interface defines the methods for interacting with the SSH Manager.
 type SshManager interface {
 	IsInit() bool
-	ExchangeKeys() error
 	ExecuteScript(scriptPath, scriptContent string, postRemove bool, runWithSudo bool) error
 	WriteFileOnRemoteMachine(path, fileContent string, fileMode os.FileMode) error
 	DisablePasswordSSHLogin() error
 	RebootCloudInit() error
-	RegisterOS(regcode, email string) error
 	DeregisterOS() error
 }
 
@@ -268,34 +264,6 @@ func (sc *StandardSshManager) runCommand(command string) (string, error) {
 	return output, nil
 }
 
-func (sc *StandardSshManager) ExchangeKeys() error {
-
-	if err := sc.createSSHKey(); err != nil {
-		slog.Error("Could not generate SSH keys because of an error: ", "err", err)
-		return err
-	}
-
-	if err := sc.transferSSHKeyToMachine(); err != nil {
-		slog.Error("Could not transfer SSH keys because of an error: ", "err", err)
-		return err
-	}
-
-	slog.Info("SSH key pair exchanged successfully")
-	return nil
-}
-
-// createSSHKey is responsible for generating new SSH key pair
-func (sc *StandardSshManager) createSSHKey() error {
-
-	if err := ssh.GenerateSSHKey(sc.SshKeyPath); err != nil {
-		slog.Error("SSH key could not be generated because of an error: ", "err", err)
-		return err
-	}
-	slog.Info("SSH key pair generated successfully: ", "path", sc.SshKeyPath)
-
-	return nil
-}
-
 // DisablePasswordSSHLogin disables password authentication for SSH on newly created machine
 func (sc *StandardSshManager) DisablePasswordSSHLogin() error {
 
@@ -325,28 +293,6 @@ func (sc *StandardSshManager) RebootCloudInit() error {
 		return err
 	}
 	slog.Info("Cloud-init reboot executed successfully")
-	return nil
-}
-
-// transferSSHKeyToMachine is responsible for transferring existing SSH key to newly created machine
-func (sc *StandardSshManager) transferSSHKeyToMachine() error {
-
-	pubSshKeyPath := sc.SshKeyPath + ".pub"
-	slog.Debug("Opening file: ", "file", pubSshKeyPath)
-
-	buffer, err := os.ReadFile(pubSshKeyPath)
-	if err != nil {
-		slog.Error("Error opening file: ", "sshKeyPath", pubSshKeyPath, "err", err)
-		return err
-	}
-
-	command := fmt.Sprintf(`echo "%s" >> $HOME/.ssh/authorized_keys`, string(buffer))
-	_, err = sc.runCommand(command)
-	if err != nil {
-		slog.Error("Error writing public key: ", "err", err)
-		return err
-	}
-
 	return nil
 }
 
@@ -530,58 +476,6 @@ func (sc *StandardSshManager) removeRemoteFile(path string, runWithSudo bool) er
 	if _, err := sc.runCommand(command); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// RegisterOS - Registers SLES OS license using SUSEConnect
-func (sc *StandardSshManager) RegisterOS(regcode, email string) error {
-	if regcode == "" {
-		slog.Info("OS registration skipped: no registration code provided.")
-		return nil
-	}
-
-	// Step 1: Perform the initial base registration.
-	slog.Info("Attempting initial OS registration: ", "email", email)
-	initialRegCommand := fmt.Sprintf(cmdRegisterOS, regcode, email)
-	if _, err := sc.runCommand(initialRegCommand); err != nil {
-		slog.Error("Error executing initial OS registration: ", "err", err)
-		return err
-	}
-	slog.Info("Initial OS registration successful")
-
-	// Step 2: Get the status of all products in JSON format.
-	slog.Info("Fetching status of all SUSE modules...")
-	jsonOutput, err := sc.runCommand(cmdGetStatusOS)
-	if err != nil {
-		slog.Error("Error fetching SUSE product status: ", "err", err)
-		return err
-	}
-
-	// Step 3: Parse the JSON response.
-	var products []models.SuseProduct
-	if err := json.Unmarshal([]byte(jsonOutput), &products); err != nil {
-		slog.Error("Error parsing SUSE product status JSON: ", "err", err)
-		return err
-	}
-
-	// Step 4: Loop through products and register any that are not registered.
-	slog.Info("Checking for unregistered modules...")
-	for _, product := range products {
-		if product.Status == "Not Registered" {
-			productString := fmt.Sprintf("%s/%s/%s", product.Identifier, product.Version, product.Arch)
-			slog.Info("Found unregistered module. Attempting to register: ", "module", productString)
-
-			moduleRegCommand := fmt.Sprintf(cmdRegisterModuleOS, productString)
-			if _, err := sc.runCommand(moduleRegCommand); err != nil {
-				slog.Error("Error registering module: ", "module", productString, "err", err)
-				return err
-			}
-			slog.Info("Successfully registered module: ", "module", productString)
-		}
-	}
-
-	slog.Info("OS and all modules registered successfully")
 
 	return nil
 }
