@@ -212,7 +212,7 @@ func Test_logWithAttributes_AddsColonAutomatically(t *testing.T) {
 
 	output := captureLogOutput(Info, "Tenant check failed because of an error", "endpoint", "/foo", "err", "boom")
 
-	assert.Contains(t, output, ": ")
+	assert.Contains(t, output, "error: ")
 	assert.NotContains(t, output, "::")
 	assert.NotContains(t, output, "  ")
 	assert.NotContains(t, output, ": : ")
@@ -227,6 +227,7 @@ func Test_logWithoutAttributes_DoesNotAddColonAutomatically(t *testing.T) {
 
 	output := captureLogOutput(Info, "Not possible to read ssdId because of empty resource list")
 	
+	assert.NotContains(t, output, "list:")
 	assert.NotContains(t, output, ":;\n")
 	assert.NotContains(t, output, ";\n:")
 }
