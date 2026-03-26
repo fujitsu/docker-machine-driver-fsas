@@ -292,19 +292,15 @@ set -e
 timestamp=$(date +%Y-%m-%d__%H_%M_%S)
 exec > "/tmp/register-suse-modules-${timestamp}.log" 2>&1
 
+if ! command -v jq 2>&1 >/dev/null; then
+  echo "System OS registration cannot proceed. 'jq' command-line JSON processor is required but not found on your system. 'jq' must be installed as part of the OS image preparation steps. Please refer to the user manual for detailed instructions on preparing your OS image before proceeding with registration. Aborting registration."
+  exit 1
+fi
+
 echo "Starting SUSE Registration..."
 
 cmd="SUSEConnect -r {{.RegCode}} -e {{.Email}}"
 echo "$> SUSEConnect -r ***** -e {{.Email}}"
-$cmd
-
-# install jq; it will be needed in next steps
-cmd="zypper --non-interactive refresh"
-echo "$> $cmd"
-$cmd
-
-cmd="zypper --non-interactive install jq"
-echo "$> $cmd"
 $cmd
 
 sudo SUSEConnect --status | jq -r '.[] | "\(.identifier)\t\(.status)\t\(.arch)\t\(.version)"' | while IFS=$'\t' read -r id status arch ver; do
