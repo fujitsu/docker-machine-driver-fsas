@@ -3,6 +3,7 @@ module github.com/fujitsu/docker-machine-driver-fsas
 require (
 	github.com/rancher/machine v0.15.0-rancher137
 	github.com/stretchr/testify v1.11.1
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require github.com/kr/fs v0.1.0 // indirect
@@ -20,7 +21,7 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 go 1.24.0

@@ -72,6 +72,10 @@ const (
 )
 
 type NetworkConfig struct {
+	Network NetworkSpec `yaml:"network"`
+}
+
+type NetworkSpec struct {
 	SchemaVersion NetworkConfigVersion `yaml:"version"`
 	Renderer      Renderer             `yaml:"renderer"`
 	Ethernets     map[string]Ethernet  `yaml:"ethernets,omitempty"`
@@ -80,7 +84,7 @@ type NetworkConfig struct {
 
 type Ethernet struct {
 	Match Match `yaml:"match,omitempty"`
-	DHCP4 *bool `yaml:"dhcp4,omitempty"`
+	DHCP4 bool  `yaml:"dhcp4,omitempty"`
 }
 
 type Match struct {
@@ -89,7 +93,7 @@ type Match struct {
 
 type Bond struct {
 	Interfaces []string        `yaml:"interfaces,omitempty"`
-	DHCP4      *bool           `yaml:"dhcp4,omitempty"`
+	DHCP4      bool            `yaml:"dhcp4,omitempty"`
 	Parameters *BondParameters `yaml:"parameters,omitempty"`
 }
 

@@ -828,6 +828,30 @@ done
 			}
 		}
 	]`
+
+	NetworkConfigValid = `network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    bare0:
+      match:
+        macaddress: 52:54:00:a6:36:86
+    bare1:
+      match:
+        macaddress: 52:54:00:32:72:16
+    prov:
+      match:
+        macaddress: 52:54:00:7e:de:e2
+      dhcp4: true
+  bonds:
+    bond0:
+      interfaces:
+      - bare0
+      - bare1
+      dhcp4: true
+      parameters:
+        mode: active-backup
+`
 )
 
 var ExpectedLanports = []Lanport{

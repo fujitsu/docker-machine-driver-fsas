@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	yaml "gopkg.in/yaml.v2"
 )
 
 func TestCreateMachineRequestToJSON(t *testing.T) {
@@ -373,4 +374,44 @@ func Test_customUnmarshallerForResourceStruct(t *testing.T) {
 		})
 	}
 
+}
+
+func TestNetworkConfigMarshalYamlFullSuccess(t *testing.T) {
+	networkconfig := NetworkConfig{
+		Network: NetworkSpec{
+			SchemaVersion: NetworkConfigVersion2,
+			Renderer:      RendererNetworkManager,
+			Ethernets: map[string]Ethernet{
+				"prov": {
+					Match: Match{
+						MACAddress: "52:54:00:7e:de:e2",
+					},
+					DHCP4: true,
+				},
+				"bare0": {
+					Match: Match{
+						MACAddress: "52:54:00:a6:36:86",
+					},
+				},
+				"bare1": {
+					Match: Match{
+						MACAddress: "52:54:00:32:72:16",
+					},
+				},
+			},
+			Bonds: map[string]Bond{
+				"bond0": {
+					Interfaces: []string{"bare0", "bare1"},
+					DHCP4:      true,
+					Parameters: &BondParameters{
+						Mode: BondModeActiveBackup,
+					},
+				},
+			},
+		},
+	}
+
+	rawYAML, err := yaml.Marshal(&networkconfig)
+	assert.NoError(t, err)
+	assert.Equal(t, NetworkConfigValid, string(rawYAML))
 }
