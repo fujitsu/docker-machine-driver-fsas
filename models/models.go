@@ -55,20 +55,10 @@ type Resource struct {
 	MaxResourceCount int             `json:"max_resource_count,omitempty"` // GPU field (read-only and optional)
 }
 
-type NetworkConfigVersion int
-
-const NetworkConfigVersion2 NetworkConfigVersion = 2
-
-type Renderer string
-
 const (
-	RendererNetworkManager Renderer = "NetworkManager"
-)
-
-type BondMode string
-
-const (
-	BondModeActiveBackup BondMode = "active-backup"
+	NetworkConfigVersion2  int    = 2
+	RendererNetworkManager string = "NetworkManager"
+	BondModeActiveBackup   string = "active-backup"
 )
 
 type NetworkConfig struct {
@@ -76,10 +66,10 @@ type NetworkConfig struct {
 }
 
 type NetworkSpec struct {
-	SchemaVersion NetworkConfigVersion `yaml:"version"`
-	Renderer      Renderer             `yaml:"renderer"`
-	Ethernets     map[string]Ethernet  `yaml:"ethernets,omitempty"`
-	Bonds         map[string]Bond      `yaml:"bonds,omitempty"`
+	SchemaVersion int                 `yaml:"version"`
+	Renderer      string              `yaml:"renderer"`
+	Ethernets     map[string]Ethernet `yaml:"ethernets,omitempty"`
+	Bonds         map[string]Bond     `yaml:"bonds,omitempty"`
 }
 
 type Ethernet struct {
@@ -98,7 +88,7 @@ type Bond struct {
 }
 
 type BondParameters struct {
-	Mode BondMode `yaml:"mode,omitempty"`
+	Mode string `yaml:"mode,omitempty"`
 }
 
 // Custom Unmarshaler to handle both "res_spec" and "res_spcec"
