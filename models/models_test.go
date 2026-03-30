@@ -415,3 +415,17 @@ func TestRoundTripNetworkConfigOnboardComposable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, original, decoded)
 }
+
+func TestUnmarshalNetworkConfigOnboardFromYAML(t *testing.T) {
+	var decoded NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValid), &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, validNetworkConfigOnboard(), decoded)
+}
+
+func TestUnmarshalNetworkConfigOnboardComposableFromYAML(t *testing.T) {
+	var decoded NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValidMultipleInterfaces), &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, validNetworkConfigOnboardComposable(), decoded)
+}
