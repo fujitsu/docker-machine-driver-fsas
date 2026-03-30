@@ -483,6 +483,10 @@ func (d *Driver) initSshManager() error {
 			return err
 		}
 		d.SshManager = sshManager
+
+		if err := d.SshManager.HostPublicKeyIsValid(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -633,11 +637,6 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.initSshManager(); err != nil {
-		slog.Error("Error while initializing SSH Manager", "err", err)
-		return err
-	}
-
 	hostName, err := d.GetSSHHostname()
 	if err != nil {
 		slog.Error("Could not acquire target SSH hostname because of an error", "err", err)
@@ -665,6 +664,11 @@ func (d *Driver) innerCreate() error {
 
 	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
 		slog.Error("Failed to inject OS registration data into config file", "err", err)
+		return err
+	}
+
+	if err := d.initSshManager(); err != nil {
+		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
 	}
 

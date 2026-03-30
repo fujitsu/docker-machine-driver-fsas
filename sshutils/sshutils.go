@@ -80,6 +80,7 @@ type SshManager interface {
 	DisablePasswordSSHLogin() error
 	RebootCloudInit() error
 	DeregisterOS() error
+	HostPublicKeyIsValid() error
 }
 
 // StandardSshManager struct holds configuration for SSH Manager interaction.
@@ -178,8 +179,8 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 	return config
 }
 
-// hostPublicKeyIsValid checks if the remote host's public key complies with the given one passed as param.
-func (sc *StandardSshManager) hostPublicKeyIsValid() error {
+// HostPublicKeyIsValid checks if the remote host's public key complies with the given one passed as param.
+func (sc *StandardSshManager) HostPublicKeyIsValid() error {
 
 	if publicKeyIsValid {
 		return nil
@@ -237,10 +238,6 @@ func (sc *StandardSshManager) initNativeClient() error {
 
 // runCommand Runs command on remote host and returns command's result and error
 func (sc *StandardSshManager) runCommand(command string) (string, error) {
-
-	if err := sc.hostPublicKeyIsValid(); err != nil {
-		return "", err
-	}
 
 	if err := sc.initNativeClient(); err != nil {
 		return "", err
