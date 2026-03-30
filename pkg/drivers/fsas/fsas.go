@@ -69,7 +69,7 @@ type Driver struct {
 	Keycloak                  keycloak.Keycloak   `json:"-"`
 	SshManager                sshutils.SshManager `json:"-"`
 	CfgManager                cfgutils.CfgManager `json:"-"`
-	LoginSshKey               string              `json:"loginSshKey"` // Matches the name used in annotations
+	FirstLoginSshKey          string              `json:"firstLoginSshKey"` // Matches the name used in annotations
 }
 
 // NewDriver creates and returns a new instance of the FSAS CDI driver
@@ -251,9 +251,9 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "FSAS_USERDATA",
 		},
 		mcnflag.StringFlag{
-			Name:   "fsas-login-ssh-key",
+			Name:   "fsas-first-login-ssh-key",
 			Usage:  "SSH private key for first log in",
-			EnvVar: "FSAS_LOGIN_SSH_KEY",
+			EnvVar: "FSAS_FIRST_LOGIN_SSH_KEY",
 		},
 	}
 }
@@ -404,8 +404,8 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SlesRegistrationEmail = strings.TrimSpace(flags.String("fsas-sles-registration-email"))
 	slog.Debug("Driver", "FSAS SLES registration email", d.SlesRegistrationEmail)
 
-	d.LoginSshKey = strings.TrimSpace(flags.String("fsas-login-ssh-key"))
-	slog.Debug("Driver ", "FSAS Login SSH key", d.LoginSshKey)
+	d.FirstLoginSshKey = strings.TrimSpace(flags.String("fsas-first-login-ssh-key"))
+	slog.Debug("Driver ", "FSAS first login SSH key", d.FirstLoginSshKey)
 
 	return d.checkConfig()
 }
@@ -529,8 +529,8 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image name", "--fsas-os-image-name")
 	}
 
-	if d.LoginSshKey == "" {
-		return fmt.Errorf(errorMandatoryOption, "Login SSH key", "--fsas-login-ssh-key")
+	if d.FirstLoginSshKey == "" {
+		return fmt.Errorf(errorMandatoryOption, "First login SSH key", "--fsas-first-login-ssh-key")
 	}
 
 	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {

@@ -107,7 +107,7 @@ func TestSetConfigFromFlagsTrimsWhitespace(t *testing.T) {
 			"fsas-image-os-ssh-host-pub-key":    "  " + hostPublicKey + "  ",
 			"fsas-sles-registration-code":       "",
 			"fsas-sles-registration-email":      "",
-			"fsas-login-ssh-key":                "111-222-333",
+			"fsas-first-login-ssh-key":          "111-222-333",
 		},
 	}
 
@@ -292,7 +292,7 @@ func TestCheckConfigTenantSuccess(t *testing.T) {
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      hostPublicKey,
-		LoginSshKey:               "111-222-333",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -327,7 +327,7 @@ func TestCheckConfigEmptySshHostPubKey(t *testing.T) {
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      "",
-		LoginSshKey:               "111-222-333",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -361,7 +361,7 @@ func TestCheckConfigInvalidSshHostPubKey(t *testing.T) {
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      "not-a-valid ssh-key",
-		LoginSshKey:               "111-222-333",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -397,7 +397,7 @@ func TestCheckConfig_SlesParamsFail(t *testing.T) {
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      hostPublicKey,
 		SlesRegistrationCode:      "123",
-		LoginSshKey:               "111-222-333",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -465,7 +465,7 @@ func TestCheckConfigTenantFailed(t *testing.T) {
 		TenantUuid:                "cdi-test",
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
-		LoginSshKey:               "111-222-333",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
