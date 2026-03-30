@@ -887,6 +887,87 @@ done
 `
 )
 
+func validNetworkConfigOnboard() NetworkConfig {
+	return NetworkConfig{
+		Network: NetworkSpec{
+			SchemaVersion: NetworkConfigVersion2,
+			Renderer:      RendererNetworkManager,
+			Ethernets: map[string]Ethernet{
+				"prov": {
+					Match: Match{MACAddress: "52:54:00:7e:de:e2"},
+					DHCP4: true,
+				},
+				"bare0": {
+					Match: Match{MACAddress: "52:54:00:a6:36:86"},
+				},
+				"bare1": {
+					Match: Match{MACAddress: "52:54:00:32:72:16"},
+				},
+			},
+			Bonds: map[string]Bond{
+				"bond0": {
+					Interfaces: []string{"bare0", "bare1"},
+					DHCP4:      true,
+					Parameters: &BondParameters{
+						Mode: BondModeActiveBackup,
+					},
+				},
+			},
+		},
+	}
+}
+
+func validNetworkConfigOnboardComposable() NetworkConfig {
+	return NetworkConfig{
+		Network: NetworkSpec{
+			SchemaVersion: NetworkConfigVersion2,
+			Renderer:      RendererNetworkManager,
+			Ethernets: map[string]Ethernet{
+				"prov": {
+					Match: Match{
+						MACAddress: "52:54:00:7e:de:e2",
+					},
+					DHCP4: true,
+				},
+				"bare0": {
+					Match: Match{
+						MACAddress: "52:54:00:a6:36:86",
+					},
+				},
+				"bare1": {
+					Match: Match{
+						MACAddress: "52:54:00:32:72:16",
+					},
+				},
+				"bare2": {
+					Match: Match{
+						MACAddress: "52:54:00:f4:20:de",
+					},
+				},
+				"bare3": {
+					Match: Match{
+						MACAddress: "52:54:00:a0:b4:ca",
+					},
+				},
+				"bare4": {
+					Match: Match{
+						MACAddress: "52:54:00:da:78:9f",
+					},
+				},
+			},
+			Bonds: map[string]Bond{
+				"bond0": {
+					Interfaces: []string{"bare0", "bare1"},
+					DHCP4:      true,
+					Parameters: &BondParameters{
+						Mode: BondModeActiveBackup,
+					},
+				},
+			},
+		},
+	}
+}
+
 var ExpectedLanports = []Lanport{
 	{
 		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",

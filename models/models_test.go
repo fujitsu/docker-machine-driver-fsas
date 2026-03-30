@@ -376,109 +376,42 @@ func Test_customUnmarshallerForResourceStruct(t *testing.T) {
 
 }
 
-func TestMarshalNetworkConfigOnboardFullSuccess(t *testing.T) {
-	networkconfig := NetworkConfig{
-		Network: NetworkSpec{
-			SchemaVersion: NetworkConfigVersion2,
-			Renderer:      RendererNetworkManager,
-			Ethernets: map[string]Ethernet{
-				"prov": {
-					Match: Match{
-						MACAddress: "52:54:00:7e:de:e2",
-					},
-					DHCP4: true,
-				},
-				"bare0": {
-					Match: Match{
-						MACAddress: "52:54:00:a6:36:86",
-					},
-				},
-				"bare1": {
-					Match: Match{
-						MACAddress: "52:54:00:32:72:16",
-					},
-				},
-			},
-			Bonds: map[string]Bond{
-				"bond0": {
-					Interfaces: []string{"bare0", "bare1"},
-					DHCP4:      true,
-					Parameters: &BondParameters{
-						Mode: BondModeActiveBackup,
-					},
-				},
-			},
-		},
-	}
+func TestMarshalNetworkConfigOnboard(t *testing.T) {
+	networkconfig := validNetworkConfigOnboard()
 
 	rawYAML, err := yaml.Marshal(&networkconfig)
 	assert.NoError(t, err)
 	assert.Equal(t, NetworkConfigValid, string(rawYAML))
-
-	// Unmarshal to verify that the marshaled YAML is valid and can be unmarshaled back to the struct
-	var decoded NetworkConfig
-	err = yaml.Unmarshal(rawYAML, &decoded)
-	assert.NoError(t, err)
-	assert.Equal(t, networkconfig, decoded)
 }
 
-func TestMarshalNetworkConfigOnboardComposableFullSuccess(t *testing.T) {
-	networkconfig := NetworkConfig{
-		Network: NetworkSpec{
-			SchemaVersion: NetworkConfigVersion2,
-			Renderer:      RendererNetworkManager,
-			Ethernets: map[string]Ethernet{
-				"prov": {
-					Match: Match{
-						MACAddress: "52:54:00:7e:de:e2",
-					},
-					DHCP4: true,
-				},
-				"bare0": {
-					Match: Match{
-						MACAddress: "52:54:00:a6:36:86",
-					},
-				},
-				"bare1": {
-					Match: Match{
-						MACAddress: "52:54:00:32:72:16",
-					},
-				},
-				"bare2": {
-					Match: Match{
-						MACAddress: "52:54:00:f4:20:de",
-					},
-				},
-				"bare3": {
-					Match: Match{
-						MACAddress: "52:54:00:a0:b4:ca",
-					},
-				},
-				"bare4": {
-					Match: Match{
-						MACAddress: "52:54:00:da:78:9f",
-					},
-				},
-			},
-			Bonds: map[string]Bond{
-				"bond0": {
-					Interfaces: []string{"bare0", "bare1"},
-					DHCP4:      true,
-					Parameters: &BondParameters{
-						Mode: BondModeActiveBackup,
-					},
-				},
-			},
-		},
-	}
+func TestRoundTripNetworkConfigOnboard(t *testing.T) {
+	original := validNetworkConfigOnboard()
+
+	data, err := yaml.Marshal(&original)
+	assert.NoError(t, err)
+
+	var decoded NetworkConfig
+	err = yaml.Unmarshal(data, &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, original, decoded)
+}
+
+func TestMarshalNetworkConfigOnboardComposable(t *testing.T) {
+	networkconfig := validNetworkConfigOnboardComposable()
 
 	rawYAML, err := yaml.Marshal(&networkconfig)
 	assert.NoError(t, err)
 	assert.Equal(t, NetworkConfigValidMultipleInterfaces, string(rawYAML))
+}
 
-	// Unmarshal to verify that the marshaled YAML is valid and can be unmarshaled back to the struct
-	var decoded NetworkConfig
-	err = yaml.Unmarshal(rawYAML, &decoded)
+func TestRoundTripNetworkConfigOnboardComposable(t *testing.T) {
+	original := validNetworkConfigOnboardComposable()
+
+	data, err := yaml.Marshal(&original)
 	assert.NoError(t, err)
-	assert.Equal(t, networkconfig, decoded)
+
+	var decoded NetworkConfig
+	err = yaml.Unmarshal(data, &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, original, decoded)
 }
