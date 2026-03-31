@@ -71,12 +71,12 @@ func (c *MockSSHClient) Wait() error {
 func TestMain(m *testing.M) {
 
 	// setup code here
-	publicKeyIsValid = true
+	IsPublicKeyIsValid = true
 
 	exitCode := m.Run() // run tests
 
 	// tear-down code here
-	publicKeyIsValid = false
+	IsPublicKeyIsValid = false
 
 	os.Exit(exitCode)
 }

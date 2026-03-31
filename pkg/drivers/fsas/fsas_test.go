@@ -883,7 +883,7 @@ func TestInitSshManagerSuccess(t *testing.T) {
 	}
 
 	mockSSH.On("IsInit").Return(false)
-	mockSSH.On("HostPublicKeyIsValid").Return(nil)
+	sshutils.IsPublicKeyIsValid = true
 
 	err = driver.initSshManager()
 	assert.NoError(t, err)
