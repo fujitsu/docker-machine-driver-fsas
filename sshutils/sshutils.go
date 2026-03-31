@@ -201,10 +201,6 @@ func (sc *StandardSshManager) HostPublicKeyIsValid() error {
 				return fmt.Errorf("failed to dial SSH server: %w", err)
 			}
 
-			// sleep added to handle immediate connection refused response
-			slog.Info("Waiting for next attempt to dial", "sleepTime", SSH_CONNECT_ATTEMPT_DELAY)
-			time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
-
 			currentAttempt++
 		} else {
 			defer client.Close()

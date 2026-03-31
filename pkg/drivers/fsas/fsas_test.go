@@ -886,7 +886,34 @@ func TestInitSshManagerSuccess(t *testing.T) {
 	sshutils.IsPublicKeyIsValid = true
 
 	err = driver.initSshManager()
+
+	sshutils.IsPublicKeyIsValid = false
 	assert.NoError(t, err)
+	// After successful init, SshManager should have been replaced with a real StandardSshManager
+	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
+}
+
+func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
+	mockSSH := sshMock.NewMockSshManager(t)
+	hostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+	parsedKey, err := sshutils.ParseSSHPublicKey(hostPubKeyStr)
+	require.NoError(t, err)
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			SSHUser:    "rancher",
+			SSHKeyPath: "/tmp/test-key",
+			IPAddress:  "192.168.1.10",
+		},
+		SSHPassword:             "rancher",
+		OsImageSshHostPubKey:    hostPubKeyStr,
+		OsImageSshHostParsedKey: parsedKey,
+		SshManager:              mockSSH,
+	}
+
+	mockSSH.On("IsInit").Return(false)
+	driver.IPAddress = "[test"
+	err = driver.initSshManager()
+	assert.Error(t, err)
 	// After successful init, SshManager should have been replaced with a real StandardSshManager
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
 }
@@ -909,8 +936,10 @@ func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 	}
 
 	mockSSH.On("IsInit").Return(false)
+	sshutils.IsPublicKeyIsValid = true
 
 	err := driver.initSshManager()
+	sshutils.IsPublicKeyIsValid = false
 	assert.NoError(t, err)
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
 	// The parsed key should have been populated by lazy parsing
