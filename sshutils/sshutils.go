@@ -188,7 +188,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid() error {
 
 	config := sc.getSshClientConfig()
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
-	maxAttempts := 20
+	maxAttempts := 5
 	currentAttempt := 1
 	for {
 		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
