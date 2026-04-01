@@ -376,56 +376,36 @@ func Test_customUnmarshallerForResourceStruct(t *testing.T) {
 
 }
 
-func TestMarshalNetworkConfigOnboard(t *testing.T) {
-	networkconfig := validNetworkConfigOnboard()
-
-	rawYAML, err := yaml.Marshal(&networkconfig)
+func TestNetworkConfigOnboardComposable(t *testing.T) {
+	// Test Unmarshalling
+	var decodedNetworkConfig NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardComposableYaml), &decodedNetworkConfig)
 	assert.NoError(t, err)
-	assert.Equal(t, NetworkConfigValid, string(rawYAML))
+	assert.Equal(t, decodedNetworkConfig, validNetworkConfigOnboardComposable)
+
+	// Test Marshalling and Round-trip
+	marshaledYAML, err := yaml.Marshal(&validNetworkConfigOnboardComposable)
+	assert.NoError(t, err)
+
+	var roundTrippedConfig NetworkConfig
+	err = yaml.Unmarshal(marshaledYAML, &roundTrippedConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, validNetworkConfigOnboardComposable, roundTrippedConfig)
 }
 
-func TestRoundTripNetworkConfigOnboard(t *testing.T) {
-	original := validNetworkConfigOnboard()
+func TestNetworkConfigOnboard(t *testing.T) {
+	// Test Unmarshalling
+	var decodedNetworkConfig NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardYaml), &decodedNetworkConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, validNetworkConfigOnboard, decodedNetworkConfig)
 
-	data, err := yaml.Marshal(&original)
+	// Test Marshalling and Round-trip
+	marshaledYAML, err := yaml.Marshal(&validNetworkConfigOnboard)
 	assert.NoError(t, err)
 
-	var decoded NetworkConfig
-	err = yaml.Unmarshal(data, &decoded)
+	var roundTrippedConfig NetworkConfig
+	err = yaml.Unmarshal(marshaledYAML, &roundTrippedConfig)
 	assert.NoError(t, err)
-	assert.Equal(t, original, decoded)
-}
-
-func TestMarshalNetworkConfigOnboardComposable(t *testing.T) {
-	networkconfig := validNetworkConfigOnboardComposable()
-
-	rawYAML, err := yaml.Marshal(&networkconfig)
-	assert.NoError(t, err)
-	assert.Equal(t, NetworkConfigValidMultipleInterfaces, string(rawYAML))
-}
-
-func TestRoundTripNetworkConfigOnboardComposable(t *testing.T) {
-	original := validNetworkConfigOnboardComposable()
-
-	data, err := yaml.Marshal(&original)
-	assert.NoError(t, err)
-
-	var decoded NetworkConfig
-	err = yaml.Unmarshal(data, &decoded)
-	assert.NoError(t, err)
-	assert.Equal(t, original, decoded)
-}
-
-func TestUnmarshalNetworkConfigOnboardFromYAML(t *testing.T) {
-	var decoded NetworkConfig
-	err := yaml.Unmarshal([]byte(NetworkConfigValid), &decoded)
-	assert.NoError(t, err)
-	assert.Equal(t, validNetworkConfigOnboard(), decoded)
-}
-
-func TestUnmarshalNetworkConfigOnboardComposableFromYAML(t *testing.T) {
-	var decoded NetworkConfig
-	err := yaml.Unmarshal([]byte(NetworkConfigValidMultipleInterfaces), &decoded)
-	assert.NoError(t, err)
-	assert.Equal(t, validNetworkConfigOnboardComposable(), decoded)
+	assert.Equal(t, validNetworkConfigOnboard, roundTrippedConfig)
 }

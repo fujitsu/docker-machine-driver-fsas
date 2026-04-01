@@ -82,9 +82,9 @@ type Match struct {
 }
 
 type Bond struct {
-	Interfaces []string        `yaml:"interfaces,omitempty"`
-	DHCP4      bool            `yaml:"dhcp4,omitempty"`
-	Parameters *BondParameters `yaml:"parameters,omitempty"`
+	Interfaces []string       `yaml:"interfaces,omitempty"`
+	DHCP4      bool           `yaml:"dhcp4,omitempty"`
+	Parameters BondParameters `yaml:"parameters,omitempty"`
 }
 
 type BondParameters struct {
