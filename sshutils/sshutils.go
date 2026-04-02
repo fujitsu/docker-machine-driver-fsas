@@ -33,7 +33,7 @@ const (
 var (
 	ErrNoneOfConstructorArgsCanBeEmpty = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'sshKeyPath', 'hostPublicKey'")
 	isInit                             = false
-	IsPublicKeyIsValid                 = false
+	IsPublicKeyValid                   = false
 )
 
 // SSHKeyParser defines the interface for parsing an SSH key from a path.
@@ -182,7 +182,7 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 // HostPublicKeyIsValid checks if the remote host's public key complies with the given one passed as param.
 func (sc *StandardSshManager) HostPublicKeyIsValid() error {
 
-	if IsPublicKeyIsValid {
+	if IsPublicKeyValid {
 		return nil
 	}
 
@@ -205,7 +205,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid() error {
 		} else {
 			defer client.Close()
 			slog.Info("Host public key verification succeeded")
-			IsPublicKeyIsValid = true
+			IsPublicKeyValid = true
 			return nil
 		}
 	}

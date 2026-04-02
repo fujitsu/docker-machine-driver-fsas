@@ -883,11 +883,11 @@ func TestInitSshManagerSuccess(t *testing.T) {
 	}
 
 	mockSSH.On("IsInit").Return(false)
-	sshutils.IsPublicKeyIsValid = true
+	sshutils.IsPublicKeyValid = true
 
 	err = driver.initSshManager()
 
-	sshutils.IsPublicKeyIsValid = false
+	sshutils.IsPublicKeyValid = false
 	assert.NoError(t, err)
 	// After successful init, SshManager should have been replaced with a real StandardSshManager
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
@@ -911,6 +911,8 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 	}
 
 	mockSSH.On("IsInit").Return(false)
+	// Setting an IP address as a string that starts with "["" will cause an error:
+	// "Failed to dial SSH server: err=dial tcp: address [test:22: missing ']' in address;"
 	driver.IPAddress = "[test"
 	err = driver.initSshManager()
 	assert.Error(t, err)
@@ -936,10 +938,10 @@ func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 	}
 
 	mockSSH.On("IsInit").Return(false)
-	sshutils.IsPublicKeyIsValid = true
+	sshutils.IsPublicKeyValid = true
 
 	err := driver.initSshManager()
-	sshutils.IsPublicKeyIsValid = false
+	sshutils.IsPublicKeyValid = false
 	assert.NoError(t, err)
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
 	// The parsed key should have been populated by lazy parsing
