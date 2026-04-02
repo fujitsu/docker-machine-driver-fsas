@@ -11,18 +11,18 @@ import (
 
 func TestCreateMachineRequestToJSON(t *testing.T) {
 	request := CreateMachineRequest{
-		Tenants: CreateMachineTenantsRequest{
+		Tenants: CreateMachineRequestBodyTenants{
 			TenantUUID: "b3b65e79-ad41-4367-89d6-e4e7315141ef",
 			Machines: []CreateMachineSpec{
 				{
-					Machine: "test-machine-001",
-					Resources: []ResSpecs{
+					MachineName: "test-machine-001",
+					Resources: []CreateMachineResources{
 						{
 							ResourceSpecifications: []Resource{
 								{
 									ResourceType: "compute",
 									ResourceNum:  1,
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "model", Operator: "eq", Value: "PRIMERGY-RX2540M6"},
 										},
@@ -31,7 +31,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 								{
 									ResourceType: "storage",
 									ResourceNum:  2, // Added a second storage resource
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "type", Operator: "eq", Value: "NVMe"},
 										},
@@ -40,7 +40,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 								{
 									ResourceType: "network",
 									ResourceNum:  1,
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "name", Operator: "eq", Value: "baremetal-mgmt"},
 										},
@@ -62,7 +62,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 								{
 									ResourceType: "network",
 									ResourceNum:  2,
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "name", Operator: "eq", Value: "provisioning-net"},
 										},
@@ -96,7 +96,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 }
 
 func TestUnmarshalPostMachinesResponse(t *testing.T) {
-	var postResponse MachinesRequestResponse
+	var postResponse MachineResponse
 	err := json.Unmarshal([]byte(PostMachinesResponseExample), &postResponse)
 	assert.NoError(t, err)
 
@@ -155,7 +155,7 @@ func TestUnmarshalPostMachinesResponse(t *testing.T) {
 }
 
 func TestUnmarshalGetMachineResponse(t *testing.T) {
-	var getResponse MachinesRequestResponse
+	var getResponse MachineResponse
 	err := json.Unmarshal([]byte(GetMachineResponseExample), &getResponse)
 	assert.NoError(t, err)
 
@@ -179,14 +179,14 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 	lanport1 := machine.Lanports[0]
 	assert.Equal(t, "d8c7b6a5-4321-0987-6543-210fedcba098", lanport1.LanportUUID)
 	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", lanport1.SubnetUUID)
-	assert.Equal(t, "00:11:22:33:44:55", lanport1.MacAddress)
+	assert.Equal(t, "00:11:22:33:44:55", lanport1.MACAddress)
 	assert.Equal(t, 1, lanport1.LanportIdx)
 	assert.Equal(t, "192.168.2.100", lanport1.IPAddress)
 
 	lanport2 := machine.Lanports[1] // Assertions for the second lanport
 	assert.Equal(t, "01085c2c-15c4-4957-9ad3-7d1ee481f082", lanport2.LanportUUID)
 	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", lanport2.SubnetUUID)
-	assert.Equal(t, "00:11:22:33:44:66", lanport2.MacAddress)
+	assert.Equal(t, "00:11:22:33:44:66", lanport2.MACAddress)
 	assert.Equal(t, 2, lanport2.LanportIdx)
 	assert.Equal(t, "192.168.2.150", lanport2.IPAddress)
 
@@ -276,7 +276,7 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 }
 
 func TestUnmarshalDeleteMachineResponse(t *testing.T) {
-	var deleteResponse MachinesRequestResponse
+	var deleteResponse MachineResponse
 	err := json.Unmarshal([]byte(DeleteMachineResponseExample), &deleteResponse)
 	assert.NoError(t, err)
 
@@ -312,7 +312,7 @@ func Test_customUnmarshallerForResourceStruct(t *testing.T) {
 	testCases := []struct {
 		name       string
 		jsonString string
-		expected   *ResSpec
+		expected   *ResourceSpecification
 	}{
 		{name: "valid response without typo",
 			jsonString: `{
@@ -331,7 +331,7 @@ func Test_customUnmarshallerForResourceStruct(t *testing.T) {
 					]
 					}
 				}`,
-			expected: &ResSpec{[]Condition{{Column: "cpu_cores", Operator: "eq", Value: "4"}}}},
+			expected: &ResourceSpecification{[]Condition{{Column: "cpu_cores", Operator: "eq", Value: "4"}}}},
 
 		{name: "not valid response with typo",
 			jsonString: `{
@@ -350,7 +350,7 @@ func Test_customUnmarshallerForResourceStruct(t *testing.T) {
 					]
 					}
 				}`,
-			expected: &ResSpec{[]Condition{{Column: "cpu_cores", Operator: "eq", Value: "4"}}}},
+			expected: &ResourceSpecification{[]Condition{{Column: "cpu_cores", Operator: "eq", Value: "4"}}}},
 
 		{name: "response without res_spec field at all, neither valid nor invalid",
 			jsonString: `{
