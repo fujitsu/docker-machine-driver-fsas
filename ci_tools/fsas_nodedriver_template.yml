@@ -5,6 +5,7 @@ metadata:
     passwordFields: credentialsPassword,slesRegistrationCode
     privateCredentialFields: credentialsPassword,slesRegistrationCode
     publicCredentialFields: credentialsUsername,tenantUuid,apiUrl,ntpUrl,dnsIp,slesRegistrationEmail
+    nodedriver.cattle.io/file-to-field-aliases: userdata:userdata
   name: fsas
 spec:
   active: true
