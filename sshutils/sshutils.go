@@ -33,7 +33,7 @@ const (
 var (
 	ErrNoneOfConstructorArgsCanBeEmpty = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'sshKeyPath', 'hostPublicKey'")
 	isInit                             = false
-	publicKeyIsValid                   = false
+	IsPublicKeyValid                   = false
 )
 
 // SSHKeyParser defines the interface for parsing an SSH key from a path.
@@ -80,6 +80,7 @@ type SshManager interface {
 	DisablePasswordSSHLogin() error
 	RebootCloudInit() error
 	DeregisterOS() error
+	HostPublicKeyIsValid() error
 }
 
 // StandardSshManager struct holds configuration for SSH Manager interaction.
@@ -178,16 +179,16 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 	return config
 }
 
-// hostPublicKeyIsValid checks if the remote host's public key complies with the given one passed as param.
-func (sc *StandardSshManager) hostPublicKeyIsValid() error {
+// HostPublicKeyIsValid checks if the remote host's public key complies with the given one passed as param.
+func (sc *StandardSshManager) HostPublicKeyIsValid() error {
 
-	if publicKeyIsValid {
+	if IsPublicKeyValid {
 		return nil
 	}
 
 	config := sc.getSshClientConfig()
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
-	maxAttempts := 20
+	maxAttempts := 5
 	currentAttempt := 1
 	for {
 		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
@@ -200,15 +201,11 @@ func (sc *StandardSshManager) hostPublicKeyIsValid() error {
 				return fmt.Errorf("failed to dial SSH server: %w", err)
 			}
 
-			// sleep added to handle immediate connection refused response
-			slog.Info("Waiting for next attempt to dial", "sleepTime", SSH_CONNECT_ATTEMPT_DELAY)
-			time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
-
 			currentAttempt++
 		} else {
 			defer client.Close()
 			slog.Info("Host public key verification succeeded")
-			publicKeyIsValid = true
+			IsPublicKeyValid = true
 			return nil
 		}
 	}
@@ -237,10 +234,6 @@ func (sc *StandardSshManager) initNativeClient() error {
 
 // runCommand Runs command on remote host and returns command's result and error
 func (sc *StandardSshManager) runCommand(command string) (string, error) {
-
-	if err := sc.hostPublicKeyIsValid(); err != nil {
-		return "", err
-	}
 
 	if err := sc.initNativeClient(); err != nil {
 		return "", err
