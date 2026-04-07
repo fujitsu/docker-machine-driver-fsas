@@ -36,7 +36,7 @@ type Subnet struct {
 
 type Network struct {
 	NicType int      `json:"nic_type"`
-	Subnets []Subnet `json:"subnets"` // Expected 1-element arrays only
+	Subnets []Subnet `json:"subnets"` // Expected 2-elements arrays: bare-metal and provisioning
 }
 
 type ResStorageTags struct {

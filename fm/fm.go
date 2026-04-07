@@ -306,6 +306,7 @@ func (fmc *FabricManagerClient) CreateMachine(machineName, tenantId string, mach
 		slog.Error("Error while getting machine UUID from POST response", "response", response)
 		return "", ErrGetMachineUUIDFromPostResponse
 	}
+	slog.Debug(fmt.Sprintf("Post request response: %#v\n", response))
 	machineUuid := response.Data.Machines[0].MachineUUID
 
 	slog.Info("New machine successfully created", "machineUuid", machineUuid)

@@ -678,6 +678,7 @@ func (d *Driver) innerCreate() error {
 	}
 
 	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
+		slog.Error("Error while applying cloud init", "err", err)
 		return err
 	}
 
