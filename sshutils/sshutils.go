@@ -80,7 +80,7 @@ type SshManager interface {
 	DisablePasswordSSHLogin() error
 	RebootCloudInit() error
 	DeregisterOS() error
-	HostPublicKeyIsValid() error
+	HostPublicKeyIsValid(maxAttempts int) error
 }
 
 // StandardSshManager struct holds configuration for SSH Manager interaction.
@@ -180,15 +180,18 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 }
 
 // HostPublicKeyIsValid checks if the remote host's public key complies with the given one passed as param.
-func (sc *StandardSshManager) HostPublicKeyIsValid() error {
+func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 	if IsPublicKeyValid {
 		return nil
 	}
 
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+
 	config := sc.getSshClientConfig()
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
-	maxAttempts := 5
 	currentAttempt := 1
 	for {
 		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
@@ -197,7 +200,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid() error {
 		if err != nil {
 			slog.Warn("Failed to dial SSH server", "err", err)
 
-			if currentAttempt > maxAttempts {
+			if currentAttempt >= maxAttempts {
 				return fmt.Errorf("failed to dial SSH server: %w", err)
 			}
 

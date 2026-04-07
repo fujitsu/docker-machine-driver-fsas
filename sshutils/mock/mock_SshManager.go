@@ -160,17 +160,17 @@ func (_c *MockSshManager_ExecuteScript_Call) RunAndReturn(run func(string, strin
 	return _c
 }
 
-// HostPublicKeyIsValid provides a mock function with no fields
-func (_m *MockSshManager) HostPublicKeyIsValid() error {
-	ret := _m.Called()
+// HostPublicKeyIsValid provides a mock function with given fields: maxAttempts
+func (_m *MockSshManager) HostPublicKeyIsValid(maxAttempts int) error {
+	ret := _m.Called(maxAttempts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for HostPublicKeyIsValid")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(maxAttempts)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -184,13 +184,14 @@ type MockSshManager_HostPublicKeyIsValid_Call struct {
 }
 
 // HostPublicKeyIsValid is a helper method to define mock.On call
-func (_e *MockSshManager_Expecter) HostPublicKeyIsValid() *MockSshManager_HostPublicKeyIsValid_Call {
-	return &MockSshManager_HostPublicKeyIsValid_Call{Call: _e.mock.On("HostPublicKeyIsValid")}
+//   - maxAttempts int
+func (_e *MockSshManager_Expecter) HostPublicKeyIsValid(maxAttempts interface{}) *MockSshManager_HostPublicKeyIsValid_Call {
+	return &MockSshManager_HostPublicKeyIsValid_Call{Call: _e.mock.On("HostPublicKeyIsValid", maxAttempts)}
 }
 
-func (_c *MockSshManager_HostPublicKeyIsValid_Call) Run(run func()) *MockSshManager_HostPublicKeyIsValid_Call {
+func (_c *MockSshManager_HostPublicKeyIsValid_Call) Run(run func(maxAttempts int)) *MockSshManager_HostPublicKeyIsValid_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(int))
 	})
 	return _c
 }
@@ -200,7 +201,7 @@ func (_c *MockSshManager_HostPublicKeyIsValid_Call) Return(_a0 error) *MockSshMa
 	return _c
 }
 
-func (_c *MockSshManager_HostPublicKeyIsValid_Call) RunAndReturn(run func() error) *MockSshManager_HostPublicKeyIsValid_Call {
+func (_c *MockSshManager_HostPublicKeyIsValid_Call) RunAndReturn(run func(int) error) *MockSshManager_HostPublicKeyIsValid_Call {
 	_c.Call.Return(run)
 	return _c
 }

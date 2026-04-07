@@ -44,6 +44,8 @@ func TestMain(m *testing.M) {
 	original := generateSSHKey
 	generateSSHKey = func(path string) error { return nil }
 
+	originalIsPublicKeyIsValid := sshutils.IsPublicKeyValid
+
 	exitCode := m.Run() // run tests
 
 	/* tear-down code here */
@@ -53,6 +55,8 @@ func TestMain(m *testing.M) {
 
 	// Restore original logger
 	slog.SetDefault(originalLogger)
+
+	sshutils.IsPublicKeyValid = originalIsPublicKeyIsValid
 
 	os.Exit(exitCode)
 }
@@ -181,6 +185,8 @@ func TestGetStateRunning(t *testing.T) {
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
 		TenantUuid:    "cdi-test",
+		SlesRegistrationCode:  "dummy",
+		SlesRegistrationEmail: "test@example.com",
 	}
 	driver.MachineUUID = "ddb3e14d-b9c8-4500-8377-073ad43a5ff7"
 
@@ -861,7 +867,7 @@ func TestInitSshManagerAlreadyInitialized(t *testing.T) {
 
 	mockSSH.On("IsInit").Return(true)
 
-	err := driver.initSshManager()
+	err := driver.initSshManager(3)
 	assert.NoError(t, err)
 }
 
@@ -883,9 +889,11 @@ func TestInitSshManagerSuccess(t *testing.T) {
 	}
 
 	mockSSH.On("IsInit").Return(false)
+	old := sshutils.IsPublicKeyValid
 	sshutils.IsPublicKeyValid = true
+	defer func() { sshutils.IsPublicKeyValid = old }()
 
-	err = driver.initSshManager()
+	err = driver.initSshManager(3)
 
 	sshutils.IsPublicKeyValid = false
 	assert.NoError(t, err)
@@ -914,7 +922,7 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 	// Setting an IP address as a string that starts with "["" will cause an error:
 	// "Failed to dial SSH server: err=dial tcp: address [test:22: missing ']' in address;"
 	driver.IPAddress = "[test"
-	err = driver.initSshManager()
+	err = driver.initSshManager(3)
 	assert.Error(t, err)
 	// After successful init, SshManager should have been replaced with a real StandardSshManager
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
@@ -940,7 +948,10 @@ func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 	mockSSH.On("IsInit").Return(false)
 	sshutils.IsPublicKeyValid = true
 
-	err := driver.initSshManager()
+	old := sshutils.IsPublicKeyValid
+	sshutils.IsPublicKeyValid = true
+	defer func() { sshutils.IsPublicKeyValid = old }()
+	err := driver.initSshManager(3)
 	sshutils.IsPublicKeyValid = false
 	assert.NoError(t, err)
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
@@ -965,7 +976,7 @@ func TestInitSshManagerFailInvalidPubKeyFormat(t *testing.T) {
 
 	mockSSH.On("IsInit").Return(false)
 
-	err := driver.initSshManager()
+	err := driver.initSshManager(3)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "invalid SSH host public key format")
 }
@@ -981,7 +992,7 @@ func TestInitSshManagerFailEmptyIPAddress(t *testing.T) {
 
 	mockSSH.On("IsInit").Return(false)
 
-	err := driver.initSshManager()
+	err := driver.initSshManager(3)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "IPAddress is empty")
 }
@@ -1002,7 +1013,7 @@ func TestInitSshManagerFailNewStandardSshManager(t *testing.T) {
 
 	mockSSH.On("IsInit").Return(false)
 
-	err := driver.initSshManager()
+	err := driver.initSshManager(3)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, sshutils.ErrNoneOfConstructorArgsCanBeEmpty)
 }
