@@ -77,7 +77,6 @@ type SshManager interface {
 	IsInit() bool
 	ExecuteScript(scriptPath, scriptContent string, postRemove bool, runWithSudo bool) error
 	WriteFileOnRemoteMachine(path, fileContent string, fileMode os.FileMode) error
-	DisablePasswordSSHLogin() error
 	RebootCloudInit() error
 	DeregisterOS() error
 	HostPublicKeyIsValid(maxAttempts int) error
@@ -258,27 +257,6 @@ func (sc *StandardSshManager) runCommand(command string) (string, error) {
 	}
 	slog.Debug("Running command via SSH succeed")
 	return output, nil
-}
-
-// DisablePasswordSSHLogin disables password authentication for SSH on newly created machine
-func (sc *StandardSshManager) DisablePasswordSSHLogin() error {
-
-	commands := []string{
-		"sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak",
-		`echo "PasswordAuthentication no" | sudo tee /etc/ssh/sshd_config.d/99-disable-password.conf`,
-		`echo "AuthenticationMethods publickey" | sudo tee /etc/ssh/sshd_config.d/99-auth-methods.conf`,
-		"sudo systemctl reload sshd",
-	}
-
-	for _, cmd := range commands {
-		if _, err := sc.runCommand(cmd); err != nil {
-			slog.Error("Failed to execute command", "cmd", cmd, "err", err)
-			return fmt.Errorf("error running '%s': %w", cmd, err)
-		}
-	}
-	slog.Info("Password authentication disabled successfully")
-
-	return nil
 }
 
 // RebootCloudInit() error

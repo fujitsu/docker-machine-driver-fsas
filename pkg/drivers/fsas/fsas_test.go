@@ -1205,8 +1205,9 @@ func TestCreate(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
 
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
-	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
+	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
+	mockCfg.On("DisableSSHLogin").Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
@@ -1215,7 +1216,6 @@ func TestCreate(t *testing.T) {
 	mockCfg.On("PrepareMetadata", testMachineUUID, driver.MachineName).Return("")
 	mockSSH.On("WriteFileOnRemoteMachine", metadataPath, "", fs.FileMode(0700)).Return(nil)
 	mockSSH.On("RebootCloudInit").Return(nil)
-	mockSSH.On("DisablePasswordSSHLogin").Return(nil)
 	mockClock.On("Sleep", WAIT_FOR_START_AFTER_REBOOT).Return(nil)
 
 	// Mock implementation of os.ReadFile
@@ -1292,6 +1292,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
+	mockCfg.On("DisableSSHLogin").Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	mockSSH.On("WriteFileOnRemoteMachine", userdataPath, "custom-user-data.yaml", fs.FileMode(0700)).Return(fmt.Errorf("WriteFileOnRemoteMachine failed"))

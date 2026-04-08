@@ -672,6 +672,11 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
+	if err := d.CfgManager.DisableSSHLogin(); err != nil {
+		slog.Error("Failed to disable SSH login via cloud config", "err", err)
+		return err
+	}
+
 	if err := d.initSshManager(INNER_CREATE_SSH_MAX_ATTEMPTS); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
@@ -679,11 +684,6 @@ func (d *Driver) innerCreate() error {
 
 	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
 		slog.Error("Error while applying cloud init", "err", err)
-		return err
-	}
-
-	if err := d.SshManager.DisablePasswordSSHLogin(); err != nil {
-		slog.Error("Failed to disable password login", "err", err)
 		return err
 	}
 

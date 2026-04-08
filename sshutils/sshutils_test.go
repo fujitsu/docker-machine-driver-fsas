@@ -361,48 +361,6 @@ func Test_removeRemoteDir(t *testing.T) {
 	assert.Contains(t, mockClient.ExecutedCommands[0], "rmdir /tmp/mytestdir")
 }
 
-func Test_DisablePasswordSSHLogin_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{}
-	manager.Client = mockClient
-	manager.SshKeyPath = ""
-
-	err = manager.DisablePasswordSSHLogin()
-	assert.NoError(t, err)
-
-	expectedCommands := []string{
-		"sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak",
-		`echo "PasswordAuthentication no" | sudo tee /etc/ssh/sshd_config.d/99-disable-password.conf`,
-		`echo "AuthenticationMethods publickey" | sudo tee /etc/ssh/sshd_config.d/99-auth-methods.conf`,
-		"sudo systemctl reload sshd",
-	}
-	assert.Equal(t, mockClient.ExecutedCommands, expectedCommands)
-}
-
-func Test_DisablePasswordSSHLogin_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(cmd string) (string, error) {
-			// Fail on the second command
-			if strings.Contains(cmd, "tee") {
-				return "", MOCK_ERROR_FOR_OUTPUT_METHOD
-			}
-			return "", nil
-		},
-	}
-	manager.Client = mockClient
-	manager.SshKeyPath = ""
-
-	err = manager.DisablePasswordSSHLogin()
-
-	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-	assert.Len(t, mockClient.ExecutedCommands, 2)
-}
-
 func Test_RebootCloudInit_Success(t *testing.T) {
 	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)

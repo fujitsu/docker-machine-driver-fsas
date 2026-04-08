@@ -146,10 +146,10 @@ write_files:
     encoding: "gzip+b64"
     permissions: "0644"`
 
-	inputOneItemWriteFiles = []CloudConfigItem{
+	inputOneItemWriteFiles = []CloudConfigItemWriteFiles{
 		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files")}
 
-	inputTwoItemsWriteFiles = []CloudConfigItem{
+	inputTwoItemsWriteFiles = []CloudConfigItemWriteFiles{
 		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
 		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files-2.log", "Cloud config succeeded for write_files part 2"),
 	}
@@ -218,12 +218,14 @@ write_files:
     encoding: "gzip+b64"
     permissions: "0644"`
 
-	input1ItemRunCmdCast = []CloudConfigItem{
-		NewCloudConfigItemRunCmd([]string{`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`})}
+	input1ItemRunCmdCast = cloudInitFile{
+		RunCmds: []string{`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`}}
 
-	input1ItemRunCmdCast1ItemWriteFiles = []CloudConfigItem{
-		NewCloudConfigItemRunCmd([]string{`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`}),
-		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
+	input1ItemRunCmdCast1ItemWriteFiles = cloudInitFile{
+		RunCmds: []string{`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`},
+		WriteFiles: []CloudConfigItemWriteFiles{
+			NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
+		},
 	}
 
 	expectedStr2Cmd1Write = `#cloud-config
@@ -250,12 +252,13 @@ write_files:
     encoding: "gzip+b64"
     permissions: "0644"`
 
-	input2ItemsRunCmdCast2ItemsWriteFiles = []CloudConfigItem{
-		NewCloudConfigItemRunCmd([]string{
-			`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,
-			`echo "Cloud config test succeeded" >> /tmp/cloud-config-test-runcmd.log`}),
-		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
-		NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files-2.log", "Cloud config succeeded for write_files part 2"),
+	input2ItemsRunCmdCast2ItemsWriteFiles = cloudInitFile{
+		RunCmds: []string{`echo "Boot completed at $(date)" >> /tmp/cloud-config-test-runcmd.log`,
+			`echo "Cloud config test succeeded" >> /tmp/cloud-config-test-runcmd.log`},
+		WriteFiles: []CloudConfigItemWriteFiles{
+			NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files.log", "Cloud config succeeded for write_files"),
+			NewCloudConfigItemWriteFiles("/tmp/cloud-config-test-write-files-2.log", "Cloud config succeeded for write_files part 2"),
+		},
 	}
 
 	expectedStr3Cmd3Write = `#cloud-config
@@ -359,6 +362,134 @@ write_files:
     content: H4sIAAAAAAAA/wAAAP//BMBhCoUgDADgqzz8+xjm0lChw0y3hRQUWp2/b3+KHHID9e2ff+bq59tYOjReddCAyi1b62JCrmGBuZCAl0CQSCdArcSk6B1G8wUAAP//2sQU+UsAAAA=
     encoding: "gzip+b64"
     permissions: "0644"`
+
+	expectedStrDisablePwdAuth = `
+#cloud-config
+ssh_pwauth: false
+write_files:
+  - path: /etc/ssh/sshd_config.d/30-auth-methods.conf
+    content: H4sIAAAAAAAA/wAAAP//ciwtyUjNK8lMTizJzM/zTS3JyE8pVigoTcrJTM5OrQQEAAD//5RFpK0fAAAA
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedStrDisablePwdAuth1rc = `#cloud-config
+ssh_pwauth: false
+runcmd:
+  - timedatectl set-timezone Europe/Warsaw
+write_files:
+  - path: /etc/ssh/sshd_config.d/30-auth-methods.conf
+    content: H4sIAAAAAAAA/wAAAP//ciwtyUjNK8lMTizJzM/zTS3JyE8pVigoTcrJTM5OrQQEAAD//5RFpK0fAAAA
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	sampleDisablePwdAuthExists = `
+#cloud-config
+ssh_pwauth: true
+`
+
+	sample1rc2wf = `#cloud-config
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	sampleHostname1rc2wf = `#cloud-config
+hostname: alpha1
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedDisablePwdAuth1rc2wf = `#cloud-config
+ssh_pwauth: false
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+  - path: /etc/ssh/sshd_config.d/30-auth-methods.conf
+    content: H4sIAAAAAAAA/wAAAP//ciwtyUjNK8lMTizJzM/zTS3JyE8pVigoTcrJTM5OrQQEAAD//5RFpK0fAAAA
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedDisablePwdAuth1rc1wf = `#cloud-config
+ssh_pwauth: false
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedStr2rc1wf = `#cloud-config
+hostname: alpha1
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedBoolStr2rc1wf = `#cloud-config
+hostname: alpha1
+ssh_pwauth: false
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedBoolStrInt2rc1wf = `#cloud-config
+hostname: alpha1
+ssh_pwauth: false
+boot_cmd_timeout: 30
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
+
+	expectedInt2rc1wf = `#cloud-config
+boot_cmd_timeout: 30
+runcmd:
+  - sh /tmp/register-suse-modules.sh
+  - rm /tmp/register-suse-modules.sh
+write_files:
+  - path: /tmp/foo
+    content: Foo was here
+    encoding: "gzip+b64"
+    permissions: "0644"
+`
 )
 
 const sampleRke2ConfigFileContent = `kubelet-arg+: "provider-id=fsas-cdi://%s"`
