@@ -927,24 +927,34 @@ func (d *Driver) Remove() error {
 	return nil
 }
 
-// Restart a host. This may just call Stop(); Start() if the provider does not
-// have any special restart behaviour.
+// Restart a host using Fabric Manager reboot operation.
 func (d *Driver) Restart() error {
-	slog.Debug("Restarting host", "machineName", d.MachineName)
+	slog.Debug("Try to restart host")
+	slog.Debug(fmt.Sprintf("BaseDriver struct: %+v", d.BaseDriver))
+	slog.Debug(fmt.Sprintf("Driver struct: %+v", d))
 
-	slog.Debug("Attempting to Stop", "machineName", d.MachineName)
-	if err := d.Stop(); err != nil {
-		slog.Error("Issue during attempt to Stop the host", "err", err)
+	if err := d.initClients(); err != nil {
 		return err
 	}
 
-	slog.Debug("Attempting to Start", "machineName", d.MachineName)
-	if err := d.Start(); err != nil {
-		slog.Error("Issue during attempt to Start the host", "err", err)
+	// error MachineUUID is empty
+	if d.MachineUUID == "" {
+		slog.Error("Machine's UUID was unexpectedly empty", "machine_name", d.MachineName)
+		return fmt.Errorf("machine uuid is empty")
+	}
+
+	if err := d.FabricManager.Reboot(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
+		slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", err)
 		return err
 	}
 
-	slog.Info("Successfully restarted host", "machineName", d.MachineName)
+	slog.Info("Waiting for status", "status", ACTIVE_PON)
+	if err := d.waitForStatus(ACTIVE_PON, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
+		slog.Error("Error occurred during waitForStatus execution", "err", err)
+		return err
+	}
+
+	slog.Info("Successfully restarted machine", "machineUUID", d.MachineUUID)
 	return nil
 }
 

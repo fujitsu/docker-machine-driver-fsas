@@ -583,6 +583,54 @@ func TestGracefulShutdownFailed(t *testing.T) {
 	assert.EqualError(t, err, "Request failed")
 }
 
+func TestRebootSuccess(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	tenantId := "cdi-test"
+	machineId := "cdd792f2-5591-4c18-a8bd-1c39e55dedfa"
+
+	expectedQuery := map[string]string{"tenant_uuid": tenantId}
+	expectedHeaders := map[string]string{
+		"Content-Type": "application/json",
+		"Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample),
+	}
+	expectedEndpoint := fmt.Sprintf("/machines/%s/reboot", machineId)
+	expectedPayload := []byte{}
+
+	mockClient.EXPECT().
+		Put(expectedPayload, expectedEndpoint, expectedQuery, nil, expectedHeaders).
+		Return(http.StatusOK, nil)
+
+	err := fmc.Reboot(machineId, tenantId, models.AccessTokenExample)
+	assert.NoError(t, err)
+}
+
+func TestRebootFailed(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	tenantId := "cdi-test"
+	machineId := "cdd792f2-5591-4c18-a8bd-1c39e55dedfa"
+
+	expectedQuery := map[string]string{"tenant_uuid": tenantId}
+	expectedHeaders := map[string]string{
+		"Content-Type": "application/json",
+		"Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample),
+	}
+	expectedEndpoint := fmt.Sprintf("/machines/%s/reboot", machineId)
+	expectedPayload := []byte{}
+
+	mockError := errors.New("Request failed")
+	mockClient.EXPECT().
+		Put(expectedPayload, expectedEndpoint, expectedQuery, nil, expectedHeaders).
+		Return(http.StatusInternalServerError, mockError)
+
+	err := fmc.Reboot(machineId, tenantId, models.AccessTokenExample)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "Request failed")
+}
+
 func TestImageInstallSuccess(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}

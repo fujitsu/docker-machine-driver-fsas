@@ -2124,20 +2124,16 @@ func TestRestartSuccess(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
-	// Stop
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil).Once()
-	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil)
-
-	// Start
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 13, nil).Once()
-	mockFM.On("PowerOn", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
+		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 13, nil).Once()
 
 	err := driver.Restart()
 	assert.NoError(t, err)
 
 }
 
-func TestRestartFail_Stop(t *testing.T) {
+func TestRestartFailReboot(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 
@@ -2155,25 +2151,14 @@ func TestRestartFail_Stop(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
-	// No Start on Stop Failure
-
-	// Stop Fail - FM
-	shutdownError := fmt.Errorf("FM graceful shutdown failed")
-	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(shutdownError).Once()
+	rebootError := fmt.Errorf("FM reboot failed")
+	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(rebootError).Once()
 
 	err := driver.Restart()
-	assert.ErrorIs(t, err, shutdownError)
-
-	// Stop Fail - Status
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil).Once()
-	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil).Once()
-
-	err = driver.Restart()
-	assert.ErrorContains(t, err, "required status was not achieved within the specified time")
-
+	assert.ErrorIs(t, err, rebootError)
 }
 
-func TestRestartFail_Start(t *testing.T) {
+func TestRestartFailWaitForStatus(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 
@@ -2191,20 +2176,9 @@ func TestRestartFail_Start(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
-	// Stop
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
-	// Normal UUID
-	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil).Once()
-	// Empty UUID
-	mockFM.On("GracefulShutdown", "", "", models.AccessTokenExample).Return(nil).Maybe()
-
-	// Start Fail - Status
-	// mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(
-	// 	models.ExpectedLanports,
-	// 	"902cc002-3775-4be0-be00-535a677b2ab4",
-	// 	987,
-	// 	nil)
-	mockFM.On("PowerOn", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
+		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
 
 	mockClock := timeutilsmock.NewMockClock(t)
 	statusClock = mockClock
@@ -2215,17 +2189,31 @@ func TestRestartFail_Start(t *testing.T) {
 	err := driver.Restart()
 
 	assert.Error(t, err)
-	errorData := "error: required status was not achieved within the specified time"
-	assert.EqualError(t, err, errorData)
+	assert.EqualError(t, err, "error: required status was not achieved within the specified time")
+}
 
-	// Start Fail - Empty UUID
-	driver.MachineUUID = ""
+func TestRestartFailEmptyMachineUUID(t *testing.T) {
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 
-	err = driver.Restart()
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			IPAddress: "10.1.2.3",
+			SSHUser:   "user-1",
+		},
+		SSHPassword:   "password1",
+		MachineUUID:   "",
+		FabricManager: mockFM,
+		Keycloak:      mockKeycloak,
+	}
+
+	mockKeycloak.On("IsInit").Return(true)
+	mockFM.On("IsInit").Return(true)
+
+	err := driver.Restart()
 
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "machine uuid is empty")
-
 }
 
 func TestAssignIpAddressesSuccess(t *testing.T) {
