@@ -56,9 +56,10 @@ type Resource struct {
 }
 
 const (
-	NetworkConfigVersion2  int    = 2
-	RendererNetworkManager string = "NetworkManager"
-	BondModeActiveBackup   string = "active-backup"
+	NetworkConfigVersion2   int    = 2
+	RendererNetworkManager  string = "NetworkManager"
+	BondModeActiveBackup    string = "active-backup"
+	FailoverMacPolicyActive string = "active"
 )
 
 type NetworkConfig struct {
@@ -88,7 +89,8 @@ type Bond struct {
 }
 
 type BondParameters struct {
-	Mode string `yaml:"mode,omitempty"`
+	Mode              string `yaml:"mode,omitempty"`
+	FailoverMacPolicy string `yaml:"fail-over-mac-policy,omitempty"`
 }
 
 // Custom Unmarshaler to handle both "res_spec" and "res_spcec"

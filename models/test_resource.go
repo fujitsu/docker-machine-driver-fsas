@@ -851,6 +851,7 @@ done
       dhcp4: true
       parameters:
         mode: active-backup
+        fail-over-mac-policy: active
 `
 
 	NetworkConfigValidOnboardComposableYaml = `network:
@@ -884,6 +885,7 @@ done
       dhcp4: true
       parameters:
         mode: active-backup
+        fail-over-mac-policy: active
 `
 )
 
@@ -908,7 +910,8 @@ var validNetworkConfigOnboard = NetworkConfig{
 				Interfaces: []string{"bare0", "bare1"},
 				DHCP4:      true,
 				Parameters: BondParameters{
-					Mode: BondModeActiveBackup,
+					Mode:              BondModeActiveBackup,
+					FailoverMacPolicy: FailoverMacPolicyActive,
 				},
 			},
 		},
@@ -957,7 +960,8 @@ var validNetworkConfigOnboardComposable = NetworkConfig{
 				Interfaces: []string{"bare0", "bare1"},
 				DHCP4:      true,
 				Parameters: BondParameters{
-					Mode: BondModeActiveBackup,
+					Mode:              BondModeActiveBackup,
+					FailoverMacPolicy: FailoverMacPolicyActive,
 				},
 			},
 		},
