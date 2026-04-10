@@ -113,6 +113,11 @@ const (
 	cloudInitDirPath             = "/etc/cdi/cloud-init-discovery/"
 )
 
+const (
+	INNER_CREATE_SSH_MAX_ATTEMPTS = 5
+	REMOVE_SSH_MAX_ATTEMPTS       = 1
+)
+
 func (d *Driver) String() string {
 	return "{" +
 		fmt.Sprintf("Tenant: %s, ", d.TenantUuid) +
@@ -455,7 +460,7 @@ func (d *Driver) initFabricManager() error {
 }
 
 // initSshManager Initialize SSH Manager client
-func (d *Driver) initSshManager() error {
+func (d *Driver) initSshManager(maxAttempts int) error {
 	if !d.SshManager.IsInit() {
 		slog.Warn("SSH Manager is NOT initialized then start init procedure")
 
@@ -484,7 +489,7 @@ func (d *Driver) initSshManager() error {
 		}
 		d.SshManager = sshManager
 
-		if err := d.SshManager.HostPublicKeyIsValid(); err != nil {
+		if err := d.SshManager.HostPublicKeyIsValid(maxAttempts); err != nil {
 			return err
 		}
 	}
@@ -667,7 +672,7 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.initSshManager(); err != nil {
+	if err := d.initSshManager(INNER_CREATE_SSH_MAX_ATTEMPTS); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
 	}
@@ -896,10 +901,10 @@ func (d *Driver) Remove() error {
 		return err
 	}
 
-	// Check if ssh manager is available for e.g. OS deregistration, if not - proceed with machine removal anyway
-	if err := d.initSshManager(); err != nil {
+	// Attempt OS deregistration during machine removal
+	if err := d.initSshManager(REMOVE_SSH_MAX_ATTEMPTS); err != nil {
 		// If ssh manager cannot be initialized then do not return error and proceed with machine removal
-		slog.Warn("error while initializing SSH Manager, proceeding with machine removal", "err", err)
+		slog.Warn("SSH unavailable - could not read registration status; proceeding with machine removal; if the machine was previously registered, manual action might be required", "err", err)
 	} else {
 		if err := d.SshManager.DeregisterOS(); err != nil {
 			slog.Warn("Could not deregister SLES OS, manual action might be required", "err", err)
