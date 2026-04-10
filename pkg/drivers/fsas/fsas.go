@@ -929,7 +929,7 @@ func (d *Driver) Remove() error {
 
 // Restart a host using Fabric Manager reboot operation.
 func (d *Driver) Restart() error {
-	slog.Debug("Try to restart host")
+	slog.Debug("Attempting to restart host")
 	slog.Debug(fmt.Sprintf("BaseDriver struct: %+v", d.BaseDriver))
 	slog.Debug(fmt.Sprintf("Driver struct: %+v", d))
 
