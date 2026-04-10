@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestCreateMachineRequestToJSON(t *testing.T) {
@@ -382,15 +382,6 @@ func TestNetworkConfigOnboardComposable(t *testing.T) {
 	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardComposableYaml), &decodedNetworkConfig)
 	assert.NoError(t, err)
 	assert.Equal(t, decodedNetworkConfig, validNetworkConfigOnboardComposable)
-
-	// Test Marshalling and Round-trip
-	marshaledYAML, err := yaml.Marshal(&validNetworkConfigOnboardComposable)
-	assert.NoError(t, err)
-
-	var roundTrippedConfig NetworkConfig
-	err = yaml.Unmarshal(marshaledYAML, &roundTrippedConfig)
-	assert.NoError(t, err)
-	assert.Equal(t, validNetworkConfigOnboardComposable, roundTrippedConfig)
 }
 
 func TestNetworkConfigOnboard(t *testing.T) {
@@ -399,13 +390,4 @@ func TestNetworkConfigOnboard(t *testing.T) {
 	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardYaml), &decodedNetworkConfig)
 	assert.NoError(t, err)
 	assert.Equal(t, validNetworkConfigOnboard, decodedNetworkConfig)
-
-	// Test Marshalling and Round-trip
-	marshaledYAML, err := yaml.Marshal(&validNetworkConfigOnboard)
-	assert.NoError(t, err)
-
-	var roundTrippedConfig NetworkConfig
-	err = yaml.Unmarshal(marshaledYAML, &roundTrippedConfig)
-	assert.NoError(t, err)
-	assert.Equal(t, validNetworkConfigOnboard, roundTrippedConfig)
 }

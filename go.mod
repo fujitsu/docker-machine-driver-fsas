@@ -3,7 +3,6 @@ module github.com/fujitsu/docker-machine-driver-fsas
 require (
 	github.com/rancher/machine v0.15.0-rancher137
 	github.com/stretchr/testify v1.11.1
-	gopkg.in/yaml.v2 v2.4.0
 )
 
 require github.com/kr/fs v0.1.0 // indirect
