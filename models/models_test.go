@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestCreateMachineRequestToJSON(t *testing.T) {
@@ -373,4 +374,20 @@ func Test_customUnmarshallerForResourceStruct(t *testing.T) {
 		})
 	}
 
+}
+
+func TestNetworkConfigOnboardComposable(t *testing.T) {
+	// Test Unmarshalling
+	var decodedNetworkConfig NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardComposableYaml), &decodedNetworkConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, decodedNetworkConfig, validNetworkConfigOnboardComposable)
+}
+
+func TestNetworkConfigOnboard(t *testing.T) {
+	// Test Unmarshalling
+	var decodedNetworkConfig NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardYaml), &decodedNetworkConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, validNetworkConfigOnboard, decodedNetworkConfig)
 }

@@ -55,6 +55,44 @@ type Resource struct {
 	MaxResourceCount int             `json:"max_resource_count,omitempty"` // GPU field (read-only and optional)
 }
 
+const (
+	NetworkConfigVersion2   int    = 2
+	RendererNetworkManager  string = "NetworkManager"
+	BondModeActiveBackup    string = "active-backup"
+	FailoverMacPolicyActive string = "active"
+)
+
+type NetworkConfig struct {
+	Network NetworkSpec `yaml:"network"`
+}
+
+type NetworkSpec struct {
+	SchemaVersion int                 `yaml:"version"`
+	Renderer      string              `yaml:"renderer"`
+	Ethernets     map[string]Ethernet `yaml:"ethernets,omitempty"`
+	Bonds         map[string]Bond     `yaml:"bonds,omitempty"`
+}
+
+type Ethernet struct {
+	Match Match `yaml:"match,omitempty"`
+	DHCP4 bool  `yaml:"dhcp4,omitempty"`
+}
+
+type Match struct {
+	MACAddress string `yaml:"macaddress,omitempty"`
+}
+
+type Bond struct {
+	Interfaces []string       `yaml:"interfaces,omitempty"`
+	DHCP4      bool           `yaml:"dhcp4,omitempty"`
+	Parameters BondParameters `yaml:"parameters,omitempty"`
+}
+
+type BondParameters struct {
+	Mode              string `yaml:"mode,omitempty"`
+	FailoverMacPolicy string `yaml:"fail-over-mac-policy,omitempty"`
+}
+
 // Custom Unmarshaler to handle both "res_spec" and "res_spcec"
 /*
 	The reason why there is a defined custom unmarshaller is a typo
@@ -100,7 +138,7 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 func (r *Resource) MarshalJSON() ([]byte, error) {
 	// Create a temporary struct without the Tags, MinResourceCount and MaxResourceCount fields
 	type OutgoingResource Resource
-	alias := &OutgoingResource {
+	alias := &OutgoingResource{
 		ResourceType:     r.ResourceType,
 		ResourceNum:      r.ResourceNum,
 		ResourceSpec:     r.ResourceSpec,
