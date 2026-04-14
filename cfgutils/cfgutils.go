@@ -24,6 +24,7 @@ var (
 type CfgManager interface {
 	IsInit() bool
 	PrepareMetadata(instanceId, hostname string) string
+	PrepareNetworkConfig(lanports []models.Lanport) (string, error)
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
 	ImplantSSHKey(sshKeyPath, sshUser string) error
@@ -54,6 +55,62 @@ func NewStandardCfgManager(devicesSpecJson, userDataFile string) *StandardCfgMan
 // IsInit Returns true if constructor succeed else false
 func (sc *StandardCfgManager) IsInit() bool {
 	return isInit
+}
+
+func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport) (string, error) {
+	if len(lanports) == 0 {
+		slog.Warn("No lanports provided for network configuration")
+		return "", nil
+	}
+
+	ethernets := make(map[string]models.Ethernet)
+	bonds := make(map[string]models.Bond)
+	bondInterfaces := []string{}
+
+	for idx, lanport := range lanports {
+		// Only interfaces with lanport indices 1 and 2 are to be bonded together
+		if lanport.LanportIdx == 1 || lanport.LanportIdx == 2 {
+			ethernets[fmt.Sprintf("bare%d", idx)] = models.Ethernet{
+				Match: models.Match{MACAddress: lanport.MACAddress},
+				DHCP4: true,
+			}
+			bondInterfaces = append(bondInterfaces, fmt.Sprintf("bare%d", idx))
+		} else {
+			ethernets[fmt.Sprintf("prov%d", idx)] = models.Ethernet{
+				Match: models.Match{MACAddress: lanport.MACAddress},
+				DHCP4: true,
+			}
+		}
+	}
+	// Create bond interface
+	if len(bondInterfaces) == 2 {
+		bonds["bond0"] = models.Bond{
+			Interfaces: bondInterfaces,
+			DHCP4:      true,
+			Parameters: models.BondParameters{
+				Mode:              models.BondModeActiveBackup,
+				FailoverMacPolicy: models.FailoverMacPolicyActive,
+			},
+		}
+		slog.Debug("Created bond interface")
+	}
+
+	networkConfig := models.NetworkConfig{
+		Network: models.NetworkSpec{
+			SchemaVersion: models.NetworkConfigVersion2,
+			Renderer:      models.RendererNetworkManager,
+			Ethernets:     ethernets,
+			Bonds:         bonds,
+		},
+	}
+
+	rawYaml, err := yaml.Marshal(networkConfig)
+	if err != nil {
+		slog.Error("Failed to marshal network config to YAML", "err", err)
+		return "", err
+	}
+
+	return string(rawYaml), nil
 }
 
 const metadataContent = `dsmode: local
@@ -309,7 +366,7 @@ sudo SUSEConnect --status | jq -r '.[] | "\(.identifier)\t\(.status)\t\(.arch)\t
     echo "ACTION: Registering $id"
 	for i in {1..4}; do
         echo "Attempt $i for registering $id"
-        
+
         # Try to register the module
 		cmd="SUSEConnect -p ${id}/${ver}/${arch}"
 		echo "$> $cmd"
