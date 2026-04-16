@@ -2124,9 +2124,11 @@ func TestRestartSuccess(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
-	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil).Once()
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
-		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 13, nil).Once()
+		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", int(BOOTING), nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
+		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", int(ACTIVE_PON), nil).Once()	
 
 	err := driver.Restart()
 	assert.NoError(t, err)
@@ -2154,6 +2156,15 @@ func TestRestartFailReboot(t *testing.T) {
 	rebootError := fmt.Errorf("FM reboot failed")
 	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(rebootError).Once()
 
+	mockClock := timeutilsmock.NewMockClock(t)
+	statusClock = mockClock
+	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
+	mockClock.On("Now").Return(mock_now_time)
+
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
+		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
+	mockClock.On("Since", mock_now_time).Return(WAIT_FOR_STATUS_TIMEOUT + time.Microsecond*100)
+
 	err := driver.Restart()
 	assert.ErrorIs(t, err, rebootError)
 }
@@ -2176,7 +2187,7 @@ func TestRestartFailWaitForStatus(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
-	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil).Once()
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
 		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
 

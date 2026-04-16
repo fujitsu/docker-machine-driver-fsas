@@ -943,14 +943,36 @@ func (d *Driver) Restart() error {
 		return fmt.Errorf("machine uuid is empty")
 	}
 
-	if err := d.FabricManager.Reboot(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
-		slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", err)
+	rebootErrCh := make(chan error, 1)
+	go func() {
+		token := d.Keycloak.GetToken()
+		rebootErrCh <- d.FabricManager.Reboot(d.MachineUUID, d.TenantUuid, token)
+	}()
+
+	slog.Info("Waiting for status", "status", BOOTING)
+	if err := d.waitForStatus(BOOTING, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
+		rebootErr := <-rebootErrCh
+		if rebootErr != nil {
+			slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", rebootErr)
+			return rebootErr
+		}
+		slog.Error("Error occurred during waitForStatus execution", "status", BOOTING, "err", err)
 		return err
 	}
 
 	slog.Info("Waiting for status", "status", ACTIVE_PON)
 	if err := d.waitForStatus(ACTIVE_PON, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
-		slog.Error("Error occurred during waitForStatus execution", "err", err)
+		rebootErr := <-rebootErrCh
+		if rebootErr != nil {
+			slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", rebootErr)
+			return rebootErr
+		}
+		slog.Error("Error occurred during waitForStatus execution", "status", ACTIVE_PON, "err", err)
+		return err
+	}
+
+	if err := <-rebootErrCh; err != nil {
+		slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", err)
 		return err
 	}
 
