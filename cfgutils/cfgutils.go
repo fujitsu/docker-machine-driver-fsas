@@ -58,6 +58,7 @@ func (sc *StandardCfgManager) IsInit() bool {
 }
 
 func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport) (string, error) {
+	// TODO: Decide whether to use the models.Lanport structure or place the GetMachineDetails request here
 	if len(lanports) == 0 {
 		slog.Warn("No lanports provided for network configuration")
 		return "", nil
@@ -83,7 +84,7 @@ func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport) (s
 		}
 	}
 	// Create bond interface
-	if len(bondInterfaces) == 2 {
+	if len(bondInterfaces) > 1 {
 		bonds["bond0"] = models.Bond{
 			Interfaces: bondInterfaces,
 			DHCP4:      true,

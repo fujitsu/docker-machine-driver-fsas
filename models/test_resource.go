@@ -861,22 +861,23 @@ done
   ethernets:
     bare0:
       match:
-        macaddress: 52:54:00:a6:36:86
+        macaddress: 00:11:22:33:44:55
+      dhcp4: true
     bare1:
       match:
-        macaddress: 52:54:00:32:72:16
-    bare2:
+        macaddress: 00:11:22:33:44:66
+      dhcp4: true
+    prov2:
       match:
-        macaddress: 52:54:00:f4:20:de
-    bare3:
+        macaddress: 00:11:22:33:44:77
+      dhcp4: true
+    prov3:
       match:
-        macaddress: 52:54:00:a0:b4:ca
-    bare4:
+        macaddress: 11:11:11:11:11:11
+      dhcp4: true
+    prov4:
       match:
-        macaddress: 52:54:00:da:78:9f
-    prov:
-      match:
-        macaddress: 52:54:00:7e:de:e2
+        macaddress: 22:22:22:22:22:22
       dhcp4: true
   bonds:
     bond0:
@@ -919,41 +920,40 @@ var validNetworkConfigOnboard = NetworkConfig{
 	},
 }
 
-var validNetworkConfigOnboardComposable = NetworkConfig{
+var ValidNetworkConfigOnboardComposable = NetworkConfig{
 	Network: NetworkSpec{
 		SchemaVersion: NetworkConfigVersion2,
 		Renderer:      RendererNetworkManager,
 		Ethernets: map[string]Ethernet{
-			"prov": {
+			"bare0": {
 				Match: Match{
-					MACAddress: "52:54:00:7e:de:e2",
+					MACAddress: "00:11:22:33:44:55",
 				},
 				DHCP4: true,
 			},
-			"bare0": {
-				Match: Match{
-					MACAddress: "52:54:00:a6:36:86",
-				},
-			},
 			"bare1": {
 				Match: Match{
-					MACAddress: "52:54:00:32:72:16",
+					MACAddress: "00:11:22:33:44:66",
 				},
+				DHCP4: true,
 			},
-			"bare2": {
+			"prov2": {
 				Match: Match{
-					MACAddress: "52:54:00:f4:20:de",
+					MACAddress: "00:11:22:33:44:77",
 				},
+				DHCP4: true,
 			},
-			"bare3": {
+			"prov3": {
 				Match: Match{
-					MACAddress: "52:54:00:a0:b4:ca",
+					MACAddress: "11:11:11:11:11:11",
 				},
+				DHCP4: true,
 			},
-			"bare4": {
+			"prov4": {
 				Match: Match{
-					MACAddress: "52:54:00:da:78:9f",
+					MACAddress: "22:22:22:22:22:22",
 				},
+				DHCP4: true,
 			},
 		},
 		Bonds: map[string]Bond{

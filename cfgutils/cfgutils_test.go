@@ -996,3 +996,14 @@ func TestInjectOSRegistration(t *testing.T) {
 		})
 	}
 }
+
+func TestPrepareNetworkConfigSuccess(t *testing.T) {
+	manager := NewStandardCfgManager("[]", "")
+
+	networkConfigString, err := manager.PrepareNetworkConfig(models.ExpectedLanports)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, networkConfigString)
+	rawYaml, err := yaml.Marshal(models.ValidNetworkConfigOnboardComposable)
+	assert.NoError(t, err)
+	assert.Equal(t, string(rawYaml), networkConfigString)
+}
