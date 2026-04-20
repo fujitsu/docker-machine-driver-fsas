@@ -51,6 +51,7 @@ type Driver struct {
 	DnsIp                     string
 	ComputeConditionsJson     string
 	DevicesSpecJson           string
+	EnableBaremetalBonding    bool
 	NetworkBaremetalPort      int
 	NetworkBaremetalUUID      string
 	NetworkBaremetalDefaultGW string
@@ -84,6 +85,7 @@ func NewDriver() *Driver {
 		DnsIp:                     "",
 		ComputeConditionsJson:     "",
 		DevicesSpecJson:           "",
+		EnableBaremetalBonding:    false,
 		NetworkBaremetalPort:      -1,
 		NetworkBaremetalUUID:      "",
 		NetworkBaremetalDefaultGW: "",
@@ -127,6 +129,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("DnsIp: %s, ", d.DnsIp) +
 		fmt.Sprintf("ComputeConditionsJson: %s, ", d.ComputeConditionsJson) +
 		fmt.Sprintf("DevicesSpecJson: %s, ", d.DevicesSpecJson) +
+		fmt.Sprintf("EnableBaremetalBonding: %t, ", d.EnableBaremetalBonding) +
 		fmt.Sprintf("NetworkBaremetalPort: %d, ", d.NetworkBaremetalPort) +
 		fmt.Sprintf("NetworkBaremetalUUID: %s, ", d.NetworkBaremetalUUID) +
 		fmt.Sprintf("NetworkBaremetalDefaultGW: %s, ", d.NetworkBaremetalDefaultGW) +
@@ -193,6 +196,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "fsas-compute-conditions-json",
 			Usage:  `FSAS CDI compute conditions JSON (string with CPU spec, e.g. "[{"column":"model","operator":"eq","value":"PRIMERGYRX2540M6"}]")`,
 			EnvVar: "FSAS_COMPUTE_CONDITIONS_JSON",
+		},
+		mcnflag.BoolFlag{
+			Name:   "fsas-enable-baremetal-bonding",
+			Usage:  "Enable baremetal bonding",
+			EnvVar: "FSAS_ENABLE_BAREMETAL_BONDING",
 		},
 		mcnflag.IntFlag{
 			Name:   "fsas-network-baremetal-port",
@@ -361,6 +369,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 
 	d.ComputeConditionsJson = strings.TrimSpace(flags.String("fsas-compute-conditions-json"))
 	slog.Debug("Driver", "FSAS compute conditions JSON", d.ComputeConditionsJson)
+
+	d.EnableBaremetalBonding = flags.Bool("fsas-enable-baremetal-bonding")
+	slog.Debug("Driver", "FSAS enable baremetal bonding", d.EnableBaremetalBonding)
 
 	d.NetworkBaremetalPort = flags.Int("fsas-network-baremetal-port")
 	slog.Debug("Driver", "FSAS baremetal subnet LAN port index", d.NetworkBaremetalPort)
@@ -590,6 +601,7 @@ func (d *Driver) innerCreate() error {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson:     d.ComputeConditionsJson,
 		DevicesSpecJson:           d.DevicesSpecJson,
+		EnableBaremetalBonding:    d.EnableBaremetalBonding,
 		NetworkBaremetalPort:      d.NetworkBaremetalPort,
 		NetworkBaremetalUUID:      d.NetworkBaremetalUUID,
 		NetworkBaremetalDefaultGW: d.NetworkBaremetalDefaultGW,

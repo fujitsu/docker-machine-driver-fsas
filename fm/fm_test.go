@@ -246,6 +246,69 @@ func TestPopulateCreateMachineRequestOneProvisioningNetwork_Success(t *testing.T
 	assert.Equal(t, models.CreateMachineRequestOneProvisioningNetworkExpected, string(rawJSON))
 }
 
+func TestPopulateCreateMachineRequestBaremetalBondingEnabled_Success(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	machineName := "test-machine-001"
+	tenantId := "b3b65e79-ad41-4367-89d6-e4e7315141ef"
+
+	machineSpecsArgs := models.MachineSpecsArgs{
+		ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
+		EnableBaremetalBonding:    true,
+		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+		NetworkProvisionPort:      1,
+		NetworkProvisionDefaultGW: "192.168.0.1",
+		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
+		NetworkBaremetalDefaultGW: "172.0.0.1",
+		NtpServer:                 "192.168.0.1",
+		DnsServer:                 "8.8.8.8",
+	}
+
+	createRequest, err := fmc.populateCreateMachineRequest(machineName, tenantId, machineSpecsArgs)
+
+	assert.NoError(t, err, "populateCreateMachineRequest should not return an error")
+
+	rawJSON, err := json.Marshal(createRequest)
+	assert.NoError(t, err, "Marshaling JSON should not return an error")
+
+	// Expect two baremetal subnets with lanport_idx 1 and 2
+	assert.Equal(t, models.CreateMachineRequestBaremetalBondingExpected, string(rawJSON))
+}
+
+func TestPopulateCreateMachineRequestBaremetalBondingDisabled_Success(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	machineName := "test-machine-001"
+	tenantId := "b3b65e79-ad41-4367-89d6-e4e7315141ef"
+
+	machineSpecsArgs := models.MachineSpecsArgs{
+		ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
+		EnableBaremetalBonding:    false,
+		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+		NetworkProvisionPort:      1,
+		NetworkProvisionDefaultGW: "192.168.0.1",
+		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
+		NetworkBaremetalPort:      2,
+		NetworkBaremetalDefaultGW: "172.0.0.1",
+		NtpServer:                 "192.168.0.1",
+		DnsServer:                 "8.8.8.8",
+	}
+
+	createRequest, err := fmc.populateCreateMachineRequest(machineName, tenantId, machineSpecsArgs)
+
+	assert.NoError(t, err, "populateCreateMachineRequest should not return an error")
+
+	rawJSON, err := json.Marshal(createRequest)
+	assert.NoError(t, err, "Marshaling JSON should not return an error")
+
+	// Expect a single baremetal subnet using the configured NetworkBaremetalPort
+	assert.Equal(t, models.CreateMachineRequestExpected, string(rawJSON))
+}
+
 func TestCheckDeviceSpecJson(t *testing.T) {
 	testCases := []struct {
 		name       string
