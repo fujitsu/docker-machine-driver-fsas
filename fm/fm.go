@@ -230,13 +230,32 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 	}
 
 	if machineSpecs.NetworkBaremetalUUID != "" {
-		subnets = append(subnets, models.Subnet{
-			SubnetUUID: machineSpecs.NetworkBaremetalUUID,
-			LanportIdx: machineSpecs.NetworkBaremetalPort,
-			Ntp:        machineSpecs.NtpServer,
-			Dns:        machineSpecs.DnsServer,
-			DefaultGW:  machineSpecs.NetworkBaremetalDefaultGW,
-		})
+		if machineSpecs.EnableBaremetalBonding {
+			subnets = append(subnets,
+				models.Subnet{
+					SubnetUUID: machineSpecs.NetworkBaremetalUUID,
+					LanportIdx: 1,
+					Ntp:        machineSpecs.NtpServer,
+					Dns:        machineSpecs.DnsServer,
+					DefaultGW:  machineSpecs.NetworkBaremetalDefaultGW,
+				},
+				models.Subnet{
+					SubnetUUID: machineSpecs.NetworkBaremetalUUID,
+					LanportIdx: 2,
+					Ntp:        machineSpecs.NtpServer,
+					Dns:        machineSpecs.DnsServer,
+					DefaultGW:  machineSpecs.NetworkBaremetalDefaultGW,
+				},
+			)
+		} else {
+			subnets = append(subnets, models.Subnet{
+				SubnetUUID: machineSpecs.NetworkBaremetalUUID,
+				LanportIdx: machineSpecs.NetworkBaremetalPort,
+				Ntp:        machineSpecs.NtpServer,
+				Dns:        machineSpecs.DnsServer,
+				DefaultGW:  machineSpecs.NetworkBaremetalDefaultGW,
+			})
+		}
 	}
 
 	resourceSpecification := []models.Resource{
