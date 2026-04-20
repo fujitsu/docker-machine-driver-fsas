@@ -230,6 +230,7 @@ type ImageInstallation struct {
 type MachineSpecsArgs struct {
 	ComputeConditionsJson     string
 	DevicesSpecJson           string
+	EnableBaremetalBonding    bool
 	NetworkBaremetalPort      int
 	NetworkProvisionPort      int
 	NetworkBaremetalUUID      string
