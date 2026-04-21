@@ -55,8 +55,8 @@ func TestCreateMachine_Success(t *testing.T) {
 		DnsServer:             "8.8.8.8",
 	}
 
-	getEntryData := func(index int) models.MachinesRequestResponse {
-		var entryData models.MachinesRequestResponse
+	getEntryData := func(index int) models.MachineResponse {
+		var entryData models.MachineResponse
 		json.Unmarshal([]byte(models.PostMachinesResponseExample), &entryData)
 
 		switch index {
@@ -64,17 +64,17 @@ func TestCreateMachine_Success(t *testing.T) {
 			// happy path
 			return entryData
 		case 1:
-			return func() models.MachinesRequestResponse {
+			return func() models.MachineResponse {
 				entryData.Data.Machines[0].MachineUUID = ""
 				return entryData
 			}()
 		case 2:
-			return func() models.MachinesRequestResponse {
+			return func() models.MachineResponse {
 				entryData.Data.Machines = []models.MachineDetails{}
 				return entryData
 			}()
 		case 3:
-			return func() models.MachinesRequestResponse {
+			return func() models.MachineResponse {
 				entryData.Data.Machines = nil
 				return entryData
 			}()
@@ -86,7 +86,7 @@ func TestCreateMachine_Success(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		entryData    models.MachinesRequestResponse
+		entryData    models.MachineResponse
 		err          error
 		expectedUUID string
 	}{
@@ -120,10 +120,10 @@ func TestCreateMachine_Success(t *testing.T) {
 		expectedJSONPayload, _ := json.Marshal(expectedPayload)
 		expectedQuery := map[string]string{"tenant_uuid": expectedPayload.Tenants.TenantUUID}
 		expectedHeaders := map[string]string{"Content-Type": "application/json", "Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample)}
-		var responseData models.MachinesRequestResponse
+		var responseData models.MachineResponse
 
 		helperSetResponseMachineUUID := func(payload []byte, endpoint string, queryParams map[string]string, response interface{}, headers map[string]string) {
-			resp := response.(*models.MachinesRequestResponse)
+			resp := response.(*models.MachineResponse)
 			resp.Data = tc.entryData.Data
 		}
 
@@ -167,7 +167,7 @@ func TestCreateMachine_PostError(t *testing.T) {
 	expectedQuery := map[string]string{"tenant_uuid": expectedPayload.Tenants.TenantUUID}
 	expectedHeaders := map[string]string{"Content-Type": "application/json", "Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample)}
 
-	var responseData, entryData models.MachinesRequestResponse
+	var responseData, entryData models.MachineResponse
 
 	json.Unmarshal([]byte(models.PostMachinesResponseExample), &entryData)
 
@@ -294,7 +294,7 @@ func getSpecArgs(tagsValue string) models.MachineSpecsArgs {
 }
 
 func getResourcesForTest() []models.Resource {
-	var mrr models.MachinesRequestResponse
+	var mrr models.MachineResponse
 	err := json.Unmarshal([]byte(models.GetMachineResponseExampleWithTypoInStorageResSpec), &mrr)
 	if err != nil {
 		slog.Error("Error unmarshalling devices specification from JSON: ", "err", err)
@@ -677,7 +677,7 @@ func TestGetMachineDetailsSuccess(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}
 	fmc.bootStorageCondition = getBootStorageConditionForTest()
-	var responseData, entryData models.MachinesRequestResponse
+	var responseData, entryData models.MachineResponse
 
 	json.Unmarshal([]byte(models.GetMachineResponseExampleWithTypoInStorageResSpec), &entryData)
 
@@ -689,7 +689,7 @@ func TestGetMachineDetailsSuccess(t *testing.T) {
 	expectedEndpoint := fmt.Sprintf("/machines/%s", machineUUID)
 
 	helperSetMachineDetails := func(endpoint string, queryParams map[string]string, responseAddress interface{}, headers map[string]string) {
-		resp := responseAddress.(*models.MachinesRequestResponse)
+		resp := responseAddress.(*models.MachineResponse)
 		resp.Data = entryData.Data
 	}
 
@@ -712,7 +712,7 @@ func TestGetMachineDetailsSuccessDeleted(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}
 	fmc.bootStorageCondition = getBootStorageConditionForTest()
-	var responseData, entryData models.MachinesRequestResponse
+	var responseData, entryData models.MachineResponse
 
 	json.Unmarshal([]byte(models.GetMachineResponseExampleDeletedMachine), &entryData)
 
@@ -724,7 +724,7 @@ func TestGetMachineDetailsSuccessDeleted(t *testing.T) {
 	expectedEndpoint := fmt.Sprintf("/machines/%s", machineUUID)
 
 	helperSetMachineDetails := func(endpoint string, queryParams map[string]string, responseAddress interface{}, headers map[string]string) {
-		resp := responseAddress.(*models.MachinesRequestResponse)
+		resp := responseAddress.(*models.MachineResponse)
 		resp.Data = entryData.Data
 	}
 
@@ -748,7 +748,7 @@ func TestGetMachineDetailsFailed(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}
 
-	var responseData models.MachinesRequestResponse
+	var responseData models.MachineResponse
 
 	tenantId := "cdi-test"
 	machineUUID := "a1b2c3d4-e5f6-7890-1234-567890abcdef"

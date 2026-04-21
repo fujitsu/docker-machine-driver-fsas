@@ -243,7 +243,7 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 		{
 			ResourceType: "compute",
 			ResourceNum:  1,
-			ResourceSpec: &models.ResSpec{Condition: computeConditions},
+			ResourceSpec: &models.ResourceSpecification{Condition: computeConditions},
 			Network: &models.Network{
 				NicType: 1,
 				Subnets: subnets,
@@ -257,8 +257,8 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 	machineName = strings.ReplaceAll(machineName, "-", "_")
 
 	machine := models.CreateMachineSpec{
-		Machine: machineName,
-		Resources: []models.ResSpecs{
+		MachineName: machineName,
+		Resources: []models.CreateMachineResources{
 			{
 				ResourceSpecifications: resourceSpecification,
 			},
@@ -266,7 +266,7 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 	}
 	machines := []models.CreateMachineSpec{machine}
 
-	tenants := models.CreateMachineTenantsRequest{
+	tenants := models.CreateMachineRequestBodyTenants{
 		TenantUUID: tenantId,
 		Machines:   machines,
 	}
@@ -291,7 +291,7 @@ func (fmc *FabricManagerClient) CreateMachine(machineName, tenantId string, mach
 
 	slog.Debug("Request Payload", "payload", string(payload))
 
-	var response models.MachinesRequestResponse
+	var response models.MachineResponse
 
 	queryParams := map[string]string{"tenant_uuid": createMachineRequest.Tenants.TenantUUID}
 	headers := httputils.GetAuthorizationHeaderWithContentType(bearerToken)
@@ -317,7 +317,7 @@ func (fmc *FabricManagerClient) GetMachineDetails(tenantId, machineUUID, bearerT
 	endpoint := fmt.Sprintf("/machines/%s", machineUUID)
 	slog.Debug("Getting status on Machine", "mach_uuid", machineUUID)
 
-	var responseData models.MachinesRequestResponse
+	var responseData models.MachineResponse
 
 	queryParams := map[string]string{"tenant_uuid": tenantId}
 	headers := httputils.GetAuthorizationHeader(bearerToken)
