@@ -19,21 +19,9 @@ const (
 )
 
 /*
-	cloudInitFile represents a cloud-init configuration payload.
-
-Regarding filed SSHPasswordAuth in cloudInitFile struct - why pointer to bool?
-When there is an annotation "omitempty" on a struct field, it means that
-if the field has the zero value for its type (false), it will be omitted from the YAML output when marshaling
-or simply there will not be a key "ssh_pwauth: false". Which is not what the user expects.
-To prevent this default yaml behaviour the field is defined as a pointer to bool (*bool) instead of a plain bool.
-It allows to distinguishing between three states:
-1. nil: The field is not set in the YAML, so it should be omitted from the output.
-2. &true: The field is explicitly set to true in the YAML - "ssh_pwauth: true".
-3. &false: The field is explicitly set to false in the YAML - "ssh_pwauth: false".
-
-When there is no annotation "omitempty" on a struct field, it means that
-the field will always be included in the YAML output when marshaling, even if it has the zero value for its type (false).
-So there will always be a key "ssh_pwauth: false" which is not what the user expects.
+cloudInitFile is a cloud-init payload.
+SSHPasswordAuth uses *bool with omitempty to preserve 3 states in YAML:
+nil (omit), true, and false.
 */
 type cloudInitFile struct {
 	Hostname        string                      `yaml:"hostname,omitempty"`
