@@ -69,17 +69,25 @@ func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport, su
 		return "", fmt.Errorf("Bonding requested but no lanports available")
 	}
 
+	if _, ok := subnets["provisioning"]; !ok {
+		return "", fmt.Errorf("missing 'provisioning' key in subnets map")
+	}
+	if _, ok := subnets["baremetal"]; !ok {
+		return "", fmt.Errorf("missing 'baremetal' key in subnets map")
+	}
+
 	ethernets := make(map[string]models.Ethernet)
 	bonds := make(map[string]models.Bond)
 	bondInterfaces := []string{}
 
 	for idx, lanport := range lanports {
-		ifaceName := ""
-		if lanport.SubnetUUID == subnets["provisioning"] {
+		var ifaceName string
+		switch lanport.SubnetUUID {
+		case subnets["provisioning"]:
 			ifaceName = fmt.Sprintf("prov%d", idx)
-		} else if lanport.SubnetUUID == subnets["baremetal"] {
+		case subnets["baremetal"]:
 			ifaceName = fmt.Sprintf("bare%d", idx)
-		} else {
+		default:
 			ifaceName = fmt.Sprintf("custom%d", idx)
 		}
 		ethernets[ifaceName] = models.Ethernet{

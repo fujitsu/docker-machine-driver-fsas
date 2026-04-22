@@ -1118,3 +1118,37 @@ func TestPrepareNetworkConfigCustomSubnetNaming(t *testing.T) {
 	_, hasCustom := config.Network.Ethernets["custom0"]
 	assert.True(t, hasCustom, "Unknown subnet should produce 'custom' prefix")
 }
+
+func TestPrepareNetworkConfigMissingSubnetKeys(t *testing.T) {
+	testCases := []struct {
+		name             string
+		subnets          map[string]string
+		expectedErrorStr string
+	}{
+		{name: "missing baremetal key",
+			subnets:          map[string]string{"provisioning": "uuid1"},
+			expectedErrorStr: "baremetal",
+		},
+		{name: "missing provisioning key",
+			subnets:          map[string]string{"baremetal": "uuid1"},
+			expectedErrorStr: "provisioning",
+		},
+		{name: "empty subnets map",
+			subnets:          map[string]string{},
+			expectedErrorStr: "provisioning",
+		},
+	}
+
+	manager := NewStandardCfgManager("[]", "")
+	lanports := []models.Lanport{
+		{LanportUUID: "aaa", SubnetUUID: "some-uuid", MACAddress: "AA:BB:CC:DD:EE:01", LanportIdx: 1},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := manager.PrepareNetworkConfig(lanports, tc.subnets)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedErrorStr)
+		})
+	}
+}
