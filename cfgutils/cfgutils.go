@@ -16,6 +16,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	LanportTypeUndetermined int = 0
+	LanportTypeOnboard      int = 1
+	LanportTypeComposable   int = 2
+)
+
 var (
 	isInit = false
 )
@@ -24,7 +30,7 @@ var (
 type CfgManager interface {
 	IsInit() bool
 	PrepareMetadata(instanceId, hostname string) string
-	PrepareNetworkConfig(lanports []models.Lanport) (string, error)
+	PrepareNetworkConfig(lanports []models.Lanport, subnets map[string]string) (string, error)
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
 	ImplantSSHKey(sshKeyPath, sshUser string) error
@@ -57,11 +63,10 @@ func (sc *StandardCfgManager) IsInit() bool {
 	return isInit
 }
 
-func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport) (string, error) {
-	// TODO: Decide whether to use the models.Lanport structure or place the GetMachineDetails request here
+func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport, subnets map[string]string) (string, error) {
 	if len(lanports) == 0 {
-		slog.Warn("No lanports provided for network configuration")
-		return "", nil
+		slog.Error("No lanports provided for network configuration")
+		return "", fmt.Errorf("Bonding requested but no lanports available")
 	}
 
 	ethernets := make(map[string]models.Ethernet)
@@ -69,18 +74,21 @@ func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport) (s
 	bondInterfaces := []string{}
 
 	for idx, lanport := range lanports {
-		// Only interfaces with lanport indices 1 and 2 are to be bonded together
-		if lanport.LanportIdx == 1 || lanport.LanportIdx == 2 {
-			ethernets[fmt.Sprintf("bare%d", idx)] = models.Ethernet{
-				Match: models.Match{MACAddress: lanport.MACAddress},
-				DHCP4: true,
-			}
-			bondInterfaces = append(bondInterfaces, fmt.Sprintf("bare%d", idx))
+		ifaceName := ""
+		if lanport.SubnetUUID == subnets["provisioning"] {
+			ifaceName = fmt.Sprintf("prov%d", idx)
+		} else if lanport.SubnetUUID == subnets["baremetal"] {
+			ifaceName = fmt.Sprintf("bare%d", idx)
 		} else {
-			ethernets[fmt.Sprintf("prov%d", idx)] = models.Ethernet{
-				Match: models.Match{MACAddress: lanport.MACAddress},
-				DHCP4: true,
-			}
+			ifaceName = fmt.Sprintf("custom%d", idx)
+		}
+		ethernets[ifaceName] = models.Ethernet{
+			Match: models.Match{MACAddress: lanport.MACAddress},
+			DHCP4: true,
+		}
+		// Only onboard interfaces with lanport indices 1 and 2 are to be bonded together
+		if (lanport.LanportIdx == 1 || lanport.LanportIdx == 2) && lanport.LanportType == LanportTypeOnboard {
+			bondInterfaces = append(bondInterfaces, ifaceName)
 		}
 	}
 	// Create bond interface

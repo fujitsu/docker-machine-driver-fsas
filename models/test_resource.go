@@ -3,8 +3,8 @@ package models
 const (
 	PostMachinesRequestExpected                        = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test-machine-001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]}},{"res_type":"storage","res_num":2,"res_spec":{"condition":[{"column":"type","operator":"eq","value":"NVMe"}]}},{"res_type":"network","res_num":1,"res_spec":{"condition":[{"column":"name","operator":"eq","value":"baremetal-mgmt"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":1,"default_gw":"192.168.1.1","lease_time":"86400s","ntp":"ntp.example.com","dns":"8.8.8.8"}]}},{"res_type":"network","res_num":2,"res_spec":{"condition":[{"column":"name","operator":"eq","value":"provisioning-net"}]},"network":{"nic_type":2,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":2,"default_gw":"10.0.0.1","lease_time":"1209600000000000s","ntp":"time.google.com"}]}}]}]}]}}`
 	CreateMachineRequestExpected                       = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":1,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":2,"default_gw":"172.0.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
-	CreateMachineRequestOneProvisioningNetworkExpected  = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":2,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
-	CreateMachineRequestBaremetalBondingExpected        = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":1,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":1,"default_gw":"172.0.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":2,"default_gw":"172.0.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
+	CreateMachineRequestOneProvisioningNetworkExpected = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":2,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
+	CreateMachineRequestBaremetalBondingExpected       = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":1,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":1,"default_gw":"172.0.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":2,"default_gw":"172.0.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
 	PostMachinesResponseExample                        = `{
 		"data":{
 			"machines":[
@@ -969,6 +969,11 @@ var ValidNetworkConfigOnboardComposable = NetworkConfig{
 	},
 }
 
+var ExpectedSubnets = map[string]string{
+	"baremetal":    "123e4567-e89b-12d3-a456-426614174000",
+	"provisioning": "78901234-5678-9abc-def0-1234567890ab",
+}
+
 var ExpectedLanports = []Lanport{
 	{
 		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
@@ -1004,5 +1009,49 @@ var ExpectedLanports = []Lanport{
 		MACAddress:  "22:22:22:22:22:22",
 		LanportIdx:  0,
 		IPAddress:   "",
+	},
+}
+
+// ExpectedLanportsWithType is ExpectedLanports with LanportType populated (as set by the driver after FM response)
+var ExpectedLanportsWithType = []Lanport{
+	{
+		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:55",
+		LanportIdx:  1,
+		IPAddress:   "192.168.2.100",
+		LanportType: 1, // Onboard
+	},
+	{
+		LanportUUID: "01085c2c-15c4-4957-9ad3-7d1ee481f082",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:66",
+		LanportIdx:  2,
+		IPAddress:   "192.168.2.150",
+		LanportType: 1, // Onboard
+	},
+	{
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:77",
+		LanportIdx:  3,
+		IPAddress:   "10.0.0.100",
+		LanportType: 2, // Composable
+	},
+	{
+		LanportUUID: "a7d09755-d5c9-49ae-8f8c-7f53a3ae4f69",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "11:11:11:11:11:11",
+		LanportIdx:  4,
+		IPAddress:   "10.0.0.200",
+		LanportType: 2, // Composable
+	},
+	{
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "03aa247b-dd21-4dd0-943c-1b878bb6cccc",
+		MACAddress:  "22:22:22:22:22:22",
+		LanportIdx:  0,
+		IPAddress:   "",
+		LanportType: 0, // Undetermined
 	},
 }
