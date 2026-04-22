@@ -295,7 +295,7 @@ func getSpecArgs(tagsValue string) models.MachineSpecsArgs {
 
 func getResourcesForTest() []models.Resource {
 	var mrr models.MachineResponse
-	err := json.Unmarshal([]byte(models.GetMachineResponseExampleWithTypoInStorageResSpec), &mrr)
+	err := json.Unmarshal([]byte(models.GetMachineResponseExample), &mrr)
 	if err != nil {
 		slog.Error("Error unmarshalling devices specification from JSON: ", "err", err)
 		log.Fatalf("error while unmarshallig struct: %+v", err)
@@ -679,7 +679,7 @@ func TestGetMachineDetailsSuccess(t *testing.T) {
 	fmc.bootStorageCondition = getBootStorageConditionForTest()
 	var responseData, entryData models.MachineResponse
 
-	json.Unmarshal([]byte(models.GetMachineResponseExampleWithTypoInStorageResSpec), &entryData)
+	json.Unmarshal([]byte(models.GetMachineResponseExample), &entryData)
 
 	tenantId := "cdi-test"
 	machineUUID := "a1b2c3d4-e5f6-7890-1234-567890abcdef"

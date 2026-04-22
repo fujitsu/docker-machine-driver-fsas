@@ -60,36 +60,6 @@ type Resource struct {
 	ResourceSerialNumber string                 `json:"res_serial_num,omitempty"`     // POST response, GET response
 }
 
-// Custom Unmarshaler to handle both "res_spec" and "res_spcec"
-/*
-	The reason why there is a defined custom unmarshaller is a typo
-	in the production Fabric Manager code: response for the Get request
-	returns JSON with field: 'res_spcec' instead of 'res_spec'.
-	This is only a temporary workaround until the typo is corrected
-	and merged to the release branch.
-*/
-// TODO: Remove this custom unmarshaller when the typo is fixed
-func (r *Resource) UnmarshalJSON(data []byte) error {
-	// Define a temporary type to avoid recursion during unmarshaling.
-	type Alias Resource
-	aux := &struct {
-		*Alias
-		ResSpcec *ResourceSpecification `json:"res_spcec,omitempty"`
-	}{
-		Alias: (*Alias)(r),
-	}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	// If "res_spcec" was present, move its value to ResourceSpec.
-	if aux.ResSpcec != nil {
-		r.ResourceSpec = aux.ResSpcec
-	}
-
-	return nil
-}
 
 // Custom Marshaler to omit "tags", "minresourcecount" and "maxresourcecount"
 /*
