@@ -205,6 +205,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.IntFlag{
 			Name:   "fsas-network-baremetal-port",
 			Usage:  "Node LAN port index for baremetal subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_BAREMETAL_PORT",
 		},
 		mcnflag.StringFlag{
@@ -220,6 +221,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.IntFlag{
 			Name:   "fsas-network-provision-port",
 			Usage:  "Node LAN port index for provisioning subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_PROVISION_PORT",
 		},
 		mcnflag.StringFlag{
@@ -585,6 +587,9 @@ func (d *Driver) checkOnboardNicsConfig() error {
 	} else if d.NetworkBaremetalUUID != "" {
 		if d.NetworkBaremetalPort == -1 {
 			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet LAN port", "--fsas-network-baremetal-port")
+		}
+		if d.NetworkBaremetalDefaultGW == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet Default GW", "--fsas-network-baremetal-default-gw")
 		}
 		if d.NetworkBaremetalPort == d.NetworkProvisionPort {
 			return fmt.Errorf("baremetal and provisioning lanport idx must not be the same")

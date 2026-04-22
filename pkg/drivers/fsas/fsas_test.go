@@ -181,10 +181,10 @@ func TestGetStateRunning(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	driver := &Driver{
-		BaseDriver:    &drivers.BaseDriver{},
-		FabricManager: mockFM,
-		Keycloak:      mockKeycloak,
-		TenantUuid:    "cdi-test",
+		BaseDriver:            &drivers.BaseDriver{},
+		FabricManager:         mockFM,
+		Keycloak:              mockKeycloak,
+		TenantUuid:            "cdi-test",
 		SlesRegistrationCode:  "dummy",
 		SlesRegistrationEmail: "test@example.com",
 	}
@@ -2433,12 +2433,13 @@ func Test_applyCloudInit_success_with_userdata_fail(t *testing.T) {
 
 func TestCheckOnboardNicsConfig(t *testing.T) {
 	testCases := []struct {
-		name           string
-		bonding        bool
-		baremetalUUID  string
-		baremetalPort  int
-		provisionPort  int
-		expectedErrMsg string
+		name               string
+		bonding            bool
+		baremetalUUID      string
+		baremetalPort      int
+		provisionPort      int
+		baremetalDefaultGW string
+		expectedErrMsg     string
 	}{
 		// Bonding disabled
 		{
@@ -2452,64 +2453,79 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 		{
 			name:           "bonding disabled, baremetal UUID set, baremetal port not set (-1)",
 			bonding:        false,
-			baremetalUUID:  "some-uuid",
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
 			baremetalPort:  -1,
 			provisionPort:  1,
 			expectedErrMsg: "--fsas-network-baremetal-port",
 		},
 		{
-			name:           "bonding disabled, baremetal and provisioning on the same port",
-			bonding:        false,
-			baremetalUUID:  "some-uuid",
-			baremetalPort:  3,
-			provisionPort:  3,
-			expectedErrMsg: "baremetal and provisioning lanport idx must not be the same",
+			name:               "bonding disabled, baremetal and provisioning on the same port",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      3,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "baremetal and provisioning lanport idx must not be the same",
 		},
 		{
-			name:           "bonding disabled, baremetal port 1 and provisioning port 2 - both onboard NICs",
-			bonding:        false,
-			baremetalUUID:  "some-uuid",
-			baremetalPort:  1,
-			provisionPort:  2,
-			expectedErrMsg: "baremetal and provisioning subnets cannot both use onboard NICs",
+			name:               "bonding disabled, baremetal port 1 and provisioning port 2 - both onboard NICs",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      1,
+			provisionPort:      2,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "baremetal and provisioning subnets cannot both use onboard NICs",
 		},
 		{
-			name:           "bonding disabled, baremetal port 2 and provisioning port 1 - both onboard NICs",
-			bonding:        false,
-			baremetalUUID:  "some-uuid",
-			baremetalPort:  2,
-			provisionPort:  1,
-			expectedErrMsg: "baremetal and provisioning subnets cannot both use onboard NICs",
+			name:               "bonding disabled, baremetal port 2 and provisioning port 1 - both onboard NICs",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      2,
+			provisionPort:      1,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "baremetal and provisioning subnets cannot both use onboard NICs",
 		},
 		{
-			name:           "bonding disabled, valid - baremetal port 3, provisioning port 1",
-			bonding:        false,
-			baremetalUUID:  "some-uuid",
-			baremetalPort:  3,
-			provisionPort:  1,
-			expectedErrMsg: "",
+			name:               "bonding disabled, valid - baremetal port 3, provisioning port 1",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      1,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "",
 		},
 		{
-			name:           "bonding disabled, valid - baremetal port 3, provisioning port 2",
-			bonding:        false,
-			baremetalUUID:  "some-uuid",
-			baremetalPort:  3,
-			provisionPort:  2,
-			expectedErrMsg: "",
+			name:               "bonding disabled, valid - baremetal port 3, provisioning port 2",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      2,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "",
 		},
 		{
-			name:           "bonding disabled, valid - baremetal port 1, provisioning port 3",
-			bonding:        false,
-			baremetalUUID:  "some-uuid",
-			baremetalPort:  1,
-			provisionPort:  3,
-			expectedErrMsg: "",
+			name:               "bonding disabled, valid - baremetal port 1, provisioning port 3",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      1,
+			provisionPort:      3,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "",
+		},
+		{
+			name:               "bonding disabled, baremetal UUID set, valid ports, but no baremetal default GW",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      1,
+			baremetalDefaultGW: "",
+			expectedErrMsg:     "--fsas-network-baremetal-default-gw",
 		},
 		// Bonding enabled
 		{
 			name:           "bonding enabled, provisioning port 1 - reserved for bonding",
 			bonding:        true,
-			baremetalUUID:  "some-uuid",
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
 			baremetalPort:  -1,
 			provisionPort:  1,
 			expectedErrMsg: "provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled",
@@ -2517,7 +2533,7 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 		{
 			name:           "bonding enabled, provisioning port 2 - reserved for bonding",
 			bonding:        true,
-			baremetalUUID:  "some-uuid",
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
 			baremetalPort:  -1,
 			provisionPort:  2,
 			expectedErrMsg: "provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled",
@@ -2525,7 +2541,7 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 		{
 			name:           "bonding enabled, provisioning port 3 - valid",
 			bonding:        true,
-			baremetalUUID:  "some-uuid",
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
 			baremetalPort:  -1,
 			provisionPort:  3,
 			expectedErrMsg: "",
@@ -2541,7 +2557,7 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 		{
 			name:           "bonding enabled, baremetal port not set - ignored, provisioning port 3 valid",
 			bonding:        true,
-			baremetalUUID:  "some-uuid",
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
 			baremetalPort:  -1,
 			provisionPort:  3,
 			expectedErrMsg: "",
@@ -2551,11 +2567,12 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			driver := &Driver{
-				BaseDriver:             &drivers.BaseDriver{},
-				EnableBaremetalBonding: tc.bonding,
-				NetworkBaremetalUUID:   tc.baremetalUUID,
-				NetworkBaremetalPort:   tc.baremetalPort,
-				NetworkProvisionPort:   tc.provisionPort,
+				BaseDriver:                &drivers.BaseDriver{},
+				EnableBaremetalBonding:    tc.bonding,
+				NetworkBaremetalUUID:      tc.baremetalUUID,
+				NetworkBaremetalPort:      tc.baremetalPort,
+				NetworkProvisionPort:      tc.provisionPort,
+				NetworkBaremetalDefaultGW: tc.baremetalDefaultGW,
 			}
 			err := driver.checkOnboardNicsConfig()
 			if tc.expectedErrMsg == "" {
