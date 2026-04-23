@@ -99,7 +99,7 @@ func TestSetConfigFromFlagsTrimsWhitespace(t *testing.T) {
 			"fsas-ntp-url":                      "  ntp.example.com  ",
 			"fsas-dns-ip":                       "  8.8.8.8  ",
 			"fsas-compute-conditions-json":      "  test  ",
-			"fsas-network-baremetal-port":       1,
+			"fsas-network-baremetal-port":       3,
 			"fsas-network-baremetal-uuid":       "  bm-uuid  ",
 			"fsas-network-baremetal-default-gw": "  192.168.0.254  ",
 			"fsas-network-provision-port":       1,
@@ -181,10 +181,10 @@ func TestGetStateRunning(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	driver := &Driver{
-		BaseDriver:    &drivers.BaseDriver{},
-		FabricManager: mockFM,
-		Keycloak:      mockKeycloak,
-		TenantUuid:    "cdi-test",
+		BaseDriver:            &drivers.BaseDriver{},
+		FabricManager:         mockFM,
+		Keycloak:              mockKeycloak,
+		TenantUuid:            "cdi-test",
 		SlesRegistrationCode:  "dummy",
 		SlesRegistrationEmail: "test@example.com",
 	}
@@ -285,7 +285,7 @@ func TestCheckConfigTenantSuccess(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      1,
+		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
 		NetworkBaremetalDefaultGW: "192.168.0.254",
 		NetworkProvisionPort:      1,
@@ -319,7 +319,7 @@ func TestCheckConfigEmptySshHostPubKey(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      1,
+		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
 		NetworkBaremetalDefaultGW: "192.168.0.254",
 		NetworkProvisionPort:      1,
@@ -352,7 +352,7 @@ func TestCheckConfigInvalidSshHostPubKey(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      1,
+		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
 		NetworkBaremetalDefaultGW: "192.168.0.254",
 		NetworkProvisionPort:      1,
@@ -386,7 +386,7 @@ func TestCheckConfig_SlesParamsFail(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      1,
+		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
 		NetworkBaremetalDefaultGW: "192.168.0.254",
 		NetworkProvisionPort:      1,
@@ -455,7 +455,7 @@ func TestCheckConfigTenantFailed(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      1,
+		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
 		NetworkBaremetalDefaultGW: "192.168.0.254",
 		NetworkProvisionPort:      1,
@@ -2429,4 +2429,157 @@ func Test_applyCloudInit_success_with_userdata_fail(t *testing.T) {
 	testhostname := "a20-pool1-d5h97-lmjkr"
 	err := driver.applyCloudInit(testhostname)
 	assert.EqualError(t, err, errors.New("WriteFileOnRemoteMachine failed").Error())
+}
+
+func TestCheckOnboardNicsConfig(t *testing.T) {
+	testCases := []struct {
+		name               string
+		bonding            bool
+		baremetalUUID      string
+		baremetalPort      int
+		provisionPort      int
+		baremetalDefaultGW string
+		expectedErrMsg     string
+	}{
+		// Bonding disabled
+		{
+			name:           "bonding disabled, no baremetal UUID - skips all baremetal checks",
+			bonding:        false,
+			baremetalUUID:  "",
+			baremetalPort:  -1,
+			provisionPort:  1,
+			expectedErrMsg: "",
+		},
+		{
+			name:           "bonding disabled, baremetal UUID set, baremetal port not set (-1)",
+			bonding:        false,
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:  -1,
+			provisionPort:  1,
+			expectedErrMsg: "--fsas-network-baremetal-port",
+		},
+		{
+			name:               "bonding disabled, baremetal and provisioning on the same port",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      3,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "baremetal and provisioning lanport idx must not be the same",
+		},
+		{
+			name:               "bonding disabled, baremetal port 1 and provisioning port 2 - both onboard NICs",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      1,
+			provisionPort:      2,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "baremetal and provisioning subnets cannot both use onboard NICs",
+		},
+		{
+			name:               "bonding disabled, baremetal port 2 and provisioning port 1 - both onboard NICs",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      2,
+			provisionPort:      1,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "baremetal and provisioning subnets cannot both use onboard NICs",
+		},
+		{
+			name:               "bonding disabled, valid - baremetal port 3, provisioning port 1",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      1,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "",
+		},
+		{
+			name:               "bonding disabled, valid - baremetal port 3, provisioning port 2",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      2,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "",
+		},
+		{
+			name:               "bonding disabled, valid - baremetal port 1, provisioning port 3",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      1,
+			provisionPort:      3,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "",
+		},
+		{
+			name:               "bonding disabled, baremetal UUID set, valid ports, but no baremetal default GW",
+			bonding:            false,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      1,
+			baremetalDefaultGW: "",
+			expectedErrMsg:     "--fsas-network-baremetal-default-gw",
+		},
+		// Bonding enabled
+		{
+			name:           "bonding enabled, provisioning port 1 - reserved for bonding",
+			bonding:        true,
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:  -1,
+			provisionPort:  1,
+			expectedErrMsg: "provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled",
+		},
+		{
+			name:           "bonding enabled, provisioning port 2 - reserved for bonding",
+			bonding:        true,
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:  -1,
+			provisionPort:  2,
+			expectedErrMsg: "provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled",
+		},
+		{
+			name:           "bonding enabled, provisioning port 3 - valid",
+			bonding:        true,
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:  -1,
+			provisionPort:  3,
+			expectedErrMsg: "",
+		},
+		{
+			name:           "bonding enabled, no baremetal UUID, provisioning port 3 - valid",
+			bonding:        true,
+			baremetalUUID:  "",
+			baremetalPort:  -1,
+			provisionPort:  3,
+			expectedErrMsg: "",
+		},
+		{
+			name:           "bonding enabled, baremetal port not set - ignored, provisioning port 3 valid",
+			bonding:        true,
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:  -1,
+			provisionPort:  3,
+			expectedErrMsg: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			driver := &Driver{
+				BaseDriver:                &drivers.BaseDriver{},
+				EnableBaremetalBonding:    tc.bonding,
+				NetworkBaremetalUUID:      tc.baremetalUUID,
+				NetworkBaremetalPort:      tc.baremetalPort,
+				NetworkProvisionPort:      tc.provisionPort,
+				NetworkBaremetalDefaultGW: tc.baremetalDefaultGW,
+			}
+			err := driver.checkOnboardNicsConfig()
+			if tc.expectedErrMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.expectedErrMsg)
+			}
+		})
+	}
 }
