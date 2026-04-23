@@ -205,6 +205,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.IntFlag{
 			Name:   "fsas-network-baremetal-port",
 			Usage:  "Node LAN port index for baremetal subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_BAREMETAL_PORT",
 		},
 		mcnflag.StringFlag{
@@ -220,6 +221,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.IntFlag{
 			Name:   "fsas-network-provision-port",
 			Usage:  "Node LAN port index for provisioning subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_PROVISION_PORT",
 		},
 		mcnflag.StringFlag{
@@ -540,6 +542,10 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image name", "--fsas-os-image-name")
 	}
 
+	if err := d.checkOnboardNicsConfig(); err != nil {
+		return err
+	}
+
 	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {
 		slog.Error("tenant_uuid validation unsuccessful", "err", err)
 		return err
@@ -564,6 +570,32 @@ func (d *Driver) checkConfig() error {
 			if _, err := mail.ParseAddress(d.SlesRegistrationEmail); err != nil {
 				return fmt.Errorf("Email address is not valid: %s", d.SlesRegistrationEmail)
 			}
+		}
+	}
+	return nil
+}
+
+// checkOnboardNicsConfig validates that onboard NIC ports (1 and 2) are not misconfigured.
+// When baremetal bonding is enabled, ports 1 and 2 are reserved for bonding and the provisioning
+// subnet must use a different port. When bonding is disabled, the baremetal and provisioning
+// subnets must not share the same port and must not both occupy the two onboard NIC slots.
+func (d *Driver) checkOnboardNicsConfig() error {
+	if d.EnableBaremetalBonding {
+		if d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2 {
+			return fmt.Errorf("provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled; ports 1 and 2 are reserved for bonding")
+		}
+	} else if d.NetworkBaremetalUUID != "" {
+		if d.NetworkBaremetalPort == -1 {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet LAN port", "--fsas-network-baremetal-port")
+		}
+		if d.NetworkBaremetalDefaultGW == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet Default GW", "--fsas-network-baremetal-default-gw")
+		}
+		if d.NetworkBaremetalPort == d.NetworkProvisionPort {
+			return fmt.Errorf("baremetal and provisioning lanport idx must not be the same")
+		}
+		if (d.NetworkBaremetalPort == 1 || d.NetworkBaremetalPort == 2) && (d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2) {
+			return fmt.Errorf("baremetal and provisioning subnets cannot both use onboard NICs (lanport idx 1 and 2)")
 		}
 	}
 	return nil
