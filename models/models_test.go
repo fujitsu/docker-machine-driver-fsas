@@ -204,6 +204,17 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 	assert.Equal(t, "cpu_cores", resourceCPU.ResourceSpec.Condition[0].Column)
 	assert.Equal(t, "eq", resourceCPU.ResourceSpec.Condition[0].Operator)
 	assert.Equal(t, "4", resourceCPU.ResourceSpec.Condition[0].Value)
+	assert.NotNil(t, resourceCPU.Network)
+	assert.Equal(t, 1, resourceCPU.Network.NicType)
+	assert.Equal(t, 2, len(resourceCPU.Network.Subnets))
+	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", resourceCPU.Network.Subnets[0].SubnetUUID)
+	assert.Equal(t, 1, resourceCPU.Network.Subnets[0].LanportIdx)
+	assert.Equal(t, "d8c7b6a5-4321-0987-6543-210fedcba098", resourceCPU.Network.Subnets[0].LanportUUID)
+	assert.Equal(t, "00:11:22:33:44:55", resourceCPU.Network.Subnets[0].MACAddress)
+	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", resourceCPU.Network.Subnets[1].SubnetUUID)
+	assert.Equal(t, 2, resourceCPU.Network.Subnets[1].LanportIdx)
+	assert.Equal(t, "01085c2c-15c4-4957-9ad3-7d1ee481f082", resourceCPU.Network.Subnets[1].LanportUUID)
+	assert.Equal(t, "00:11:22:33:44:66", resourceCPU.Network.Subnets[1].MACAddress)
 
 	resourceStorage1 := machine.Resources[1]
 	assert.Equal(t, "a5432109-8765-4321-0fed-cba098765432", resourceStorage1.ResourceUUID)

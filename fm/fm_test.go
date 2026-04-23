@@ -766,7 +766,7 @@ func TestGetMachineDetailsSuccess(t *testing.T) {
 
 	machineLanports, machineSsd, machineStatus, err := fmc.GetMachineDetails(tenantId, machineUUID, models.AccessTokenExample)
 	assert.NoError(t, err)
-	assert.Equal(t, models.ExpectedLanports, machineLanports)
+	assert.Equal(t, models.ExpectedLanportsWithType, machineLanports)
 	assert.Equal(t, "bbb32109-8765-4321-0fed-cba098765432", machineSsd)
 	assert.Equal(t, 1, machineStatus)
 }
@@ -886,6 +886,121 @@ func Test_getBootStorageCondition(t *testing.T) {
 			bsc, err := getBootStorageCondition(tc.deviceSpec)
 			assert.Equal(t, tc.err, err)
 			assert.Equal(t, tc.expected, bsc)
+		})
+	}
+}
+
+func Test_populateLanportNicTypes(t *testing.T) {
+	makeLanport := func(mac, subnetUUID string) models.Lanport {
+		return models.Lanport{MACAddress: mac, SubnetUUID: subnetUUID}
+	}
+	computeResource := func(macs ...string) models.Resource {
+		subnets := make([]models.Subnet, len(macs))
+		for i, m := range macs {
+			subnets[i] = models.Subnet{MACAddress: m}
+		}
+		return models.Resource{
+			ResourceType: "compute",
+			Network:      &models.Network{Subnets: subnets},
+		}
+	}
+
+	testCases := []struct {
+		name      string
+		lanports  []models.Lanport
+		resources []models.Resource
+		expected  []models.Lanport
+	}{
+		{
+			name: "3 onboard interfaces only (2 subnet UUIDs)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:03", "subnet-B"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:03", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+			},
+		},
+		{
+			name: "2 onboard interfaces only (2 subnet UUIDs)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-B"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+			},
+		},
+		{
+			name: "1 onboard interface only (1 subnet UUID)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+			},
+		},
+		{
+			name: "3 onboards + 2 composable (2 subnets for onboard, 1 separate subnet for composable)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:03", "subnet-B"),
+				makeLanport("AA:BB:CC:DD:EE:04", "subnet-C"),
+				makeLanport("AA:BB:CC:DD:EE:05", "subnet-C"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:03", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:04", SubnetUUID: "subnet-C", NicType: models.NicTypeComposable},
+				{MACAddress: "AA:BB:CC:DD:EE:05", SubnetUUID: "subnet-C", NicType: models.NicTypeComposable},
+			},
+		},
+		{
+			// subnet-A is shared between onboard and composable lanports;
+			// classification must be based on MAC address match, not subnet UUID.
+			name: "3 onboards + 2 composable (composables share subnet UUID with onboards)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:03", "subnet-B"),
+				makeLanport("AA:BB:CC:DD:EE:04", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:05", "subnet-A"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:03", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:04", SubnetUUID: "subnet-A", NicType: models.NicTypeComposable},
+				{MACAddress: "AA:BB:CC:DD:EE:05", SubnetUUID: "subnet-A", NicType: models.NicTypeComposable},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			populateLanportNicTypes(tc.lanports, tc.resources)
+			assert.Equal(t, tc.expected, tc.lanports)
 		})
 	}
 }

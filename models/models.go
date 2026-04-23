@@ -4,6 +4,13 @@ import (
 	"encoding/json"
 )
 
+// NicType constants for Lanport.NicType field.
+const (
+	NicTypeUndetermined int = 0
+	NicTypeOnboard      int = 1
+	NicTypeComposable   int = 2
+)
+
 // VMRequestPayload struct represents the payload for requesting a new VM.
 type VMRequestPayload struct {
 	MachineName string `json:"machine_name"`
@@ -188,9 +195,9 @@ type Lanport struct {
 	LanportIdx                int    `json:"lanport_idx"`
 	IPAddress                 string `json:"ip_address"`
 	NetworkClassConfiguration string `json:"nw_class_cu,omitempty"`
-	// The field below is not part of the API response, but it is used internally to distinguish onboard lanports (value 0)
-	// from add-on lanports (value 1); known also as NicType
-	LanportType     		  int    `json:"-"`
+	// NicType is not part of the API response; it is populated internally to distinguish NIC types:
+	// 0 = undetermined, 1 = onboard, 2 = composable
+	NicType int `json:"-"`
 }
 
 type MachineDetails struct {
