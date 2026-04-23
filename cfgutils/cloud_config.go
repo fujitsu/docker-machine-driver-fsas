@@ -166,11 +166,6 @@ func NewCloudConfigItemWriteFiles(path, content string, opts ...options) CloudCo
 	}
 }
 
-// getPointerToBool returns a pointer to the provided boolean value.
-func getPointerToBool(state bool) *bool {
-	return &state
-}
-
 // extendUserdata extends cloud-config user-data content in place.
 func extendUserdata(userDataFile string, cif cloudInitFile) error {
 

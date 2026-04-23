@@ -338,8 +338,9 @@ func (sc *StandardCfgManager) getRke2ConfigFileContent(machineUUID string) strin
 
 // DisableSSHLogin disables SSH login via password by extending cloud config
 func (sc *StandardCfgManager) DisableSSHLogin() error {
+	sshPasswordAuth := false
 	cif, err := NewCloudInitFile(
-		WithSSHPasswordAuth(getPointerToBool(false)),
+		WithSSHPasswordAuth(&sshPasswordAuth),
 		WithWriteFiles([]CloudConfigItemWriteFiles{NewCloudConfigItemWriteFiles(
 			"/etc/ssh/sshd_config.d/30-auth-methods.conf", "AuthenticationMethods publickey")}),
 	)
