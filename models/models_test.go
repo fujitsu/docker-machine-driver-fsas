@@ -314,7 +314,7 @@ func TestNetworkConfigOnboardComposable(t *testing.T) {
 	var decodedNetworkConfig NetworkConfig
 	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardComposableYaml), &decodedNetworkConfig)
 	assert.NoError(t, err)
-	assert.Equal(t, decodedNetworkConfig, validNetworkConfigOnboardComposable)
+	assert.Equal(t, decodedNetworkConfig, ValidNetworkConfigOnboardComposable)
 }
 
 func TestNetworkConfigOnboard(t *testing.T) {

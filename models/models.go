@@ -158,6 +158,9 @@ type Lanport struct {
 	LanportIdx                int    `json:"lanport_idx"`
 	IPAddress                 string `json:"ip_address"`
 	NetworkClassConfiguration string `json:"nw_class_cu,omitempty"`
+	// The field below is not part of the API response, but it is used internally to distinguish onboard lanports (value 0)
+	// from add-on lanports (value 1); known also as NicType
+	LanportType     		  int    `json:"-"`
 }
 
 type MachineDetails struct {
