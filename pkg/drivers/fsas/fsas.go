@@ -927,7 +927,9 @@ func (d *Driver) Remove() error {
 	return nil
 }
 
-// Restart a host using Fabric Manager reboot operation.
+// Restart requests a host restart using Fabric Manager reboot operation.
+// The method returns after Fabric Manager accepts the reboot request.
+// It does not wait until the node finishes rebooting or becomes SSH-ready.
 func (d *Driver) Restart() error {
 	slog.Debug("Attempting to restart host")
 	slog.Debug(fmt.Sprintf("BaseDriver struct: %+v", d.BaseDriver))
@@ -937,46 +939,17 @@ func (d *Driver) Restart() error {
 		return err
 	}
 
-	// error MachineUUID is empty
 	if d.MachineUUID == "" {
 		slog.Error("Machine's UUID was unexpectedly empty", "machine_name", d.MachineName)
 		return fmt.Errorf("machine uuid is empty")
 	}
 
-	rebootErrCh := make(chan error, 1)
-	go func() {
-		token := d.Keycloak.GetToken()
-		rebootErrCh <- d.FabricManager.Reboot(d.MachineUUID, d.TenantUuid, token)
-	}()
-
-	slog.Info("Waiting for status", "status", BOOTING)
-	if err := d.waitForStatus(BOOTING, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
-		rebootErr := <-rebootErrCh
-		if rebootErr != nil {
-			slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", rebootErr)
-			return rebootErr
-		}
-		slog.Error("Error occurred during waitForStatus execution", "status", BOOTING, "err", err)
-		return err
-	}
-
-	slog.Info("Waiting for status", "status", ACTIVE_PON)
-	if err := d.waitForStatus(ACTIVE_PON, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
-		rebootErr := <-rebootErrCh
-		if rebootErr != nil {
-			slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", rebootErr)
-			return rebootErr
-		}
-		slog.Error("Error occurred during waitForStatus execution", "status", ACTIVE_PON, "err", err)
-		return err
-	}
-
-	if err := <-rebootErrCh; err != nil {
+	if err := d.FabricManager.Reboot(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
 		slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", err)
 		return err
 	}
 
-	slog.Info("Successfully restarted machine", "machineUUID", d.MachineUUID)
+	slog.Info("Successfully requested machine restart", "machineUUID", d.MachineUUID)
 	return nil
 }
 

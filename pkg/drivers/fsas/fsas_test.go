@@ -2120,19 +2120,16 @@ func TestRestartSuccess(t *testing.T) {
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
 	}
+
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
-	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
-		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", int(BOOTING), nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
-		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", int(ACTIVE_PON), nil).Once()	
+	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).
+		Return(nil).Once()
 
 	err := driver.Restart()
 	assert.NoError(t, err)
-
 }
 
 func TestRestartFailReboot(t *testing.T) {
@@ -2149,58 +2146,17 @@ func TestRestartFailReboot(t *testing.T) {
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
 	}
+
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
 	rebootError := fmt.Errorf("FM reboot failed")
-	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(rebootError).Once()
-
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
-	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
-	mockClock.On("Now").Return(mock_now_time)
-
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
-		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
-	mockClock.On("Since", mock_now_time).Return(WAIT_FOR_STATUS_TIMEOUT + time.Microsecond*100)
+	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).
+		Return(rebootError).Once()
 
 	err := driver.Restart()
 	assert.ErrorIs(t, err, rebootError)
-}
-
-func TestRestartFailWaitForStatus(t *testing.T) {
-	mockFM := fmmock.NewMockFabricManager(t)
-	mockKeycloak := keycloakMock.NewMockKeycloak(t)
-
-	driver := &Driver{
-		BaseDriver: &drivers.BaseDriver{
-			IPAddress: "10.1.2.3",
-			SSHUser:   "user-1",
-		},
-		SSHPassword:   "password1",
-		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
-		FabricManager: mockFM,
-		Keycloak:      mockKeycloak,
-	}
-	mockKeycloak.On("IsInit").Return(true)
-	mockFM.On("IsInit").Return(true)
-	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
-
-	mockFM.On("Reboot", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).
-		Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
-
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
-	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
-	mockClock.On("Now").Return(mock_now_time)
-	mockClock.On("Since", mock_now_time).Return(WAIT_FOR_STATUS_TIMEOUT + time.Microsecond*100)
-
-	err := driver.Restart()
-
-	assert.Error(t, err)
-	assert.EqualError(t, err, "error: required status was not achieved within the specified time")
 }
 
 func TestRestartFailEmptyMachineUUID(t *testing.T) {
