@@ -682,7 +682,8 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.assignIpAddresses(); err != nil {
+	lanports, err := d.assignIpAddresses()
+	if err != nil {
 		return err
 	}
 
@@ -721,7 +722,7 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
+	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
 		slog.Error("Error while applying cloud init", "err", err)
 		return err
 	}
@@ -740,9 +741,10 @@ func (d *Driver) innerCreate() error {
 var osReadFile = os.ReadFile
 
 // applyCloudInit Save user-data and meta-data files on remote machine
-func (d *Driver) applyCloudInit(sshHostName string) error {
+func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
+	networkConfigPath := filepath.Join(cloudInitDirPath, "network-config")
 
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
@@ -758,6 +760,25 @@ func (d *Driver) applyCloudInit(sshHostName string) error {
 
 	if err := d.SshManager.WriteFileOnRemoteMachine(metadataPath, metadataContent, 0700); err != nil {
 		return err
+	}
+
+	if d.EnableBaremetalBonding {
+		subnets := map[string]string{
+			"baremetal":    d.NetworkBaremetalUUID,
+			"provisioning": d.NetworkProvisionUUID,
+		}
+		networkConfigContent, err := d.CfgManager.PrepareNetworkConfig(lanports, subnets)
+		if err != nil {
+			slog.Error("Failed to prepare network config", "err", err)
+			return err
+		}
+		if err := d.SshManager.WriteFileOnRemoteMachine(networkConfigPath, networkConfigContent, 0700); err != nil {
+			slog.Error("Failed to write network config to remote machine", "err", err)
+			return err
+		}
+		slog.Info("Successfully wrote network config to remote machine", "path", networkConfigPath)
+	} else {
+		slog.Info("Skipping network-config generation: baremetal bonding is disabled")
 	}
 
 	if err := d.SshManager.RebootCloudInit(); err != nil {
@@ -1072,11 +1093,11 @@ func (d *Driver) setTokenToEmptySTring() {
 
 }
 
-func (d *Driver) assignIpAddresses() error {
+func (d *Driver) assignIpAddresses() ([]models.Lanport, error) {
 	slog.Debug("Trying to assign IP Address")
 	lanports, _, _, err := d.FabricManager.GetMachineDetails(d.TenantUuid, d.MachineUUID, d.Keycloak.GetToken())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for idx, lanport := range lanports {
@@ -1093,10 +1114,10 @@ func (d *Driver) assignIpAddresses() error {
 
 	// d.IPAddress is mandatory in the machine creation process
 	if d.IPAddress == "" {
-		return fmt.Errorf("IPAddress must not be empty")
+		return nil, fmt.Errorf("IPAddress must not be empty")
 	}
 
-	return nil
+	return lanports, nil
 }
 
 func logContentOfCloudConfigFile(cloudConfigFilePath string) {
