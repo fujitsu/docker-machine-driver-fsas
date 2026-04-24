@@ -2659,12 +2659,12 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 			expectedErrMsg: "",
 		},
 		{
-			name:           "bonding enabled, no baremetal UUID, provisioning port 3 - valid",
+			name:           "bonding enabled, no baremetal UUID - missing required UUID",
 			bonding:        true,
 			baremetalUUID:  "",
 			baremetalPort:  -1,
 			provisionPort:  3,
-			expectedErrMsg: "",
+			expectedErrMsg: "Baremetal subnet UUID must be specified",
 		},
 		{
 			name:           "bonding enabled, baremetal port not set - ignored, provisioning port 3 valid",

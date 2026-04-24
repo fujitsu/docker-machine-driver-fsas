@@ -581,6 +581,9 @@ func (d *Driver) checkConfig() error {
 // subnets must not share the same port and must not both occupy the two onboard NIC slots.
 func (d *Driver) checkOnboardNicsConfig() error {
 	if d.EnableBaremetalBonding {
+		if d.NetworkBaremetalUUID == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
+		}
 		if d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2 {
 			return fmt.Errorf("provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled; ports 1 and 2 are reserved for bonding")
 		}
