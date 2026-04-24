@@ -264,7 +264,7 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 			ResourceNum:  1,
 			ResourceSpec: &models.ResourceSpecification{Condition: computeConditions},
 			Network: &models.Network{
-				NicType: 1,
+				NicType: models.NicTypeOnboard,
 				Subnets: subnets,
 			},
 		},
@@ -347,6 +347,7 @@ func (fmc *FabricManagerClient) GetMachineDetails(tenantId, machineUUID, bearerT
 	}
 
 	lanports = responseData.Data.Machines[0].Lanports
+	populateLanportNicTypes(lanports, responseData.Data.Machines[0].Resources)
 	bootSsd, err := fmc.getSsdId(responseData.Data.Machines[0].Resources)
 	if err != nil {
 		return lanports, bootSsd, status, err
@@ -360,6 +361,32 @@ func (fmc *FabricManagerClient) GetMachineDetails(tenantId, machineUUID, bearerT
 		"mach_status", status)
 
 	return lanports, bootSsd, status, nil
+}
+
+// populateLanportNicTypes fills the NicType field of each lanport based on the resources from a
+// GET /machines/{id} response. MAC addresses found in subnets of the "compute" resource are assigned
+// NicTypeOnboard. All other lanports are assigned NicTypeComposable.
+func populateLanportNicTypes(lanports []models.Lanport, resources []models.Resource) {
+	// Collect MAC addresses from the single compute resource
+	computeMACs := make(map[string]bool)
+	for _, r := range resources {
+		if r.ResourceType == "compute" && r.Network != nil {
+			for _, subnet := range r.Network.Subnets {
+				if subnet.MACAddress != "" {
+					computeMACs[subnet.MACAddress] = true
+				}
+			}
+			break
+		}
+	}
+
+	for i := range lanports {
+		if computeMACs[lanports[i].MACAddress] {
+			lanports[i].NicType = models.NicTypeOnboard
+		} else {
+			lanports[i].NicType = models.NicTypeComposable
+		}
+	}
 }
 
 // getSsdId Returns ssd id as UUID string and error

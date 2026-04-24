@@ -16,12 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	LanportTypeUndetermined int = 0
-	LanportTypeOnboard      int = 1
-	LanportTypeComposable   int = 2
-)
-
 var (
 	isInit = false
 )
@@ -95,7 +89,7 @@ func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport, su
 			DHCP4: true,
 		}
 		// Only onboard interfaces with lanport indices 1 and 2 are to be bonded together
-		if (lanport.LanportIdx == 1 || lanport.LanportIdx == 2) && lanport.LanportType == LanportTypeOnboard {
+		if (lanport.LanportIdx == 1 || lanport.LanportIdx == 2) && lanport.NicType == models.NicTypeOnboard {
 			bondInterfaces = append(bondInterfaces, ifaceName)
 		}
 	}
