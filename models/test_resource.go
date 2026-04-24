@@ -1054,7 +1054,7 @@ var ExpectedLanportsWithType = []Lanport{
 		MACAddress:  "00:11:22:33:44:55",
 		LanportIdx:  1,
 		IPAddress:   "192.168.2.100",
-		NicType:     1, // Onboard
+		NicType:     NicTypeOnboard,
 	},
 	{
 		LanportUUID: "01085c2c-15c4-4957-9ad3-7d1ee481f082",
@@ -1062,7 +1062,7 @@ var ExpectedLanportsWithType = []Lanport{
 		MACAddress:  "00:11:22:33:44:66",
 		LanportIdx:  2,
 		IPAddress:   "192.168.2.150",
-		NicType:     1, // Onboard
+		NicType:     NicTypeOnboard,
 	},
 	{
 		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
@@ -1070,7 +1070,7 @@ var ExpectedLanportsWithType = []Lanport{
 		MACAddress:  "00:11:22:33:44:77",
 		LanportIdx:  3,
 		IPAddress:   "10.0.0.100",
-		NicType:     2, // Composable
+		NicType:     NicTypeComposable,
 	},
 	{
 		LanportUUID: "a7d09755-d5c9-49ae-8f8c-7f53a3ae4f69",
@@ -1078,7 +1078,7 @@ var ExpectedLanportsWithType = []Lanport{
 		MACAddress:  "11:11:11:11:11:11",
 		LanportIdx:  4,
 		IPAddress:   "10.0.0.200",
-		NicType:     2, // Composable
+		NicType:     NicTypeComposable,
 	},
 	{
 		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
@@ -1086,6 +1086,6 @@ var ExpectedLanportsWithType = []Lanport{
 		MACAddress:  "22:22:22:22:22:22",
 		LanportIdx:  0,
 		IPAddress:   "",
-		NicType:     2, // Composable
+		NicType:     NicTypeComposable,
 	},
 }

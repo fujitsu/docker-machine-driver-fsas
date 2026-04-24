@@ -264,7 +264,7 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 			ResourceNum:  1,
 			ResourceSpec: &models.ResourceSpecification{Condition: computeConditions},
 			Network: &models.Network{
-				NicType: 1,
+				NicType: models.NicTypeOnboard,
 				Subnets: subnets,
 			},
 		},
@@ -365,7 +365,7 @@ func (fmc *FabricManagerClient) GetMachineDetails(tenantId, machineUUID, bearerT
 
 // populateLanportNicTypes fills the NicType field of each lanport based on the resources from a
 // GET /machines/{id} response. MAC addresses found in subnets of the "compute" resource are assigned
-// NicType=1 (onboard). All other lanports are assigned NicType=2 (composable).
+// NicTypeOnboard. All other lanports are assigned NicTypeComposable.
 func populateLanportNicTypes(lanports []models.Lanport, resources []models.Resource) {
 	// Collect MAC addresses from the single compute resource
 	computeMACs := make(map[string]bool)
