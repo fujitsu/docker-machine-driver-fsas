@@ -21,5 +21,5 @@ packages:
     interfaces:
       CfgManager:
   github.com/fujitsu/docker-machine-driver-fsas/timeutils:
-      interfaces:
-        Clock:
+    interfaces:
+      Clock:

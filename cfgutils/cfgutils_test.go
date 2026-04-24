@@ -996,3 +996,159 @@ func TestInjectOSRegistration(t *testing.T) {
 		})
 	}
 }
+
+func TestPrepareNetworkConfigSuccess(t *testing.T) {
+	manager := NewStandardCfgManager("[]", "")
+
+	networkConfigString, err := manager.PrepareNetworkConfig(models.ExpectedLanportsWithType, models.ExpectedSubnets)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, networkConfigString)
+
+	var config models.NetworkConfig
+	err = yaml.Unmarshal([]byte(networkConfigString), &config)
+	assert.NoError(t, err)
+
+	// Verify ethernets: 2 baremetal, 2 provisioning, 1 custom
+	assert.Len(t, config.Network.Ethernets, 5)
+	assert.Contains(t, config.Network.Ethernets, "bare0")
+	assert.Contains(t, config.Network.Ethernets, "bare1")
+	assert.Contains(t, config.Network.Ethernets, "prov2")
+	assert.Contains(t, config.Network.Ethernets, "prov3")
+	assert.Contains(t, config.Network.Ethernets, "custom4")
+
+	// Verify bond created from onboard interfaces (idx 1 and 2)
+	assert.Len(t, config.Network.Bonds, 1)
+	bond := config.Network.Bonds["bond0"]
+	assert.ElementsMatch(t, []string{"bare0", "bare1"}, bond.Interfaces)
+	assert.True(t, bond.DHCP4)
+	assert.Equal(t, models.BondModeActiveBackup, bond.Parameters.Mode)
+	assert.Equal(t, models.FailoverMacPolicyActive, bond.Parameters.FailoverMacPolicy)
+}
+
+func TestPrepareNetworkConfigEmptyLanports(t *testing.T) {
+	manager := NewStandardCfgManager("[]", "")
+
+	networkConfigString, err := manager.PrepareNetworkConfig([]models.Lanport{}, models.ExpectedSubnets)
+	assert.Error(t, err)
+	assert.Empty(t, networkConfigString)
+	assert.Contains(t, err.Error(), "no lanports available")
+}
+
+func TestPrepareNetworkConfigAllComposableNoBond(t *testing.T) {
+	manager := NewStandardCfgManager("[]", "")
+
+	lanports := []models.Lanport{
+		{
+			LanportUUID: "aaa",
+			SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+			MACAddress:  "AA:BB:CC:DD:EE:01",
+			LanportIdx:  1,
+			LanportType: LanportTypeComposable,
+		},
+		{
+			LanportUUID: "bbb",
+			SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+			MACAddress:  "AA:BB:CC:DD:EE:02",
+			LanportIdx:  2,
+			LanportType: LanportTypeComposable,
+		},
+	}
+
+	networkConfigString, err := manager.PrepareNetworkConfig(lanports, models.ExpectedSubnets)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, networkConfigString)
+
+	var config models.NetworkConfig
+	err = yaml.Unmarshal([]byte(networkConfigString), &config)
+	assert.NoError(t, err)
+	assert.Empty(t, config.Network.Bonds, "No bond should be created for composable-only lanports")
+	assert.Len(t, config.Network.Ethernets, 2)
+}
+
+func TestPrepareNetworkConfigSingleOnboardNoBond(t *testing.T) {
+	manager := NewStandardCfgManager("[]", "")
+
+	lanports := []models.Lanport{
+		{
+			LanportUUID: "aaa",
+			SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+			MACAddress:  "AA:BB:CC:DD:EE:01",
+			LanportIdx:  1,
+			LanportType: LanportTypeOnboard,
+		},
+		{
+			LanportUUID: "bbb",
+			SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+			MACAddress:  "AA:BB:CC:DD:EE:02",
+			LanportIdx:  3,
+			LanportType: LanportTypeComposable,
+		},
+	}
+
+	networkConfigString, err := manager.PrepareNetworkConfig(lanports, models.ExpectedSubnets)
+	assert.NoError(t, err)
+
+	var config models.NetworkConfig
+	err = yaml.Unmarshal([]byte(networkConfigString), &config)
+	assert.NoError(t, err)
+	assert.Empty(t, config.Network.Bonds, "Bond requires at least 2 onboard interfaces")
+	assert.Len(t, config.Network.Ethernets, 2)
+}
+
+func TestPrepareNetworkConfigCustomSubnetNaming(t *testing.T) {
+	manager := NewStandardCfgManager("[]", "")
+
+	unknownSubnetUUID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	lanports := []models.Lanport{
+		{
+			LanportUUID: "aaa",
+			SubnetUUID:  unknownSubnetUUID,
+			MACAddress:  "AA:BB:CC:DD:EE:01",
+			LanportIdx:  5,
+			LanportType: LanportTypeUndetermined,
+		},
+	}
+
+	networkConfigString, err := manager.PrepareNetworkConfig(lanports, models.ExpectedSubnets)
+	assert.NoError(t, err)
+
+	var config models.NetworkConfig
+	err = yaml.Unmarshal([]byte(networkConfigString), &config)
+	assert.NoError(t, err)
+	_, hasCustom := config.Network.Ethernets["custom0"]
+	assert.True(t, hasCustom, "Unknown subnet should produce 'custom' prefix")
+}
+
+func TestPrepareNetworkConfigMissingSubnetKeys(t *testing.T) {
+	testCases := []struct {
+		name             string
+		subnets          map[string]string
+		expectedErrorStr string
+	}{
+		{name: "missing baremetal key",
+			subnets:          map[string]string{"provisioning": "uuid1"},
+			expectedErrorStr: "baremetal",
+		},
+		{name: "missing provisioning key",
+			subnets:          map[string]string{"baremetal": "uuid1"},
+			expectedErrorStr: "provisioning",
+		},
+		{name: "empty subnets map",
+			subnets:          map[string]string{},
+			expectedErrorStr: "provisioning",
+		},
+	}
+
+	manager := NewStandardCfgManager("[]", "")
+	lanports := []models.Lanport{
+		{LanportUUID: "aaa", SubnetUUID: "some-uuid", MACAddress: "AA:BB:CC:DD:EE:01", LanportIdx: 1},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := manager.PrepareNetworkConfig(lanports, tc.subnets)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedErrorStr)
+		})
+	}
+}
