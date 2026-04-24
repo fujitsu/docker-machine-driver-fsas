@@ -1059,14 +1059,14 @@ func TestPrepareNetworkConfigAllComposableNoBond(t *testing.T) {
 			SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
 			MACAddress:  "AA:BB:CC:DD:EE:01",
 			LanportIdx:  1,
-			LanportType: LanportTypeComposable,
+			NicType:     models.NicTypeComposable,
 		},
 		{
 			LanportUUID: "bbb",
 			SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
 			MACAddress:  "AA:BB:CC:DD:EE:02",
 			LanportIdx:  2,
-			LanportType: LanportTypeComposable,
+			NicType:     models.NicTypeComposable,
 		},
 	}
 
@@ -1090,14 +1090,14 @@ func TestPrepareNetworkConfigSingleOnboardNoBond(t *testing.T) {
 			SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
 			MACAddress:  "AA:BB:CC:DD:EE:01",
 			LanportIdx:  1,
-			LanportType: LanportTypeOnboard,
+			NicType:     models.NicTypeOnboard,
 		},
 		{
 			LanportUUID: "bbb",
 			SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
 			MACAddress:  "AA:BB:CC:DD:EE:02",
 			LanportIdx:  3,
-			LanportType: LanportTypeComposable,
+			NicType:     models.NicTypeComposable,
 		},
 	}
 
@@ -1121,7 +1121,7 @@ func TestPrepareNetworkConfigCustomSubnetNaming(t *testing.T) {
 			SubnetUUID:  unknownSubnetUUID,
 			MACAddress:  "AA:BB:CC:DD:EE:01",
 			LanportIdx:  5,
-			LanportType: LanportTypeUndetermined,
+			NicType:     models.NicTypeUndetermined,
 		},
 	}
 

@@ -4,6 +4,15 @@ import (
 	"encoding/json"
 )
 
+// NicType represents the type of a NIC: undetermined, onboard, or composable.
+type NicType int
+
+const (
+	NicTypeUndetermined NicType = iota // 0 — not determined
+	NicTypeOnboard                     // 1 — onboard NIC
+	NicTypeComposable                  // 2 — composable NIC
+)
+
 // VMRequestPayload struct represents the payload for requesting a new VM.
 type VMRequestPayload struct {
 	MachineName string `json:"machine_name"`
@@ -35,7 +44,7 @@ type Subnet struct {
 }
 
 type Network struct {
-	NicType int      `json:"nic_type"`
+	NicType NicType  `json:"nic_type"`
 	Subnets []Subnet `json:"subnets"` // Expected up to 3-elements in arrays: bare-metal, provisioning, iRMC
 }
 
@@ -158,9 +167,9 @@ type Lanport struct {
 	LanportIdx                int    `json:"lanport_idx"`
 	IPAddress                 string `json:"ip_address"`
 	NetworkClassConfiguration string `json:"nw_class_cu,omitempty"`
-	// The field below is not part of the API response, but it is used internally to distinguish onboard lanports (value 0)
-	// from add-on lanports (value 1); known also as NicType
-	LanportType     		  int    `json:"-"`
+	// NicType is not part of the API response; it is populated internally to distinguish NIC types:
+	// NicTypeUndetermined, NicTypeOnboard, NicTypeComposable
+	NicType NicType `json:"-"`
 }
 
 type MachineDetails struct {
