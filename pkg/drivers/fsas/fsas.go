@@ -584,6 +584,9 @@ func (d *Driver) checkOnboardNicsConfig() error {
 		if d.NetworkBaremetalUUID == "" {
 			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
 		}
+		if d.NetworkBaremetalDefaultGW == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet Default GW", "--fsas-network-baremetal-default-gw")
+		}
 		if d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2 {
 			return fmt.Errorf("provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled; ports 1 and 2 are reserved for bonding")
 		}
