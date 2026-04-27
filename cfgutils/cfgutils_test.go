@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
@@ -199,7 +200,7 @@ func TestExtendUserdata(t *testing.T) {
 	testCases := []struct {
 		name              string
 		readFileContent   []byte
-		input             []CloudConfigItem
+		input             cloudInitFile
 		expectedStr       string
 		nrExpectedItemsWF int
 		nrExpectedItemsRC int
@@ -261,7 +262,7 @@ func TestExtendUserdata(t *testing.T) {
 
 		{name: "case 7: input as empty list",
 			readFileContent:   []byte(userdataSampleContentBothSections),
-			input:             []CloudConfigItem{},
+			input:             cloudInitFile{},
 			expectedStr:       userdataSampleContentBothSections,
 			nrExpectedItemsWF: 1,
 			nrExpectedItemsRC: 1,
@@ -286,8 +287,7 @@ func TestExtendUserdata(t *testing.T) {
 				require.NoError(t, err, "Failed to write to temp file")
 			}
 
-			sc := NewStandardCfgManager("[]", tempFile.Name())
-			err = sc.extendUserdata(tc.input)
+			err = extendUserdata(tempFile.Name(), tc.input)
 
 			if tc.expectedError != nil {
 				assert.ErrorIs(t, err, tc.expectedError,
@@ -385,7 +385,6 @@ func TestExtendUserdataRunCmd(t *testing.T) {
 			}
 
 			sc := NewStandardCfgManager("[]", tempFile.Name())
-
 			err = sc.ExtendUserdataRunCmd(tc.input)
 
 			if tc.expectedError != nil {
@@ -425,38 +424,36 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 		{name: "case 1: invalid yaml file - random ascii chars",
 			readFileContent: []byte(userdataSampleInvalidYamlContentRandomAscii),
 			expectedErrorStr: []string{
-				"yaml: unmarshal errors",
-				"line 1: cannot unmarshal !!str",
+				"yaml: unmarshal errors:",
+				"cannot unmarshal !!str",
 			},
 		},
 		{name: "case 2: invalid yaml file - runcmd is not list but integer",
 			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsInteger),
 			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
+				"yaml: unmarshal errors",
+				"cannot unmarshal !!int `123` into []string",
 			},
 		},
 		{name: "case 3: invalid yaml file - runcmd is not list but string",
 			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsString),
 			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
+				"yaml: unmarshal errors",
+				"cannot unmarshal !!str `foobar` into []string",
 			},
 		},
 		{name: "case 4: invalid yaml file - runcmd is not list but bool",
 			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsBool),
 			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
+				"yaml: unmarshal errors",
+				"cannot unmarshal !!bool `true` into []string",
 			},
 		},
 		{name: "case 5: invalid yaml file - runcmd is not list but map",
 			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsMap),
 			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
-			},
-		},
-		{name: "case 6: invalid yaml file - runcmd is not list but nil",
-			readFileContent: []byte(userdataSampleInvalidYamlContentRunCmdIsNil),
-			expectedErrorStr: []string{
-				"module runcmd exists but is not a list",
+				"yaml: unmarshal errors",
+				"cannot unmarshal !!map into []string",
 			},
 		},
 	}
@@ -477,13 +474,13 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 				require.NoError(t, err, "Failed to write to temp file")
 			}
 
-			sc := NewStandardCfgManager("[]", tempFile.Name())
-			err = sc.extendUserdata(input1ItemRunCmdCast1ItemWriteFiles)
+			err = extendUserdata(tempFile.Name(), input1ItemRunCmdCast1ItemWriteFiles)
 
 			if err == nil {
 				t.Fatal("expected error but got nil")
 			} else {
 				for _, errMsg := range tc.expectedErrorStr {
+					fmt.Printf("\n===> observed error: %s <===\n ", err.Error())
 					assert.Contains(t, err.Error(), errMsg)
 				}
 			}
@@ -492,42 +489,60 @@ func TestExtendUserdataRunCmd_YamlUnmarshalingError(t *testing.T) {
 	}
 }
 
+func TestNewCloudInitFile(t *testing.T) {
+
+	testCases := []struct {
+		name                string
+		constructorArgument cloudInitFileOption
+		expectedErrorStr    string
+	}{
+		{name: "case 1: section 'runcmd' is empty",
+			constructorArgument: WithRunCmds([]string{}),
+			expectedErrorStr:    "section 'runcmd' cannot be empty",
+		},
+		{name: "case 2: section 'write_files' is empty",
+			constructorArgument: WithWriteFiles([]CloudConfigItemWriteFiles{}),
+			expectedErrorStr:    "section 'write_files' cannot be empty",
+		},
+		{name: "case 3: section 'users' is empty",
+			constructorArgument: WithUsers([]cloudConfigItemUsers{}),
+			expectedErrorStr:    "section 'users' cannot be empty",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := NewCloudInitFile(tc.constructorArgument)
+
+			if err == nil {
+				t.Fatal("expected error but got nil")
+			} else {
+				assert.Contains(t, err.Error(), tc.expectedErrorStr)
+			}
+		})
+	}
+}
+
 func TestExtendUserdataWriteFiles(t *testing.T) {
 
-	inputOneItemWriteFilesExe := []CloudConfigItem{
+	inputOneItemWriteFilesExe := []CloudConfigItemWriteFiles{
 		NewCloudConfigItemWriteFiles("/tmp/run.sh", "#!/bin/bash",
 			SetCustomPermissions(os.FileMode(0744)))}
 
-	inputOneItemWriteFilesSetPermissions := []CloudConfigItem{
+	inputOneItemWriteFilesSetPermissions := []CloudConfigItemWriteFiles{
 		NewCloudConfigItemWriteFiles("/tmp/cdi.cert", "###begin cert",
 			SetCustomPermissions(os.FileMode(0400)))}
 
 	testCases := []struct {
 		name            string
 		readFileContent []byte
-		input           []CloudConfigItem
+		input           []CloudConfigItemWriteFiles
 		expectedStr     string
 		nrExpectedItems int
 		expectedError   error
 	}{
 
-		{name: "case 1: add one item to section 'write_files'",
-			readFileContent: []byte(userdataSampleContentWriteFiles),
-			input:           inputOneItemWriteFiles,
-			expectedStr:     expectedStr2Write,
-			nrExpectedItems: 2,
-			expectedError:   nil,
-		},
-
-		{name: "case 2: add two items to section 'write_files'",
-			readFileContent: []byte(userdataSampleContentWriteFiles),
-			input:           inputTwoItemsWriteFiles,
-			expectedStr:     expectedStr3Write,
-			nrExpectedItems: 3,
-			expectedError:   nil,
-		},
-
-		{name: "case 3: section 'write_files' does not exist",
+		{name: "case 1: section 'write_files' does not exist",
 			readFileContent: []byte(userdataSampleContentNoSections),
 			input:           inputOneItemWriteFiles,
 			expectedStr:     expectedStr1Write,
@@ -535,9 +550,25 @@ func TestExtendUserdataWriteFiles(t *testing.T) {
 			expectedError:   nil,
 		},
 
+		{name: "case 2: add one item to section 'write_files'",
+			readFileContent: []byte(userdataSampleContentWriteFiles),
+			input:           inputOneItemWriteFiles,
+			expectedStr:     expectedStr2Write,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: add two items to section 'write_files'",
+			readFileContent: []byte(userdataSampleContentWriteFiles),
+			input:           inputTwoItemsWriteFiles,
+			expectedStr:     expectedStr3Write,
+			nrExpectedItems: 3,
+			expectedError:   nil,
+		},
+
 		{name: "case 4: input as empty list",
 			readFileContent: []byte(userdataSampleContentWriteFiles),
-			input:           []CloudConfigItem{},
+			input:           []CloudConfigItemWriteFiles{},
 			expectedStr:     userdataSampleContentWriteFiles,
 			nrExpectedItems: 1,
 			expectedError:   nil,
@@ -617,22 +648,21 @@ func Test_userdataFile_not_exists(t *testing.T) {
 
 		{name: "case 1: method 'extendUserdata'",
 			testedFunction: func() error {
-				sc := NewStandardCfgManager("[]", "some-non-existing-file")
-				err := sc.extendUserdata([]CloudConfigItem{})
+				err := extendUserdata("some-non-existing-file", cloudInitFile{})
 				return err
 			},
 		},
 		{name: "case 2: method 'ExtendUserdataWriteFiles'",
 			testedFunction: func() error {
 				sc := NewStandardCfgManager("[]", "some-non-existing-file")
-				err := sc.ExtendUserdataWriteFiles([]CloudConfigItem{})
+				err := sc.ExtendUserdataWriteFiles([]CloudConfigItemWriteFiles{NewCloudConfigItemWriteFiles("", "")})
 				return err
 			},
 		},
 		{name: "case 3: method 'ExtendUserdataRunCmd'",
 			testedFunction: func() error {
 				sc := NewStandardCfgManager("[]", "some-non-existing-file")
-				err := sc.ExtendUserdataRunCmd([]string{})
+				err := sc.ExtendUserdataRunCmd([]string{""})
 				return err
 			},
 		},
@@ -652,100 +682,6 @@ func Test_userdataFile_not_exists(t *testing.T) {
 
 }
 
-func TestExtendUserdataSshAuthKeys(t *testing.T) {
-	testCases := []struct {
-		name            string
-		readFileContent []byte
-		input           []string
-		expectedStr     string
-		nrExpectedItems int
-		expectedError   error
-	}{
-		{name: "case 1: add one item to section 'ssh_authorized_keys'",
-			readFileContent: []byte(userdataSampleContentSsh),
-			input:           inputOneItemSshAuthKeys,
-			expectedStr:     expectedStr2Ssh,
-			nrExpectedItems: 2,
-			expectedError:   nil,
-		},
-
-		{name: "case 2: add two items to section 'ssh_authorized_keys'",
-			readFileContent: []byte(userdataSampleContentSsh),
-			input:           inputTwoItemsSshAuthKeys,
-			expectedStr:     expectedStr3Ssh,
-			nrExpectedItems: 3,
-			expectedError:   nil,
-		},
-
-		{name: "case 3: section 'ssh_authorized_keys' does not exist",
-			readFileContent: []byte(userdataSampleContentNoSections),
-			input:           inputOneItemSshAuthKeys,
-			expectedStr:     expectedStr1Ssh,
-			nrExpectedItems: 1,
-			expectedError:   nil,
-		},
-
-		{name: "case 4: no content in userdata file",
-			readFileContent: []byte{},
-			input:           inputOneItemSshAuthKeys,
-			expectedStr:     expectedStr1Ssh,
-			nrExpectedItems: 1,
-			expectedError:   nil,
-		},
-
-		{name: "case 5: input as empty list",
-			readFileContent: []byte(userdataSampleContentSsh),
-			input:           nil,
-			expectedStr:     userdataSampleContentSsh,
-			nrExpectedItems: 1,
-			expectedError:   nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		var expected, observed map[string][]any
-		t.Run(tc.name, func(t *testing.T) {
-			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
-			require.NoError(t, err, "Failed to create temp file")
-			defer func() {
-				err := tempFile.Close()
-				require.NoError(t, err, "Failed to close temp file")
-			}()
-
-			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
-				require.NoError(t, err, "Failed to write to temp file")
-			}
-
-			sc := NewStandardCfgManager("[]", tempFile.Name())
-
-			err = sc.ExtendUserdataSshAuthKeys(tc.input)
-
-			if tc.expectedError != nil {
-				assert.ErrorIs(t, err, tc.expectedError,
-					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
-			} else {
-
-				/* convert to YAML objects;
-				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
-				   Thus compare YAML semantically and not textually.
-				*/
-				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
-					t.Fatalf("failed to unmarshal expected: %v", err)
-				}
-
-				fileContent, err := os.ReadFile(tempFile.Name())
-				require.NoError(t, err, "Failed to read from temp file")
-				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
-					t.Fatalf("failed to unmarshal observed: %v", err)
-				}
-
-				assert.Equal(t, expected, observed)
-				assert.Equal(t, tc.nrExpectedItems, len(observed["ssh_authorized_keys"]))
-			}
-
-		})
-	}
-}
 func TestImplantRKE2Config(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -991,6 +927,87 @@ func TestInjectOSRegistration(t *testing.T) {
 				}
 
 				assert.Equal(t, expected, observed)
+			}
+
+		})
+	}
+}
+
+func TestDisableSSHLogin(t *testing.T) {
+	testCases := []struct {
+		name            string
+		readFileContent []byte
+		expectedStr     string
+		expectedError   error
+	}{
+		{name: "case 1: add item to empty cloud-init file",
+			readFileContent: []byte(userdataSampleContentNoSections),
+			expectedStr:     expectedStrDisablePwdAuth,
+			expectedError:   nil,
+		},
+
+		{name: "case 2: add item when section 'runcmd' exists",
+			readFileContent: []byte(userdataSampleContent1rc),
+			expectedStr:     expectedStrDisablePwdAuth1rc,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: section 'ssh_pwauth' does exist; should overwrite existing value",
+			readFileContent: []byte(sampleDisablePwdAuthExists),
+			expectedStr:     expectedStrDisablePwdAuth,
+			expectedError:   nil,
+		},
+
+		{name: "case 4: add item when sections 'runcmd' and 'write_files' exist",
+			readFileContent: []byte(sample1rc2wf),
+			expectedStr:     expectedDisablePwdAuth1rc2wf,
+			expectedError:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		var expected, observed cloudInitFile
+		t.Run(tc.name, func(t *testing.T) {
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
+			}
+
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+			err = sc.DisableSSHLogin()
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+
+				lines := strings.Split(string(fileContent), "\n")
+				assert.Contains(t, lines[1], "ssh_pwauth: false",
+					fmt.Sprintf("Expected annotation 'ssh_pwauth: false' not found in 1-st line"))
 			}
 
 		})

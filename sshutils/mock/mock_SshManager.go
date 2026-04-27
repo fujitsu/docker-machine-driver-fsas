@@ -66,51 +66,6 @@ func (_c *MockSshManager_DeregisterOS_Call) RunAndReturn(run func() error) *Mock
 	return _c
 }
 
-// DisablePasswordSSHLogin provides a mock function with no fields
-func (_m *MockSshManager) DisablePasswordSSHLogin() error {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for DisablePasswordSSHLogin")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockSshManager_DisablePasswordSSHLogin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DisablePasswordSSHLogin'
-type MockSshManager_DisablePasswordSSHLogin_Call struct {
-	*mock.Call
-}
-
-// DisablePasswordSSHLogin is a helper method to define mock.On call
-func (_e *MockSshManager_Expecter) DisablePasswordSSHLogin() *MockSshManager_DisablePasswordSSHLogin_Call {
-	return &MockSshManager_DisablePasswordSSHLogin_Call{Call: _e.mock.On("DisablePasswordSSHLogin")}
-}
-
-func (_c *MockSshManager_DisablePasswordSSHLogin_Call) Run(run func()) *MockSshManager_DisablePasswordSSHLogin_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockSshManager_DisablePasswordSSHLogin_Call) Return(_a0 error) *MockSshManager_DisablePasswordSSHLogin_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockSshManager_DisablePasswordSSHLogin_Call) RunAndReturn(run func() error) *MockSshManager_DisablePasswordSSHLogin_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ExecuteScript provides a mock function with given fields: scriptPath, scriptContent, postRemove, runWithSudo
 func (_m *MockSshManager) ExecuteScript(scriptPath string, scriptContent string, postRemove bool, runWithSudo bool) error {
 	ret := _m.Called(scriptPath, scriptContent, postRemove, runWithSudo)

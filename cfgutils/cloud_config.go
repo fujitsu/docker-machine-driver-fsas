@@ -4,143 +4,150 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+
+	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
+	"gopkg.in/yaml.v3"
 )
 
-const defaultFilePermissions = os.FileMode(0644)
+const (
+	defaultFilePermissions = os.FileMode(0644)
+	cloudConfigHeader      = "#cloud-config"
+)
 
+/*
+cloudInitFile is a cloud-init payload.
+SSHPasswordAuth uses *bool with omitempty to preserve 3 states in YAML:
+nil (omit), true, and false.
+*/
+type cloudInitFile struct {
+	Hostname        string                      `yaml:"hostname,omitempty"`
+	SSHPasswordAuth *bool                       `yaml:"ssh_pwauth,omitempty"`
+	Users           []cloudConfigItemUsers      `yaml:"users,omitempty"`
+	RunCmds         []string                    `yaml:"runcmd,omitempty"`
+	WriteFiles      []CloudConfigItemWriteFiles `yaml:"write_files,omitempty"`
+}
+
+// cloudInitFileOption applies a single optional setting to cloudInitFile.
+type cloudInitFileOption func(*cloudInitFile) error
+
+// WithHostname sets the hostname field.
+func WithHostname(hostname string) cloudInitFileOption {
+	return func(c *cloudInitFile) error {
+		c.Hostname = hostname
+		return nil
+	}
+}
+
+// WithSSHPasswordAuth sets the ssh_pwauth field.
+func WithSSHPasswordAuth(auth *bool) cloudInitFileOption {
+	return func(c *cloudInitFile) error {
+		c.SSHPasswordAuth = auth
+		return nil
+	}
+}
+
+// WithUsers sets the users field. Returns an error when the provided slice is empty.
+func WithUsers(users []cloudConfigItemUsers) cloudInitFileOption {
+	return func(c *cloudInitFile) error {
+		if len(users) > 0 {
+			c.Users = users
+		} else {
+			return errors.New("section 'users' cannot be empty")
+		}
+		return nil
+	}
+}
+
+// WithRunCmds sets the runcmd field. Returns an error when the provided slice is empty.
+func WithRunCmds(cmds []string) cloudInitFileOption {
+	return func(c *cloudInitFile) error {
+		if len(cmds) > 0 {
+			c.RunCmds = cmds
+		} else {
+			return errors.New("section 'runcmd' cannot be empty")
+		}
+		return nil
+	}
+}
+
+// WithWriteFiles sets the write_files field. Returns an error when the provided slice is empty.
+func WithWriteFiles(files []CloudConfigItemWriteFiles) cloudInitFileOption {
+	return func(c *cloudInitFile) error {
+		if len(files) > 0 {
+			c.WriteFiles = files
+		} else {
+			return errors.New("section 'write_files' cannot be empty")
+		}
+		return nil
+	}
+}
+
+// NewCloudInitFile builds cloudInitFile from functional options.
+func NewCloudInitFile(opts ...cloudInitFileOption) (cloudInitFile, error) {
+	cif := cloudInitFile{}
+	for _, opt := range opts {
+		if err := opt(&cif); err != nil {
+			return cloudInitFile{}, err
+		}
+
+	}
+	return cif, nil
+}
+
+// writeFilesConfig stores defaults and overrides for write_files entries.
 type writeFilesConfig struct {
 	encoding    string
 	permissions fs.FileMode
 }
+
+// options configures writeFilesConfig.
 type options func(*writeFilesConfig)
 
+// SetCustomPermissions overrides the default mode used by write_files entries.
 func SetCustomPermissions(permissions fs.FileMode) options {
 	return func(c *writeFilesConfig) {
 		c.permissions = permissions
 	}
 }
 
-type CloudConfigItem interface {
-	getModuleName() string
-	getNewCloudConfigContent() ([]any, error)
-}
-
-type cloudConfigItemBase struct {
-	lines []string
-}
-
-func (b cloudConfigItemBase) getNewCloudConfigContent() ([]any, error) {
-	ccItems := make([]any, len(b.lines))
-	for i, line := range b.lines {
-		ccItems[i] = line
-	}
-	return ccItems, nil
-}
-
+// cloudConfigItemUsers defines a single user entry for cloud-init users section.
 type cloudConfigItemUsers struct {
-	users []cloudConfigUser `yaml:"users"`
+	Name              string   `yaml:"name"`
+	SSHAuthorizedKeys []string `yaml:"ssh_authorized_keys"`
 }
 
-type cloudConfigUser struct {
-	Name              string                     `yaml:"name"`
-	SSHAuthorizedKeys cloudConfigItemSshAuthKeys `yaml:"ssh_authorized_keys"`
-}
-
+// NewCloudConfigItemUsers creates a users section entry.
 func NewCloudConfigItemUsers(name string, keys []string) cloudConfigItemUsers {
-	user := cloudConfigUser{
-		Name:              name,
-		SSHAuthorizedKeys: NewCloudConfigItemSshAuthKeys(keys),
-	}
-
 	return cloudConfigItemUsers{
-		users: []cloudConfigUser{user},
+		Name:              name,
+		SSHAuthorizedKeys: keys,
 	}
 }
 
-func (c cloudConfigItemUsers) getNewCloudConfigContent() ([]any, error) {
-	ccItems := make([]any, len(c.users))
-	for i, u := range c.users {
-		ccItems[i] = u
-	}
-	return ccItems, nil
-}
-
-func (c cloudConfigItemUsers) getModuleName() string {
-	return "users"
-}
-
-/*
-	module 'ssh_authorized_keys'
-
-Structure and methods for handling items from module 'ssh_authorized_keys'
-*/
-type cloudConfigItemSshAuthKeys struct {
-	cloudConfigItemBase
-}
-
-func NewCloudConfigItemSshAuthKeys(keys []string) cloudConfigItemSshAuthKeys {
-	return cloudConfigItemSshAuthKeys{cloudConfigItemBase{lines: keys}}
-}
-
-/*
-The MarshalYAML method is needed because Go's YAML library (e.g., gopkg.in/yaml.v3)
-requires custom marshaling for structs that don't have standard YAML tags or need to serialize
-in a non-default way.
-
-Without MarshalYAML, cloudConfigItemSshAuthKeys would serialize its embedded
-cloudConfigItemBase fields (e.g., commands []string) as a nested map like
-{"commands": ["key1", "key2"]}, which is invalid for cloud-init's ssh_authorized_keys
-(expects a direct list of strings).
-
-MarshalYAML overrides this by returning c.commands directly, ensuring the struct serializes
-as ["key1", "key2"] under the ssh_authorized_keys field in cloudConfigUser.
-
-This fixes the serialization error and produces correct YAML output. If the struct
-had appropriate YAML tags on fields, it might not be needed, but here it's essential
-for flattening the output.
-*/
-func (c cloudConfigItemSshAuthKeys) MarshalYAML() (any, error) {
-	return c.lines, nil
-}
-
-func (c cloudConfigItemSshAuthKeys) getModuleName() string {
-	return "ssh_authorized_keys"
-}
-
-/*
-	module 'runcmd'
-
-Structure and methods for handling items from module 'runcmd'
-*/
+// cloudConfigItemRunCmd stores run commands for cloud-init.
 type cloudConfigItemRunCmd struct {
-	cloudConfigItemBase
+	cmds []string
 }
 
+// NewCloudConfigItemRunCmd creates a runcmd module entry.
 func NewCloudConfigItemRunCmd(cmds []string) cloudConfigItemRunCmd {
-	return cloudConfigItemRunCmd{cloudConfigItemBase{lines: cmds}}
+	return cloudConfigItemRunCmd{cmds: cmds}
 }
 
-func (c cloudConfigItemRunCmd) getModuleName() string {
-	return "runcmd"
+// CloudConfigItemWriteFiles defines one write_files entry for cloud-init.
+type CloudConfigItemWriteFiles struct {
+	Encoding    string
+	Content     string
+	Permissions string
+	Path        string
 }
 
-/*
-	module 'write_files'
-
-Structure and methods for handling items from module 'write_files'
-*/
-
-type cloudConfigItemWriteFiles struct {
-	encoding    string
-	content     string
-	permissions string
-	path        string
-}
-
-func NewCloudConfigItemWriteFiles(path, content string, opts ...options) cloudConfigItemWriteFiles {
+// NewCloudConfigItemWriteFiles creates a write_files module entry.
+func NewCloudConfigItemWriteFiles(path, content string, opts ...options) CloudConfigItemWriteFiles {
 
 	cfg := &writeFilesConfig{
 		encoding:    "gzip+b64",
@@ -151,34 +158,104 @@ func NewCloudConfigItemWriteFiles(path, content string, opts ...options) cloudCo
 		opt(cfg)
 	}
 
-	return cloudConfigItemWriteFiles{
-		encoding:    cfg.encoding,
-		content:     content,
-		permissions: fmt.Sprintf("%04o", cfg.permissions),
-		path:        path,
+	return CloudConfigItemWriteFiles{
+		Encoding:    cfg.encoding,
+		Content:     content,
+		Permissions: fmt.Sprintf("%04o", cfg.permissions),
+		Path:        path,
 	}
 }
 
-func (c cloudConfigItemWriteFiles) getNewCloudConfigContent() ([]any, error) {
-	zippedContent, err := gzipEncode([]byte(c.content))
+// extendUserdata extends cloud-config user-data content in place.
+func extendUserdata(userDataFile string, cif cloudInitFile) error {
+
+	userdata, err := os.ReadFile(userDataFile)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, fs.ErrNotExist) {
+			slog.Error("User data file does not exist", "path", userDataFile, "err", err)
+		} else {
+			slog.Error("User data cannot be read", "path", userDataFile, "err", err)
+		}
+		return err
 	}
-	b64Encoded := base64.StdEncoding.EncodeToString(zippedContent)
-	return []any{
-		map[string]string{
-			"encoding":    c.encoding,
-			"content":     b64Encoded,
-			"permissions": c.permissions,
-			"path":        c.path,
-		}}, nil
+
+	var cloudInitFile cloudInitFile
+	if err := yaml.Unmarshal(userdata, &cloudInitFile); err != nil {
+		slog.Error("Unmarshal error. Failed to parse user data as YAML", "path", userDataFile, "err", err)
+		slog.Debug("Unmarshalling error details", "yaml-content", string(userdata),
+			"new-content", fmt.Sprintf("%+v", cif))
+		return err
+	}
+
+	if err := updateCloudConfigFileStruct(&cloudInitFile, &cif); err != nil {
+		return err
+	}
+
+	data, err := yaml.Marshal(cloudInitFile)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cloud init file: %w", err)
+	}
+
+	trimmed := bytes.TrimSpace(data)
+	if !bytes.HasPrefix(trimmed, []byte(cloudConfigHeader)) {
+		trimmed = append([]byte(cloudConfigHeader+"\n"), trimmed...)
+	}
+
+	if err := os.WriteFile(userDataFile, trimmed, os.FileMode(0644)); err != nil {
+		slog.Error("Failed to write userdata file", "path", userDataFile, "err", err)
+		return err
+	}
+	return nil
 }
 
-func (c cloudConfigItemWriteFiles) getModuleName() string {
-	return "write_files"
+// updateCloudConfigFileStruct merges values from new into current.
+func updateCloudConfigFileStruct(current, new *cloudInitFile) error {
+	if new.Hostname != "" {
+		current.Hostname = new.Hostname
+	}
+	if new.SSHPasswordAuth != nil {
+		current.SSHPasswordAuth = new.SSHPasswordAuth
+	}
+	if len(new.RunCmds) > 0 {
+		current.RunCmds = append(current.RunCmds, new.RunCmds...)
+	}
+	if len(new.Users) > 0 {
+		current.Users = append(current.Users, new.Users...)
+	}
+	if len(new.WriteFiles) > 0 {
+		writeFilesPackedAndEncoded, err := getWriteFilesPackedAndEncoded(new.WriteFiles)
+		if err != nil {
+			return fmt.Errorf("failed to pack and encode write_files content: %w", err)
+		}
+		current.WriteFiles = append(current.WriteFiles, writeFilesPackedAndEncoded...)
+	}
+	return nil
 }
 
-// gzipEncode Returns input data packed/compressed with gzip
+// getWriteFilesPackedAndEncoded gzip-compresses and base64-encodes write_files content.
+func getWriteFilesPackedAndEncoded(writeFiles []CloudConfigItemWriteFiles) ([]CloudConfigItemWriteFiles, error) {
+	var zippedContent []byte
+	var err error
+	updatedSlice := make([]CloudConfigItemWriteFiles, 0)
+	for _, i := range writeFiles {
+		zippedContent, err = gzipEncode([]byte(i.Content))
+		if err != nil {
+			slog.Error("Failed to gzip content for write_files", "path", i.Path, "err", err)
+			return nil, err
+		}
+		b64Encoded := base64.StdEncoding.EncodeToString(zippedContent)
+		updatedSlice = append(updatedSlice, CloudConfigItemWriteFiles{
+			Path:        i.Path,
+			Content:     b64Encoded,
+			Encoding:    i.Encoding,
+			Permissions: i.Permissions,
+		})
+	}
+
+	return updatedSlice, nil
+}
+
+// gzipEncode compresses input data with gzip.
 func gzipEncode(data []byte) ([]byte, error) {
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)

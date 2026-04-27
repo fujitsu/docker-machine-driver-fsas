@@ -1,7 +1,6 @@
 package cfgutils
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -25,10 +23,11 @@ type CfgManager interface {
 	IsInit() bool
 	PrepareMetadata(instanceId, hostname string) string
 	ExtendUserdataRunCmd(commands []string) error
-	ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error
+	ExtendUserdataWriteFiles(wf []CloudConfigItemWriteFiles) error
 	ImplantSSHKey(sshKeyPath, sshUser string) error
 	ImplantRKE2Config(configName, machineUUID string) error
 	InjectOSRegistration(regcode, email string) error
+	DisableSSHLogin() error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -133,81 +132,19 @@ func (sc *StandardCfgManager) prepareRke2ConfigNodeLabelsForGpu() string {
 }
 
 func (sc *StandardCfgManager) ExtendUserdataRunCmd(commands []string) error {
-	cloudConfigItems := []CloudConfigItem{NewCloudConfigItemRunCmd(commands)}
-	return sc.extendUserdata(cloudConfigItems)
-}
-
-func (sc *StandardCfgManager) ExtendUserdataSshAuthKeys(commands []string) error {
-	cloudConfigItems := []CloudConfigItem{NewCloudConfigItemSshAuthKeys(commands)}
-	return sc.extendUserdata(cloudConfigItems)
-}
-
-func (sc *StandardCfgManager) ExtendUserdataWriteFiles(fileObjects []CloudConfigItem) error {
-	return sc.extendUserdata(fileObjects)
-}
-
-// extendUserdata Extends cloud config userdata file
-func (sc *StandardCfgManager) extendUserdata(cci []CloudConfigItem) error {
-
-	userdata, err := os.ReadFile(sc.userDataFile)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			slog.Error("User data file does not exist", "path", sc.userDataFile, "err", err)
-		} else {
-			slog.Error("User data cannot be read", "path", sc.userDataFile, "err", err)
-		}
-		return err
-	}
-
-	if len(cci) == 0 {
-		slog.Warn("No items were passed for extending user data")
-		return nil
-	}
-
-	cloudConfig := make(map[string]any)
-	if err := yaml.Unmarshal(userdata, &cloudConfig); err != nil {
-		slog.Error("Failed to parse user data as YAML", "path", sc.userDataFile, "err", err)
-		return err
-	}
-
-	for _, ccItem := range cci {
-		moduleName := ccItem.getModuleName()
-
-		newContent, err := ccItem.getNewCloudConfigContent()
-		if err != nil {
-			return fmt.Errorf("error while appending userdata file; module= %s: %w", moduleName, err)
-		}
-
-		existing, ok := cloudConfig[moduleName]
-		if !ok {
-			cloudConfig[moduleName] = newContent
-			continue
-		}
-
-		slice, ok := existing.([]any)
-		if !ok {
-			return fmt.Errorf("module %s exists but is not a list", moduleName)
-		}
-
-		cloudConfig[moduleName] = append(slice, newContent...)
-	}
-
-	yamlBytes, err := yaml.Marshal(cloudConfig)
+	cif, err := NewCloudInitFile(WithRunCmds(commands))
 	if err != nil {
 		return err
 	}
+	return extendUserdata(sc.userDataFile, cif)
+}
 
-	trimmed := bytes.TrimSpace(yamlBytes)
-
-	if !bytes.HasPrefix(trimmed, []byte("#cloud-config")) {
-		trimmed = append([]byte("#cloud-config\n"), trimmed...)
-	}
-
-	if err := os.WriteFile(sc.userDataFile, trimmed, os.FileMode(0644)); err != nil {
-		slog.Error("Failed to write userdata file", "path", sc.userDataFile, "err", err)
+func (sc *StandardCfgManager) ExtendUserdataWriteFiles(wf []CloudConfigItemWriteFiles) error {
+	cif, err := NewCloudInitFile(WithWriteFiles(wf))
+	if err != nil {
 		return err
 	}
-	return nil
+	return extendUserdata(sc.userDataFile, cif)
 }
 
 func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
@@ -218,13 +155,17 @@ func (sc *StandardCfgManager) ImplantSSHKey(sshKeyPath, sshUser string) error {
 	}
 	sshPubKeyContentTrimmed := strings.TrimSpace(string(sshPubKeyContent))
 
-	slog.Debug("ssh public key", "keyName", fmt.Sprintf("%s.pub", filepath.Base(sshKeyPath)), "keyValue", sshPubKeyContentTrimmed)
+	slog.Debug("ssh public key",
+		"keyName", fmt.Sprintf("%s.pub", filepath.Base(sshKeyPath)),
+		"keyValue", sshPubKeyContentTrimmed)
 
-	items := []CloudConfigItem{
-		NewCloudConfigItemUsers(strings.TrimSpace(sshUser), []string{sshPubKeyContentTrimmed}),
+	cif, err := NewCloudInitFile(WithUsers([]cloudConfigItemUsers{
+		NewCloudConfigItemUsers(strings.TrimSpace(sshUser), []string{sshPubKeyContentTrimmed})}))
+	if err != nil {
+		return err
 	}
-	if err := sc.extendUserdata(items); err != nil {
 
+	if err := extendUserdata(sc.userDataFile, cif); err != nil {
 		return err
 	}
 
@@ -273,7 +214,7 @@ func (sc *StandardCfgManager) InjectOSRegistration(regCode, email string) error 
 		return err
 	}
 
-	if err := sc.ExtendUserdataWriteFiles([]CloudConfigItem{
+	if err := sc.ExtendUserdataWriteFiles([]CloudConfigItemWriteFiles{
 		NewCloudConfigItemWriteFiles(scriptPath, writeFilesRegisteringScriptContent)}); err != nil {
 		slog.Error("Failed to extend user data with SUSE registration script (write_files)", "err", err)
 		return err
@@ -354,7 +295,7 @@ done`
 // ImplantRKE2Config extends userdata cloud-config file and prepare files that configure rke2.
 func (sc *StandardCfgManager) ImplantRKE2Config(configName, machineUUID string) error {
 	rke2ConfigFileContent := sc.getRke2ConfigFileContent(machineUUID)
-	rke2ConfigScriptWriteFilesItems := []CloudConfigItem{
+	rke2ConfigScriptWriteFilesItems := []CloudConfigItemWriteFiles{
 		NewCloudConfigItemWriteFiles(fmt.Sprintf("/etc/rancher/k3s/config.yaml.d/%s", configName), rke2ConfigFileContent),
 		NewCloudConfigItemWriteFiles(fmt.Sprintf("/etc/rancher/rke2/config.yaml.d/%s", configName), rke2ConfigFileContent),
 	}
@@ -393,4 +334,22 @@ func (sc *StandardCfgManager) getRke2ConfigFileContent(machineUUID string) strin
 		configContent = providerIdEntry
 	}
 	return configContent
+}
+
+// DisableSSHLogin disables SSH login via password by extending cloud config
+func (sc *StandardCfgManager) DisableSSHLogin() error {
+	sshPasswordAuth := false
+	cif, err := NewCloudInitFile(
+		WithSSHPasswordAuth(&sshPasswordAuth),
+		WithWriteFiles([]CloudConfigItemWriteFiles{NewCloudConfigItemWriteFiles(
+			"/etc/ssh/sshd_config.d/30-auth-methods.conf", "AuthenticationMethods publickey")}),
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := extendUserdata(sc.userDataFile, cif); err != nil {
+		return err
+	}
+	return nil
 }

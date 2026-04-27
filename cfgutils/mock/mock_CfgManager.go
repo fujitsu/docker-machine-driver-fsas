@@ -20,6 +20,51 @@ func (_m *MockCfgManager) EXPECT() *MockCfgManager_Expecter {
 	return &MockCfgManager_Expecter{mock: &_m.Mock}
 }
 
+// DisableSSHLogin provides a mock function with no fields
+func (_m *MockCfgManager) DisableSSHLogin() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DisableSSHLogin")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCfgManager_DisableSSHLogin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DisableSSHLogin'
+type MockCfgManager_DisableSSHLogin_Call struct {
+	*mock.Call
+}
+
+// DisableSSHLogin is a helper method to define mock.On call
+func (_e *MockCfgManager_Expecter) DisableSSHLogin() *MockCfgManager_DisableSSHLogin_Call {
+	return &MockCfgManager_DisableSSHLogin_Call{Call: _e.mock.On("DisableSSHLogin")}
+}
+
+func (_c *MockCfgManager_DisableSSHLogin_Call) Run(run func()) *MockCfgManager_DisableSSHLogin_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCfgManager_DisableSSHLogin_Call) Return(_a0 error) *MockCfgManager_DisableSSHLogin_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCfgManager_DisableSSHLogin_Call) RunAndReturn(run func() error) *MockCfgManager_DisableSSHLogin_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ExtendUserdataRunCmd provides a mock function with given fields: commands
 func (_m *MockCfgManager) ExtendUserdataRunCmd(commands []string) error {
 	ret := _m.Called(commands)
@@ -66,17 +111,17 @@ func (_c *MockCfgManager_ExtendUserdataRunCmd_Call) RunAndReturn(run func([]stri
 	return _c
 }
 
-// ExtendUserdataWriteFiles provides a mock function with given fields: fileObjects
-func (_m *MockCfgManager) ExtendUserdataWriteFiles(fileObjects []cfgutils.CloudConfigItem) error {
-	ret := _m.Called(fileObjects)
+// ExtendUserdataWriteFiles provides a mock function with given fields: wf
+func (_m *MockCfgManager) ExtendUserdataWriteFiles(wf []cfgutils.CloudConfigItemWriteFiles) error {
+	ret := _m.Called(wf)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExtendUserdataWriteFiles")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]cfgutils.CloudConfigItem) error); ok {
-		r0 = rf(fileObjects)
+	if rf, ok := ret.Get(0).(func([]cfgutils.CloudConfigItemWriteFiles) error); ok {
+		r0 = rf(wf)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -90,14 +135,14 @@ type MockCfgManager_ExtendUserdataWriteFiles_Call struct {
 }
 
 // ExtendUserdataWriteFiles is a helper method to define mock.On call
-//   - fileObjects []cfgutils.CloudConfigItem
-func (_e *MockCfgManager_Expecter) ExtendUserdataWriteFiles(fileObjects interface{}) *MockCfgManager_ExtendUserdataWriteFiles_Call {
-	return &MockCfgManager_ExtendUserdataWriteFiles_Call{Call: _e.mock.On("ExtendUserdataWriteFiles", fileObjects)}
+//   - wf []cfgutils.CloudConfigItemWriteFiles
+func (_e *MockCfgManager_Expecter) ExtendUserdataWriteFiles(wf interface{}) *MockCfgManager_ExtendUserdataWriteFiles_Call {
+	return &MockCfgManager_ExtendUserdataWriteFiles_Call{Call: _e.mock.On("ExtendUserdataWriteFiles", wf)}
 }
 
-func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) Run(run func(fileObjects []cfgutils.CloudConfigItem)) *MockCfgManager_ExtendUserdataWriteFiles_Call {
+func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) Run(run func(wf []cfgutils.CloudConfigItemWriteFiles)) *MockCfgManager_ExtendUserdataWriteFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]cfgutils.CloudConfigItem))
+		run(args[0].([]cfgutils.CloudConfigItemWriteFiles))
 	})
 	return _c
 }
@@ -107,7 +152,7 @@ func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) Return(_a0 error) *MockC
 	return _c
 }
 
-func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) RunAndReturn(run func([]cfgutils.CloudConfigItem) error) *MockCfgManager_ExtendUserdataWriteFiles_Call {
+func (_c *MockCfgManager_ExtendUserdataWriteFiles_Call) RunAndReturn(run func([]cfgutils.CloudConfigItemWriteFiles) error) *MockCfgManager_ExtendUserdataWriteFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }
