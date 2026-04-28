@@ -30,6 +30,7 @@ type FabricManager interface {
 	PowerOn(machineUUID, tenantId, bearerToken string) error
 	PowerOff(machineUUID, tenantId, bearerToken string) error
 	GracefulShutdown(machineUUID, tenantId, bearerToken string) error
+	Reboot(machineUUID, tenantId, bearerToken string) error
 	ImageInstall(tenantId string, ssdId string, imageFilename, bearerToken string) error
 	RemoveMachine(machineUUID, tenantId, bearerToken string) error
 	CreateMachine(machineName, tenantId string, machineSpecs models.MachineSpecsArgs, bearerToken string) (string, error)
@@ -133,6 +134,24 @@ func (fmc *FabricManagerClient) GracefulShutdown(machineUUID, tenantId, bearerTo
 
 	slog.Info("Successfully requested graceful shutdown", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
 
+	return nil
+}
+
+func (fmc *FabricManagerClient) Reboot(machineUUID, tenantId, bearerToken string) error {
+
+	endpoint := fmt.Sprintf("/machines/%s/reboot", machineUUID)
+	queryParams := map[string]string{"tenant_uuid": tenantId}
+	headers := httputils.GetAuthorizationHeaderWithContentType(bearerToken)
+	payload := []byte{}
+
+	statusCode, err := fmc.cdiClient.Put(payload, endpoint, queryParams, nil, headers)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Request PUT %s failed", endpoint), "err", err)
+		return err
+	}
+
+	slog.Info("Successfully requested machine reboot", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
+	
 	return nil
 }
 
