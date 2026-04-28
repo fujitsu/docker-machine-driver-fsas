@@ -1,6 +1,7 @@
 package fsas
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	fmmock "github.com/fujitsu/docker-machine-driver-fsas/fm/mock"
 	"github.com/fujitsu/docker-machine-driver-fsas/keycloak"
 	keycloakMock "github.com/fujitsu/docker-machine-driver-fsas/keycloak/mock"
+	fsaslog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	sshMock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
@@ -1962,6 +1964,40 @@ func TestCreateFailRemoveFail(t *testing.T) {
 	assert.EqualError(t, err, "error during Create: 'ExecuteScript unsuccessful'; followed by error during Remove: 'Remove after failed inner Create failed as well'")
 }
 
+func TestCheckOnboardNicsConfig_BondingEnabled_BaremetalPortSet_LogsWarning(t *testing.T) {
+	var buf bytes.Buffer
+	restore := fsaslog.SetLogger(&buf)
+	defer restore()
+
+	driver := &Driver{
+		BaseDriver:             &drivers.BaseDriver{},
+		EnableBaremetalBonding: true,
+		NetworkBaremetalPort:   3,
+		NetworkProvisionPort:   3,
+	}
+
+	err := driver.checkOnboardNicsConfig()
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "NetworkBaremetalPort is set but will be ignored")
+}
+
+func TestCheckOnboardNicsConfig_BondingEnabled_BaremetalPortNotSet_NoWarning(t *testing.T) {
+	var buf bytes.Buffer
+	restore := fsaslog.SetLogger(&buf)
+	defer restore()
+
+	driver := &Driver{
+		BaseDriver:             &drivers.BaseDriver{},
+		EnableBaremetalBonding: true,
+		NetworkBaremetalPort:   -1,
+		NetworkProvisionPort:   3,
+	}
+
+	err := driver.checkOnboardNicsConfig()
+	assert.NoError(t, err)
+	assert.NotContains(t, buf.String(), "NetworkBaremetalPort is set but will be ignored")
+}
+
 func TestKill_success(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
@@ -2642,6 +2678,14 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 			provisionPort:      3,
 			baremetalDefaultGW: "192.168.0.1",
 			expectedErrMsg:     "",
+		},
+		{
+			name:           "bonding enabled, baremetal port set - ignored with warning, provisioning port 3 valid",
+			bonding:        true,
+			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:  3,
+			provisionPort:  3,
+			expectedErrMsg: "",
 		},
 	}
 

@@ -141,3 +141,12 @@ func Warn(msg string, args ...any) {
 func Error(msg string, args ...any) {
 	logger.Error(msg, args...)
 }
+
+// SetLogger replaces the package-level logger with one that writes to w.
+// Intended for use in tests to capture log output. Returns a restore function
+// that resets the logger to its previous state.
+func SetLogger(w io.Writer) (restore func()) {
+	prev := logger
+	logger = NewCustomLogger(w)
+	return func() { logger = prev }
+}
