@@ -22,12 +22,13 @@ import (
 )
 
 const (
-	port                                    = 22
-	cmdRebootCloudInit                      = "sudo cloud-init clean --logs --reboot"
-	cmdGetStatusOS                          = "sudo -E SUSEConnect -s"
-	cmdDeregisterOS                         = "sudo -E SUSEConnect -d"
-	remoteScriptDir                         = "/tmp/fsas-nodedriver"
-	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 5 * time.Second
+	port                                             = 22
+	cmdRebootCloudInit                               = "sudo cloud-init clean --logs --reboot"
+	cmdGetStatusOS                                   = "sudo -E SUSEConnect -s"
+	cmdDeregisterOS                                  = "sudo -E SUSEConnect -d"
+	remoteScriptDir                                  = "/tmp/fsas-nodedriver"
+	SSH_CONNECT_ATTEMPT_DELAY          time.Duration = 5 * time.Second
+	SSH_CONNECTION_REFUSED_RETRY_DELAY time.Duration = 20 * time.Second
 )
 
 var (
@@ -201,6 +202,11 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 			if currentAttempt >= maxAttempts {
 				return fmt.Errorf("failed to dial SSH server: %w", err)
+			}
+
+			if strings.Contains(err.Error(), "connection refused") {
+				slog.Debug("Connection refused, waiting before next attempt", "delay", SSH_CONNECTION_REFUSED_RETRY_DELAY)
+				time.Sleep(SSH_CONNECTION_REFUSED_RETRY_DELAY)
 			}
 
 			currentAttempt++
