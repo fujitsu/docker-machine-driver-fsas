@@ -198,7 +198,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 		if err != nil {
 			if strings.Contains(err.Error(), "connection refused") {
-				slog.Debug("Connection refused, waiting before next attempt", "delay", SSH_CONNECT_ATTEMPT_DELAY)
+				slog.Warn("Connection refused, waiting before next attempt", "delay", SSH_CONNECT_ATTEMPT_DELAY)
 				time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
 			} else {
 				slog.Warn("Failed to dial SSH server", "err", err)
