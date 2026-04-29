@@ -1,7 +1,7 @@
 module github.com/fujitsu/docker-machine-driver-fsas
 
 require (
-	github.com/rancher/machine v0.15.0-rancher137
+	github.com/rancher/machine v0.15.0-rancher142
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -23,6 +23,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-go 1.24.0
-
-toolchain go1.24.7
+go 1.25.7
