@@ -1970,10 +1970,12 @@ func TestCheckOnboardNicsConfig_BondingEnabled_BaremetalPortSet_LogsWarning(t *t
 	defer restore()
 
 	driver := &Driver{
-		BaseDriver:             &drivers.BaseDriver{},
-		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   3,
-		NetworkProvisionPort:   3,
+		BaseDriver:                &drivers.BaseDriver{},
+		EnableBaremetalBonding:    true,
+		NetworkBaremetalPort:      3,
+		NetworkBaremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+		NetworkBaremetalDefaultGW: "192.168.0.1",
+		NetworkProvisionPort:      3,
 	}
 
 	err := driver.checkOnboardNicsConfig()
@@ -1987,10 +1989,12 @@ func TestCheckOnboardNicsConfig_BondingEnabled_BaremetalPortNotSet_NoWarning(t *
 	defer restore()
 
 	driver := &Driver{
-		BaseDriver:             &drivers.BaseDriver{},
-		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   -1,
-		NetworkProvisionPort:   3,
+		BaseDriver:                &drivers.BaseDriver{},
+		EnableBaremetalBonding:    true,
+		NetworkBaremetalPort:      -1,
+		NetworkBaremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+		NetworkBaremetalDefaultGW: "192.168.0.1",
+		NetworkProvisionPort:      3,
 	}
 
 	err := driver.checkOnboardNicsConfig()
@@ -2680,12 +2684,13 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 			expectedErrMsg:     "",
 		},
 		{
-			name:           "bonding enabled, baremetal port set - ignored with warning, provisioning port 3 valid",
-			bonding:        true,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  3,
-			provisionPort:  3,
-			expectedErrMsg: "",
+			name:               "bonding enabled, baremetal port set - ignored with warning, provisioning port 3 valid",
+			bonding:            true,
+			baremetalUUID:      "7e8ba727-ea79-4951-a49d-feb866d5ca21",
+			baremetalPort:      3,
+			provisionPort:      3,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "",
 		},
 	}
 
