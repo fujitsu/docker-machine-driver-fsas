@@ -4,6 +4,15 @@ import (
 	"encoding/json"
 )
 
+// NicType represents the type of a NIC: undetermined, onboard, or composable.
+type NicType int
+
+const (
+	NicTypeUndetermined NicType = iota // 0 — not determined
+	NicTypeOnboard                     // 1 — onboard NIC
+	NicTypeComposable                  // 2 — composable NIC
+)
+
 // VMRequestPayload struct represents the payload for requesting a new VM.
 type VMRequestPayload struct {
 	MachineName string `json:"machine_name"`
@@ -35,7 +44,7 @@ type Subnet struct {
 }
 
 type Network struct {
-	NicType int      `json:"nic_type"`
+	NicType NicType  `json:"nic_type"`
 	Subnets []Subnet `json:"subnets"` // Expected up to 3-elements in arrays: bare-metal, provisioning, iRMC
 }
 
@@ -58,6 +67,44 @@ type Resource struct {
 	ResourceCollectionID int                    `json:"res_collection_id,omitempty"`  // POST response, GET response
 	ConditionUUID        string                 `json:"condition_uuid,omitempty"`     // POST response
 	ResourceSerialNumber string                 `json:"res_serial_num,omitempty"`     // POST response, GET response
+}
+
+const (
+	NetworkConfigVersion2   int    = 2
+	RendererNetworkManager  string = "NetworkManager"
+	BondModeActiveBackup    string = "active-backup"
+	FailoverMacPolicyActive string = "active"
+)
+
+type NetworkConfig struct {
+	Network NetworkSpec `yaml:"network"`
+}
+
+type NetworkSpec struct {
+	SchemaVersion int                 `yaml:"version"`
+	Renderer      string              `yaml:"renderer"`
+	Ethernets     map[string]Ethernet `yaml:"ethernets,omitempty"`
+	Bonds         map[string]Bond     `yaml:"bonds,omitempty"`
+}
+
+type Ethernet struct {
+	Match Match `yaml:"match,omitempty"`
+	DHCP4 bool  `yaml:"dhcp4,omitempty"`
+}
+
+type Match struct {
+	MACAddress string `yaml:"macaddress,omitempty"`
+}
+
+type Bond struct {
+	Interfaces []string       `yaml:"interfaces,omitempty"`
+	DHCP4      bool           `yaml:"dhcp4,omitempty"`
+	Parameters BondParameters `yaml:"parameters,omitempty"`
+}
+
+type BondParameters struct {
+	Mode              string `yaml:"mode,omitempty"`
+	FailoverMacPolicy string `yaml:"fail-over-mac-policy,omitempty"`
 }
 
 
@@ -120,6 +167,9 @@ type Lanport struct {
 	LanportIdx                int    `json:"lanport_idx"`
 	IPAddress                 string `json:"ip_address"`
 	NetworkClassConfiguration string `json:"nw_class_cu,omitempty"`
+	// NicType is not part of the API response; it is populated internally to distinguish NIC types:
+	// NicTypeUndetermined, NicTypeOnboard, NicTypeComposable
+	NicType NicType `json:"-"`
 }
 
 type MachineDetails struct {
@@ -162,6 +212,7 @@ type ImageInstallation struct {
 type MachineSpecsArgs struct {
 	ComputeConditionsJson     string
 	DevicesSpecJson           string
+	EnableBaremetalBonding    bool
 	NetworkBaremetalPort      int
 	NetworkProvisionPort      int
 	NetworkBaremetalUUID      string

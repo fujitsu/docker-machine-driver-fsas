@@ -12,6 +12,7 @@ import (
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -22,6 +23,7 @@ var (
 type CfgManager interface {
 	IsInit() bool
 	PrepareMetadata(instanceId, hostname string) string
+	PrepareNetworkConfig(lanports []models.Lanport, subnets map[string]string) (string, error)
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(wf []CloudConfigItemWriteFiles) error
 	ImplantSSHKey(sshKeyPath, sshUser string) error
@@ -53,6 +55,73 @@ func NewStandardCfgManager(devicesSpecJson, userDataFile string) *StandardCfgMan
 // IsInit Returns true if constructor succeed else false
 func (sc *StandardCfgManager) IsInit() bool {
 	return isInit
+}
+
+func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport, subnets map[string]string) (string, error) {
+	if len(lanports) == 0 {
+		slog.Error("No lanports provided for network configuration")
+		return "", fmt.Errorf("Bonding requested but no lanports available")
+	}
+
+	if _, ok := subnets["provisioning"]; !ok {
+		return "", fmt.Errorf("missing 'provisioning' key in subnets map")
+	}
+	if _, ok := subnets["baremetal"]; !ok {
+		return "", fmt.Errorf("missing 'baremetal' key in subnets map")
+	}
+
+	ethernets := make(map[string]models.Ethernet)
+	bonds := make(map[string]models.Bond)
+	bondInterfaces := []string{}
+
+	for idx, lanport := range lanports {
+		var ifaceName string
+		switch lanport.SubnetUUID {
+		case subnets["provisioning"]:
+			ifaceName = fmt.Sprintf("prov%d", idx)
+		case subnets["baremetal"]:
+			ifaceName = fmt.Sprintf("bare%d", idx)
+		default:
+			ifaceName = fmt.Sprintf("custom%d", idx)
+		}
+		ethernets[ifaceName] = models.Ethernet{
+			Match: models.Match{MACAddress: lanport.MACAddress},
+			DHCP4: true,
+		}
+		// Only onboard interfaces with lanport indices 1 and 2 are to be bonded together
+		if (lanport.LanportIdx == 1 || lanport.LanportIdx == 2) && lanport.NicType == models.NicTypeOnboard {
+			bondInterfaces = append(bondInterfaces, ifaceName)
+		}
+	}
+	// Create bond interface
+	if len(bondInterfaces) > 1 {
+		bonds["bond0"] = models.Bond{
+			Interfaces: bondInterfaces,
+			DHCP4:      true,
+			Parameters: models.BondParameters{
+				Mode:              models.BondModeActiveBackup,
+				FailoverMacPolicy: models.FailoverMacPolicyActive,
+			},
+		}
+		slog.Debug("Created bond interface")
+	}
+
+	networkConfig := models.NetworkConfig{
+		Network: models.NetworkSpec{
+			SchemaVersion: models.NetworkConfigVersion2,
+			Renderer:      models.RendererNetworkManager,
+			Ethernets:     ethernets,
+			Bonds:         bonds,
+		},
+	}
+
+	rawYaml, err := yaml.Marshal(networkConfig)
+	if err != nil {
+		slog.Error("Failed to marshal network config to YAML", "err", err)
+		return "", err
+	}
+
+	return string(rawYaml), nil
 }
 
 const metadataContent = `dsmode: local
@@ -250,7 +319,7 @@ sudo SUSEConnect --status | jq -r '.[] | "\(.identifier)\t\(.status)\t\(.arch)\t
     echo "ACTION: Registering $id"
 	for i in {1..4}; do
         echo "Attempt $i for registering $id"
-        
+
         # Try to register the module
 		cmd="SUSEConnect -p ${id}/${ver}/${arch}"
 		echo "$> $cmd"

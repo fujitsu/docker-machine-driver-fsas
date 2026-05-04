@@ -51,6 +51,7 @@ type Driver struct {
 	DnsIp                     string
 	ComputeConditionsJson     string
 	DevicesSpecJson           string
+	EnableBaremetalBonding    bool
 	NetworkBaremetalPort      int
 	NetworkBaremetalUUID      string
 	NetworkBaremetalDefaultGW string
@@ -84,6 +85,7 @@ func NewDriver() *Driver {
 		DnsIp:                     "",
 		ComputeConditionsJson:     "",
 		DevicesSpecJson:           "",
+		EnableBaremetalBonding:    false,
 		NetworkBaremetalPort:      -1,
 		NetworkBaremetalUUID:      "",
 		NetworkBaremetalDefaultGW: "",
@@ -127,6 +129,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("DnsIp: %s, ", d.DnsIp) +
 		fmt.Sprintf("ComputeConditionsJson: %s, ", d.ComputeConditionsJson) +
 		fmt.Sprintf("DevicesSpecJson: %s, ", d.DevicesSpecJson) +
+		fmt.Sprintf("EnableBaremetalBonding: %t, ", d.EnableBaremetalBonding) +
 		fmt.Sprintf("NetworkBaremetalPort: %d, ", d.NetworkBaremetalPort) +
 		fmt.Sprintf("NetworkBaremetalUUID: %s, ", d.NetworkBaremetalUUID) +
 		fmt.Sprintf("NetworkBaremetalDefaultGW: %s, ", d.NetworkBaremetalDefaultGW) +
@@ -194,9 +197,15 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  `FSAS CDI compute conditions JSON (string with CPU spec, e.g. "[{"column":"model","operator":"eq","value":"PRIMERGYRX2540M6"}]")`,
 			EnvVar: "FSAS_COMPUTE_CONDITIONS_JSON",
 		},
+		mcnflag.BoolFlag{
+			Name:   "fsas-enable-baremetal-bonding",
+			Usage:  "Enable baremetal bonding",
+			EnvVar: "FSAS_ENABLE_BAREMETAL_BONDING",
+		},
 		mcnflag.IntFlag{
 			Name:   "fsas-network-baremetal-port",
 			Usage:  "Node LAN port index for baremetal subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_BAREMETAL_PORT",
 		},
 		mcnflag.StringFlag{
@@ -212,6 +221,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.IntFlag{
 			Name:   "fsas-network-provision-port",
 			Usage:  "Node LAN port index for provisioning subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_PROVISION_PORT",
 		},
 		mcnflag.StringFlag{
@@ -361,6 +371,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 
 	d.ComputeConditionsJson = strings.TrimSpace(flags.String("fsas-compute-conditions-json"))
 	slog.Debug("Driver", "FSAS compute conditions JSON", d.ComputeConditionsJson)
+
+	d.EnableBaremetalBonding = flags.Bool("fsas-enable-baremetal-bonding")
+	slog.Debug("Driver", "FSAS enable baremetal bonding", d.EnableBaremetalBonding)
 
 	d.NetworkBaremetalPort = flags.Int("fsas-network-baremetal-port")
 	slog.Debug("Driver", "FSAS baremetal subnet LAN port index", d.NetworkBaremetalPort)
@@ -529,6 +542,10 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image name", "--fsas-os-image-name")
 	}
 
+	if err := d.checkOnboardNicsConfig(); err != nil {
+		return err
+	}
+
 	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {
 		slog.Error("tenant_uuid validation unsuccessful", "err", err)
 		return err
@@ -553,6 +570,38 @@ func (d *Driver) checkConfig() error {
 			if _, err := mail.ParseAddress(d.SlesRegistrationEmail); err != nil {
 				return fmt.Errorf("Email address is not valid: %s", d.SlesRegistrationEmail)
 			}
+		}
+	}
+	return nil
+}
+
+// checkOnboardNicsConfig validates that onboard NIC ports (1 and 2) are not misconfigured.
+// When baremetal bonding is enabled, ports 1 and 2 are reserved for bonding and the provisioning
+// subnet must use a different port. When bonding is disabled, the baremetal and provisioning
+// subnets must not share the same port and must not both occupy the two onboard NIC slots.
+func (d *Driver) checkOnboardNicsConfig() error {
+	if d.EnableBaremetalBonding {
+		if d.NetworkBaremetalUUID == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
+		}
+		if d.NetworkBaremetalDefaultGW == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet Default GW", "--fsas-network-baremetal-default-gw")
+		}
+		if d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2 {
+			return fmt.Errorf("provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled; ports 1 and 2 are reserved for bonding")
+		}
+	} else if d.NetworkBaremetalUUID != "" {
+		if d.NetworkBaremetalPort == -1 {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet LAN port", "--fsas-network-baremetal-port")
+		}
+		if d.NetworkBaremetalDefaultGW == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet Default GW", "--fsas-network-baremetal-default-gw")
+		}
+		if d.NetworkBaremetalPort == d.NetworkProvisionPort {
+			return fmt.Errorf("baremetal and provisioning lanport idx must not be the same")
+		}
+		if (d.NetworkBaremetalPort == 1 || d.NetworkBaremetalPort == 2) && (d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2) {
+			return fmt.Errorf("baremetal and provisioning subnets cannot both use onboard NICs (lanport idx 1 and 2)")
 		}
 	}
 	return nil
@@ -590,6 +639,7 @@ func (d *Driver) innerCreate() error {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson:     d.ComputeConditionsJson,
 		DevicesSpecJson:           d.DevicesSpecJson,
+		EnableBaremetalBonding:    d.EnableBaremetalBonding,
 		NetworkBaremetalPort:      d.NetworkBaremetalPort,
 		NetworkBaremetalUUID:      d.NetworkBaremetalUUID,
 		NetworkBaremetalDefaultGW: d.NetworkBaremetalDefaultGW,
@@ -638,7 +688,8 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.assignIpAddresses(); err != nil {
+	lanports, err := d.assignIpAddresses()
+	if err != nil {
 		return err
 	}
 
@@ -682,7 +733,7 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
+	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
 		slog.Error("Error while applying cloud init", "err", err)
 		return err
 	}
@@ -696,9 +747,10 @@ func (d *Driver) innerCreate() error {
 var osReadFile = os.ReadFile
 
 // applyCloudInit Save user-data and meta-data files on remote machine
-func (d *Driver) applyCloudInit(sshHostName string) error {
+func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
+	networkConfigPath := filepath.Join(cloudInitDirPath, "network-config")
 
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
@@ -714,6 +766,25 @@ func (d *Driver) applyCloudInit(sshHostName string) error {
 
 	if err := d.SshManager.WriteFileOnRemoteMachine(metadataPath, metadataContent, 0700); err != nil {
 		return err
+	}
+
+	if d.EnableBaremetalBonding {
+		subnets := map[string]string{
+			"baremetal":    d.NetworkBaremetalUUID,
+			"provisioning": d.NetworkProvisionUUID,
+		}
+		networkConfigContent, err := d.CfgManager.PrepareNetworkConfig(lanports, subnets)
+		if err != nil {
+			slog.Error("Failed to prepare network config", "err", err)
+			return err
+		}
+		if err := d.SshManager.WriteFileOnRemoteMachine(networkConfigPath, networkConfigContent, 0700); err != nil {
+			slog.Error("Failed to write network config to remote machine", "err", err)
+			return err
+		}
+		slog.Info("Successfully wrote network config to remote machine", "path", networkConfigPath)
+	} else {
+		slog.Info("Skipping network-config generation: baremetal bonding is disabled")
 	}
 
 	if err := d.SshManager.RebootCloudInit(); err != nil {
@@ -1033,11 +1104,11 @@ func (d *Driver) setTokenToEmptySTring() {
 
 }
 
-func (d *Driver) assignIpAddresses() error {
+func (d *Driver) assignIpAddresses() ([]models.Lanport, error) {
 	slog.Debug("Trying to assign IP Address")
 	lanports, _, _, err := d.FabricManager.GetMachineDetails(d.TenantUuid, d.MachineUUID, d.Keycloak.GetToken())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for idx, lanport := range lanports {
@@ -1054,10 +1125,10 @@ func (d *Driver) assignIpAddresses() error {
 
 	// d.IPAddress is mandatory in the machine creation process
 	if d.IPAddress == "" {
-		return fmt.Errorf("IPAddress must not be empty")
+		return nil, fmt.Errorf("IPAddress must not be empty")
 	}
 
-	return nil
+	return lanports, nil
 }
 
 func logContentOfCloudConfigFile(cloudConfigFilePath string) {
