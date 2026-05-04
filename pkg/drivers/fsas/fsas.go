@@ -606,6 +606,8 @@ func (d *Driver) checkOnboardNicsConfig() error {
 		if (d.NetworkBaremetalPort == 1 || d.NetworkBaremetalPort == 2) && (d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2) {
 			return fmt.Errorf("baremetal and provisioning subnets cannot both use onboard NICs (lanport idx 1 and 2)")
 		}
+	} else if d.NetworkBaremetalPort != -1 || d.NetworkBaremetalDefaultGW != "" {
+		return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
 	}
 	return nil
 }

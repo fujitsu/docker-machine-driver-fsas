@@ -2629,6 +2629,33 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 			baremetalDefaultGW: "",
 			expectedErrMsg:     "--fsas-network-baremetal-default-gw",
 		},
+		{
+			name:               "bonding disabled, no baremetal UUID, but baremetal port set",
+			bonding:            false,
+			baremetalUUID:      "",
+			baremetalPort:      3,
+			provisionPort:      1,
+			baremetalDefaultGW: "",
+			expectedErrMsg:     "--fsas-network-baremetal-uuid",
+		},
+		{
+			name:               "bonding disabled, no baremetal UUID, but baremetal default GW set",
+			bonding:            false,
+			baremetalUUID:      "",
+			baremetalPort:      -1,
+			provisionPort:      1,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "--fsas-network-baremetal-uuid",
+		},
+		{
+			name:               "bonding disabled, no baremetal UUID, but both port and default GW set",
+			bonding:            false,
+			baremetalUUID:      "",
+			baremetalPort:      3,
+			provisionPort:      1,
+			baremetalDefaultGW: "192.168.0.1",
+			expectedErrMsg:     "--fsas-network-baremetal-uuid",
+		},
 		// Bonding enabled
 		{
 			name:               "bonding enabled, provisioning port 1 - reserved for bonding",
