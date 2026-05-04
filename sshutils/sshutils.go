@@ -197,11 +197,17 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 		client, err := gossh.Dial("tcp", address, config)
 
 		if err != nil {
-			slog.Warn("Failed to dial SSH server", "err", err)
+			if strings.Contains(err.Error(), "connection refused") {
+				slog.Warn("Connection refused, waiting before next attempt", "delay", SSH_CONNECT_ATTEMPT_DELAY)
+				time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
+			} else {
+				slog.Warn("Failed to dial SSH server", "err", err)
+			}
 
 			if currentAttempt >= maxAttempts {
 				return fmt.Errorf("failed to dial SSH server: %w", err)
 			}
+
 
 			currentAttempt++
 		} else {

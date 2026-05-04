@@ -9,10 +9,12 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 	mock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
@@ -605,4 +607,63 @@ func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
+}
+
+func TestHostPublicKeyIsValid_AlreadyValid(t *testing.T) {
+	// IsPublicKeyValid is set to true by TestMain; method returns immediately without dialing.
+	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
+
+	err = manager.HostPublicKeyIsValid(1)
+	assert.NoError(t, err)
+}
+
+func TestHostPublicKeyIsValid_OtherDialError_ReturnsWrappedError(t *testing.T) {
+	IsPublicKeyValid = false
+	defer func() { IsPublicKeyValid = true }()
+
+	// An unresolvable hostname produces a quick non-"connection refused" dial error (no sleep).
+	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
+
+	err = manager.HostPublicKeyIsValid(1)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to dial SSH server")
+}
+
+func TestHostPublicKeyIsValid_ZeroMaxAttempts_NormalizedToOne(t *testing.T) {
+	IsPublicKeyValid = false
+	defer func() { IsPublicKeyValid = true }()
+
+	// maxAttempts=0 must be normalized to 1: only one attempt made, then error returned.
+	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
+
+	err = manager.HostPublicKeyIsValid(0)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to dial SSH server")
+}
+
+func TestHostPublicKeyIsValid_ConnectionRefused_ReturnsError(t *testing.T) {
+	IsPublicKeyValid = false
+	defer func() { IsPublicKeyValid = true }()
+
+	// Verify that port 22 is actually refusing connections on localhost; skip otherwise.
+	// This test exercises the "connection refused" branch which sleeps SSH_CONNECT_ATTEMPT_DELAY.
+	conn, dialErr := net.DialTimeout("tcp", "127.0.0.1:22", time.Second)
+	if dialErr == nil {
+		conn.Close()
+		t.Skip("Port 22 is open on localhost; skipping connection refused test")
+	}
+	if !strings.Contains(dialErr.Error(), "connection refused") {
+		t.Skip("localhost:22 did not return 'connection refused'; skipping test")
+	}
+
+	manager, err := NewStandardSshManager("127.0.0.1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
+
+	err = manager.HostPublicKeyIsValid(1)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to dial SSH server")
+	assert.ErrorContains(t, err, "connection refused")
 }
