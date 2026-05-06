@@ -27,7 +27,7 @@ const (
 	cmdGetStatusOS                          = "sudo -E SUSEConnect -s"
 	cmdDeregisterOS                         = "sudo -E SUSEConnect -d"
 	remoteScriptDir                         = "/tmp/fsas-nodedriver"
-	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 5 * time.Second
+	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 30 * time.Second
 )
 
 var (
@@ -191,30 +191,27 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 	config := sc.getSshClientConfig()
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
-	currentAttempt := 1
-	for {
+	
+	for currentAttempt := 1; ; currentAttempt++ {
 		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
 		client, err := gossh.Dial("tcp", address, config)
 
-		if err != nil {
-			if strings.Contains(err.Error(), "connection refused") {
-				slog.Warn("Connection refused, waiting before next attempt", "delay", SSH_CONNECT_ATTEMPT_DELAY)
-				time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
-			} else {
-				slog.Warn("Failed to dial SSH server", "err", err)
-			}
-
-			if currentAttempt >= maxAttempts {
-				return fmt.Errorf("failed to dial SSH server: %w", err)
-			}
-
-
-			currentAttempt++
-		} else {
+		if err == nil {
 			defer client.Close()
 			slog.Info("Host public key verification succeeded")
 			IsPublicKeyValid = true
 			return nil
+		}
+
+		if currentAttempt >= maxAttempts {
+			return fmt.Errorf("failed to dial SSH server: %w", err)
+		}
+
+		if strings.Contains(err.Error(), "connection refused") {
+			slog.Warn("Connection refused, waiting before next attempt", "delay", SSH_CONNECT_ATTEMPT_DELAY)
+			time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
+		} else {
+			slog.Warn("Failed to dial SSH server", "err", err)
 		}
 	}
 }
