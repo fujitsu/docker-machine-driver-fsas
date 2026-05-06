@@ -22,8 +22,8 @@ github.com/pkg/sftp v1.13.7/go.mod h1:KMKI0t3T6hfA+lTR/ssZdunHo+uwq7ghoN09/FSu3D
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/rancher/machine v0.15.0-rancher137 h1:KomES1D0LKQ3dE7BbMCXU7SPmF45l+sEiEm+MBZxi/U=
-github.com/rancher/machine v0.15.0-rancher137/go.mod h1:2AabuublGVGsYkvDQTm2LECTsRmsjt/3yd+nmYjMLo8=
+github.com/rancher/machine v0.15.0-rancher142 h1:Wy+OMNMspi1Pww03IxwQMG0IQ+G2T/bWY0q3E72wTpM=
+github.com/rancher/machine v0.15.0-rancher142/go.mod h1:eaMOTBSWQn/YaGwYH+yOm45f66WGBfrVnotbnXQlOog=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.2 h1:xuMeJ0Sdp5ZMRXx/aWO6RZxdr3beISkG5/G/aIRr3pY=
