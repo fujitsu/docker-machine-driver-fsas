@@ -733,6 +733,15 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
+	if d.EnableBaremetalBonding {
+		if err := d.CfgManager.ExtendUserdataBootCmd([]string{
+			`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
+		}); err != nil {
+			slog.Error("Failed to inject bootcmd for baremetal bonding", "err", err)
+			return err
+		}
+	}
+
 	if err := d.initSshManager(INNER_CREATE_SSH_MAX_ATTEMPTS); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err

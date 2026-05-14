@@ -24,6 +24,7 @@ type CfgManager interface {
 	IsInit() bool
 	PrepareMetadata(instanceId, hostname string) string
 	PrepareNetworkConfig(lanports []models.Lanport, subnets map[string]string) (string, error)
+	ExtendUserdataBootCmd(commands []string) error
 	ExtendUserdataRunCmd(commands []string) error
 	ExtendUserdataWriteFiles(wf []CloudConfigItemWriteFiles) error
 	ImplantSSHKey(sshKeyPath, sshUser string) error
@@ -198,6 +199,14 @@ func (sc *StandardCfgManager) prepareRke2ConfigNodeLabelsForGpu() string {
 	}
 
 	return fmt.Sprintf(`kubelet-arg+: "node-labels=%s"`, strings.Join(labels, ","))
+}
+
+func (sc *StandardCfgManager) ExtendUserdataBootCmd(commands []string) error {
+	cif, err := NewCloudInitFile(WithBootCmds(commands))
+	if err != nil {
+		return err
+	}
+	return extendUserdata(sc.userDataFile, cif)
 }
 
 func (sc *StandardCfgManager) ExtendUserdataRunCmd(commands []string) error {

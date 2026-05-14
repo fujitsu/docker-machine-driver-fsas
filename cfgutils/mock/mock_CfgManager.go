@@ -67,6 +67,52 @@ func (_c *MockCfgManager_DisableSSHLogin_Call) RunAndReturn(run func() error) *M
 	return _c
 }
 
+// ExtendUserdataBootCmd provides a mock function with given fields: commands
+func (_m *MockCfgManager) ExtendUserdataBootCmd(commands []string) error {
+	ret := _m.Called(commands)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExtendUserdataBootCmd")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]string) error); ok {
+		r0 = rf(commands)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCfgManager_ExtendUserdataBootCmd_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExtendUserdataBootCmd'
+type MockCfgManager_ExtendUserdataBootCmd_Call struct {
+	*mock.Call
+}
+
+// ExtendUserdataBootCmd is a helper method to define mock.On call
+//   - commands []string
+func (_e *MockCfgManager_Expecter) ExtendUserdataBootCmd(commands interface{}) *MockCfgManager_ExtendUserdataBootCmd_Call {
+	return &MockCfgManager_ExtendUserdataBootCmd_Call{Call: _e.mock.On("ExtendUserdataBootCmd", commands)}
+}
+
+func (_c *MockCfgManager_ExtendUserdataBootCmd_Call) Run(run func(commands []string)) *MockCfgManager_ExtendUserdataBootCmd_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]string))
+	})
+	return _c
+}
+
+func (_c *MockCfgManager_ExtendUserdataBootCmd_Call) Return(_a0 error) *MockCfgManager_ExtendUserdataBootCmd_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCfgManager_ExtendUserdataBootCmd_Call) RunAndReturn(run func([]string) error) *MockCfgManager_ExtendUserdataBootCmd_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ExtendUserdataRunCmd provides a mock function with given fields: commands
 func (_m *MockCfgManager) ExtendUserdataRunCmd(commands []string) error {
 	ret := _m.Called(commands)
