@@ -2740,3 +2740,187 @@ func TestCheckOnboardNicsConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
+	mockClock := timeutilsmock.NewMockClock(t)
+	statusClock = mockClock
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	mockSSH := sshMock.NewMockSshManager(t)
+	mockCfg := cfgMock.NewMockCfgManager(t)
+
+	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
+	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
+	testBaremetalUUID := "78901234-5678-9abc-def0-1234567890ab"
+	testProvisionUUID := "123e4567-e89b-12d3-a456-426614174000"
+
+	driver := &Driver{
+		BaseDriver:                &drivers.BaseDriver{},
+		FabricManager:             mockFM,
+		Keycloak:                  mockKeycloak,
+		SshManager:                mockSSH,
+		CfgManager:                mockCfg,
+		MachineUUID:               testMachineUUID,
+		UserDataFile:              "",
+		TenantUuid:                "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
+		ComputeConditionsJson:     "testJsnn",
+		DevicesSpecJson:           "testJson",
+		EnableBaremetalBonding:    true,
+		NetworkBaremetalPort:      -1,
+		NetworkBaremetalUUID:      testBaremetalUUID,
+		NetworkBaremetalDefaultGW: "192.168.1.1",
+		NetworkProvisionPort:      3,
+		NetworkProvisionUUID:      testProvisionUUID,
+		NtpUrl:                    "test",
+		DnsIp:                     "test",
+	}
+	driver.MachineName = "machineNameTest"
+
+	mockSSH.On("IsInit").Return(true)
+	mockKeycloak.On("IsInit").Return(true)
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("IsInit").Return(true)
+	mockCfg.On("IsInit").Return(true)
+
+	machineSpecArgs := models.MachineSpecsArgs{
+		ComputeConditionsJson:     driver.ComputeConditionsJson,
+		DevicesSpecJson:           driver.DevicesSpecJson,
+		EnableBaremetalBonding:    true,
+		NetworkBaremetalPort:      driver.NetworkBaremetalPort,
+		NetworkBaremetalUUID:      driver.NetworkBaremetalUUID,
+		NetworkBaremetalDefaultGW: driver.NetworkBaremetalDefaultGW,
+		NetworkProvisionPort:      driver.NetworkProvisionPort,
+		NetworkProvisionUUID:      driver.NetworkProvisionUUID,
+		NtpServer:                 driver.NtpUrl,
+		DnsServer:                 driver.DnsIp,
+	}
+	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
+	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
+	mockClock.On("Now").Return(mock_now_time)
+	// 1st call after Create, 2nd call for bootSSD
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
+	// 2 OS installation related checks
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	// PowerOn waitForStatus check && assignIpAddresses call
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
+	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", testMachineUUID).Return(nil)
+	mockCfg.On("InjectOSRegistration", "", "").Return(nil)
+	mockCfg.On("DisableSSHLogin").Return(nil)
+
+	expectedBootCmds := []string{
+		`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
+	}
+	mockCfg.On("ExtendUserdataBootCmd", expectedBootCmds).Return(nil)
+
+	// applyCloudInit with bonding
+	expectedSubnets := map[string]string{
+		"baremetal":    testBaremetalUUID,
+		"provisioning": testProvisionUUID,
+	}
+	networkConfigContent := models.NetworkConfigValidOnboardComposableYaml
+	networkConfigPath := filepath.Join(cloudInitDirPath, "network-config")
+	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
+
+	mockCfg.On("PrepareMetadata", testMachineUUID, driver.MachineName).Return("")
+	mockCfg.On("PrepareNetworkConfig", models.ExpectedLanports, expectedSubnets).Return(networkConfigContent, nil)
+	mockSSH.On("WriteFileOnRemoteMachine", metadataPath, "", fs.FileMode(0700)).Return(nil)
+	mockSSH.On("WriteFileOnRemoteMachine", networkConfigPath, networkConfigContent, fs.FileMode(0700)).Return(nil)
+	mockSSH.On("RebootCloudInit").Return(nil)
+	mockClock.On("Sleep", WAIT_FOR_START_AFTER_REBOOT).Return(nil)
+
+	err := driver.Create()
+	assert.NoError(t, err)
+	mockCfg.AssertCalled(t, "ExtendUserdataBootCmd", expectedBootCmds)
+}
+
+func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
+	mockClock := timeutilsmock.NewMockClock(t)
+	statusClock = mockClock
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	mockSSH := sshMock.NewMockSshManager(t)
+	mockCfg := cfgMock.NewMockCfgManager(t)
+
+	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
+	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
+	testBaremetalUUID := "78901234-5678-9abc-def0-1234567890ab"
+	testProvisionUUID := "123e4567-e89b-12d3-a456-426614174000"
+
+	driver := &Driver{
+		BaseDriver:                &drivers.BaseDriver{},
+		FabricManager:             mockFM,
+		Keycloak:                  mockKeycloak,
+		SshManager:                mockSSH,
+		CfgManager:                mockCfg,
+		MachineUUID:               testMachineUUID,
+		UserDataFile:              "",
+		TenantUuid:                "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
+		ComputeConditionsJson:     "testJsnn",
+		DevicesSpecJson:           "testJson",
+		EnableBaremetalBonding:    true,
+		NetworkBaremetalPort:      -1,
+		NetworkBaremetalUUID:      testBaremetalUUID,
+		NetworkBaremetalDefaultGW: "192.168.1.1",
+		NetworkProvisionPort:      3,
+		NetworkProvisionUUID:      testProvisionUUID,
+		NtpUrl:                    "test",
+		DnsIp:                     "test",
+	}
+	driver.MachineName = "machineNameTest"
+
+	mockSSH.On("IsInit").Return(true)
+	mockKeycloak.On("IsInit").Return(true)
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("IsInit").Return(true)
+	mockCfg.On("IsInit").Return(true)
+
+	machineSpecArgs := models.MachineSpecsArgs{
+		ComputeConditionsJson:     driver.ComputeConditionsJson,
+		DevicesSpecJson:           driver.DevicesSpecJson,
+		EnableBaremetalBonding:    true,
+		NetworkBaremetalPort:      driver.NetworkBaremetalPort,
+		NetworkBaremetalUUID:      driver.NetworkBaremetalUUID,
+		NetworkBaremetalDefaultGW: driver.NetworkBaremetalDefaultGW,
+		NetworkProvisionPort:      driver.NetworkProvisionPort,
+		NetworkProvisionUUID:      driver.NetworkProvisionUUID,
+		NtpServer:                 driver.NtpUrl,
+		DnsServer:                 driver.DnsIp,
+	}
+	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
+	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
+	mockClock.On("Now").Return(mock_now_time)
+	// 1st call after Create, 2nd call for bootSSD
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
+	// 2 OS installation related checks
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	// PowerOn waitForStatus check && assignIpAddresses call
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+
+	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
+	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", testMachineUUID).Return(nil)
+	mockCfg.On("InjectOSRegistration", "", "").Return(nil)
+	mockCfg.On("DisableSSHLogin").Return(nil)
+
+	bootCmdErr := fmt.Errorf("bootcmd injection failed")
+	expectedBootCmds := []string{
+		`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
+	}
+	mockCfg.On("ExtendUserdataBootCmd", expectedBootCmds).Return(bootCmdErr)
+
+	// Remove is called after innerCreate failure
+	mockSSH.On("DeregisterOS").Return(nil)
+	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	// waitForStatus in Remove call
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
+
+	err := driver.Create()
+	assert.EqualError(t, err, bootCmdErr.Error())
+}

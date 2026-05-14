@@ -508,6 +508,10 @@ func TestNewCloudInitFile(t *testing.T) {
 			constructorArgument: WithUsers([]cloudConfigItemUsers{}),
 			expectedErrorStr:    "section 'users' cannot be empty",
 		},
+		{name: "case 4: section 'bootcmd' is empty",
+			constructorArgument: WithBootCmds([]string{}),
+			expectedErrorStr:    "section 'bootcmd' cannot be empty",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -519,6 +523,102 @@ func TestNewCloudInitFile(t *testing.T) {
 			} else {
 				assert.Contains(t, err.Error(), tc.expectedErrorStr)
 			}
+		})
+	}
+}
+
+func TestExtendUserdataBootCmd(t *testing.T) {
+	testCases := []struct {
+		name            string
+		readFileContent []byte
+		input           []string
+		expectedStr     string
+		nrExpectedItems int
+		expectedError   error
+	}{
+		{name: "case 1: add one item to section 'bootcmd'",
+			readFileContent: []byte(userdataSampleContent1bc),
+			input:           inputOneItemBootCmd,
+			expectedStr:     expectedStr2BootCmd,
+			nrExpectedItems: 2,
+			expectedError:   nil,
+		},
+
+		{name: "case 2: add two items to section 'bootcmd'",
+			readFileContent: []byte(userdataSampleContent1bc),
+			input:           inputTwoItemsBootCmd,
+			expectedStr:     expectedStr3BootCmd,
+			nrExpectedItems: 3,
+			expectedError:   nil,
+		},
+
+		{name: "case 3: section 'bootcmd' does not exist",
+			readFileContent: []byte(userdataSampleContentNoSections),
+			input:           inputOneItemBootCmd,
+			expectedStr:     expectedStr1BootCmd,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 4: no content in userdata file",
+			readFileContent: []byte{},
+			input:           inputOneItemBootCmd,
+			expectedStr:     expectedStr1BootCmd,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+
+		{name: "case 5: input as empty list",
+			readFileContent: []byte(userdataSampleContent1bc),
+			input:           nil,
+			expectedStr:     userdataSampleContent1bc,
+			nrExpectedItems: 1,
+			expectedError:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		var expected, observed map[string][]any
+		t.Run(tc.name, func(t *testing.T) {
+			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
+			require.NoError(t, err, "Failed to create temp file")
+			defer func() {
+				err := tempFile.Close()
+				require.NoError(t, err, "Failed to close temp file")
+				err = os.Remove(tempFile.Name())
+				require.NoError(t, err, "Failed to delete temp file")
+			}()
+
+			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
+				require.NoError(t, err, "Failed to write to temp file")
+			}
+
+			sc := NewStandardCfgManager("[]", tempFile.Name())
+			err = sc.ExtendUserdataBootCmd(tc.input)
+
+			if tc.expectedError != nil {
+				assert.ErrorIs(t, err, tc.expectedError,
+					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
+			} else {
+
+				/* convert to YAML objects;
+				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
+				   Thus compare YAML semantically and not textually.
+				*/
+				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
+					t.Fatalf("failed to unmarshal expected: %v", err)
+				}
+
+				fileContent, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err, "Failed to read from temp file")
+				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
+					t.Fatalf("failed to unmarshal observed: %v", err)
+				}
+
+				assert.Equal(t, expected, observed)
+				assert.Equal(t, tc.nrExpectedItems, len(observed["bootcmd"]))
+			}
+
 		})
 	}
 }
@@ -663,6 +763,13 @@ func Test_userdataFile_not_exists(t *testing.T) {
 			testedFunction: func() error {
 				sc := NewStandardCfgManager("[]", "some-non-existing-file")
 				err := sc.ExtendUserdataRunCmd([]string{""})
+				return err
+			},
+		},
+		{name: "case 4: method 'ExtendUserdataBootCmd'",
+			testedFunction: func() error {
+				sc := NewStandardCfgManager("[]", "some-non-existing-file")
+				err := sc.ExtendUserdataBootCmd([]string{""})
 				return err
 			},
 		},

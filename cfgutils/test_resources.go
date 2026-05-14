@@ -490,6 +490,41 @@ write_files:
     encoding: "gzip+b64"
     permissions: "0644"
 `
+
+	userdataSampleContent1bc = `#cloud-config
+bootcmd:
+  - echo "boot command"
+`
+
+	inputOneItemBootCmd = []string{
+		`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
+	}
+
+	inputTwoItemsBootCmd = []string{
+		`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
+		`echo "boot completed"`,
+	}
+
+	expectedStr1BootCmd = `
+#cloud-config
+bootcmd:
+  - find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete
+`
+
+	expectedStr2BootCmd = `
+#cloud-config
+bootcmd:
+  - echo "boot command"
+  - find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete
+`
+
+	expectedStr3BootCmd = `
+#cloud-config
+bootcmd:
+  - echo "boot command"
+  - find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete
+  - echo "boot completed"
+`
 )
 
 const sampleRke2ConfigFileContent = `kubelet-arg+: "provider-id=fsas-cdi://%s"`
