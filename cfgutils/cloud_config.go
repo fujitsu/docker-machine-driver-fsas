@@ -24,6 +24,7 @@ SSHPasswordAuth uses *bool with omitempty to preserve 3 states in YAML:
 nil (omit), true, and false.
 */
 type cloudInitFile struct {
+	BootCmds        []string                    `yaml:"bootcmd,omitempty"`
 	Hostname        string                      `yaml:"hostname,omitempty"`
 	SSHPasswordAuth *bool                       `yaml:"ssh_pwauth,omitempty"`
 	Users           []cloudConfigItemUsers      `yaml:"users,omitempty"`
@@ -57,6 +58,18 @@ func WithUsers(users []cloudConfigItemUsers) cloudInitFileOption {
 			c.Users = users
 		} else {
 			return errors.New("section 'users' cannot be empty")
+		}
+		return nil
+	}
+}
+
+// WithBootCmds sets the bootcmd field. Returns an error when the provided slice is empty.
+func WithBootCmds(cmds []string) cloudInitFileOption {
+	return func(c *cloudInitFile) error {
+		if len(cmds) > 0 {
+			c.BootCmds = cmds
+		} else {
+			return errors.New("section 'bootcmd' cannot be empty")
 		}
 		return nil
 	}
@@ -212,6 +225,9 @@ func extendUserdata(userDataFile string, cif cloudInitFile) error {
 func updateCloudConfigFileStruct(current, new *cloudInitFile) error {
 	if new.Hostname != "" {
 		current.Hostname = new.Hostname
+	}
+	if len(new.BootCmds) > 0 {
+		current.BootCmds = append(current.BootCmds, new.BootCmds...)
 	}
 	if new.SSHPasswordAuth != nil {
 		current.SSHPasswordAuth = new.SSHPasswordAuth
