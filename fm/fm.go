@@ -151,7 +151,7 @@ func (fmc *FabricManagerClient) Reboot(machineUUID, tenantId, bearerToken string
 	}
 
 	slog.Info("Successfully requested machine reboot", "machine_uuid", machineUUID, "tenant_id", tenantId, "status_code", statusCode)
-	
+
 	return nil
 }
 
@@ -256,14 +256,12 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 					LanportIdx: 1,
 					Ntp:        machineSpecs.NtpServer,
 					Dns:        machineSpecs.DnsServer,
-					DefaultGW:  machineSpecs.NetworkBaremetalDefaultGW,
 				},
 				models.Subnet{
 					SubnetUUID: machineSpecs.NetworkBaremetalUUID,
 					LanportIdx: 2,
 					Ntp:        machineSpecs.NtpServer,
 					Dns:        machineSpecs.DnsServer,
-					DefaultGW:  machineSpecs.NetworkBaremetalDefaultGW,
 				},
 			)
 		} else {
@@ -272,7 +270,6 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 				LanportIdx: machineSpecs.NetworkBaremetalPort,
 				Ntp:        machineSpecs.NtpServer,
 				Dns:        machineSpecs.DnsServer,
-				DefaultGW:  machineSpecs.NetworkBaremetalDefaultGW,
 			})
 		}
 	}

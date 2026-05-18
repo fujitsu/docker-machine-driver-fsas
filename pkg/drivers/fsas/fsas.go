@@ -54,7 +54,6 @@ type Driver struct {
 	EnableBaremetalBonding    bool
 	NetworkBaremetalPort      int
 	NetworkBaremetalUUID      string
-	NetworkBaremetalDefaultGW string
 	NetworkProvisionPort      int
 	NetworkProvisionUUID      string
 	NetworkProvisionDefaultGW string
@@ -88,7 +87,6 @@ func NewDriver() *Driver {
 		EnableBaremetalBonding:    false,
 		NetworkBaremetalPort:      -1,
 		NetworkBaremetalUUID:      "",
-		NetworkBaremetalDefaultGW: "",
 		NetworkProvisionPort:      -1,
 		NetworkProvisionUUID:      "",
 		NetworkProvisionDefaultGW: "",
@@ -132,7 +130,6 @@ func (d *Driver) String() string {
 		fmt.Sprintf("EnableBaremetalBonding: %t, ", d.EnableBaremetalBonding) +
 		fmt.Sprintf("NetworkBaremetalPort: %d, ", d.NetworkBaremetalPort) +
 		fmt.Sprintf("NetworkBaremetalUUID: %s, ", d.NetworkBaremetalUUID) +
-		fmt.Sprintf("NetworkBaremetalDefaultGW: %s, ", d.NetworkBaremetalDefaultGW) +
 		fmt.Sprintf("NetworkProvisionPort: %d, ", d.NetworkProvisionPort) +
 		fmt.Sprintf("NetworkProvisionUUID: %s, ", d.NetworkProvisionUUID) +
 		fmt.Sprintf("NetworkProvisionDefaultGW: %s, ", d.NetworkProvisionDefaultGW) +
@@ -213,11 +210,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  `Node subnet UUID for baremetal-baremetal communication`,
 			EnvVar: "FSAS_NETWORK_BAREMETAL_UUID",
 		},
-		mcnflag.StringFlag{
-			Name:   "fsas-network-baremetal-default-gw",
-			Usage:  `Node subnet default gateway for baremetal-baremetal communication`,
-			EnvVar: "FSAS_NETWORK_BAREMETAL_DEFAULT_GW",
-		},
 		mcnflag.IntFlag{
 			Name:   "fsas-network-provision-port",
 			Usage:  "Node LAN port index for provisioning subnet communication, e.g. 1",
@@ -226,12 +218,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-network-provision-uuid",
-			Usage:  `Node subnet UUID for Rancher-baremetal communication`,
+			Usage:  `Node subnet UUID for Rancher-provisioning communication`,
 			EnvVar: "FSAS_NETWORK_PROVISION_UUID",
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-network-provision-default-gw",
-			Usage:  `Node subnet default gateway for Rancher-baremetal communication`,
+			Usage:  `Node subnet default gateway for Rancher-provisioning communication`,
 			EnvVar: "FSAS_NETWORK_PROVISION_DEFAULT_GW",
 		},
 		mcnflag.StringFlag{
@@ -381,9 +373,6 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.NetworkBaremetalUUID = strings.TrimSpace(flags.String("fsas-network-baremetal-uuid"))
 	slog.Debug("Driver", "FSAS baremetal subnet UUID", d.NetworkBaremetalUUID)
 
-	d.NetworkBaremetalDefaultGW = strings.TrimSpace(flags.String("fsas-network-baremetal-default-gw"))
-	slog.Debug("Driver", "FSAS baremetal subnet Default GW", d.NetworkBaremetalDefaultGW)
-
 	d.NetworkProvisionPort = flags.Int("fsas-network-provision-port")
 	slog.Debug("Driver", "FSAS provosioning subnet LAN port index", d.NetworkProvisionPort)
 
@@ -391,7 +380,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	slog.Debug("Driver", "FSAS provisioning subnet UUID", d.NetworkProvisionUUID)
 
 	d.NetworkProvisionDefaultGW = strings.TrimSpace(flags.String("fsas-network-provision-default-gw"))
-	slog.Debug("Driver", "FSAS provisioning subnet Default GW", d.NetworkBaremetalDefaultGW)
+	slog.Debug("Driver", "FSAS provisioning subnet Default GW", d.NetworkProvisionDefaultGW)
 
 	d.DevicesSpecJson = strings.TrimSpace(flags.String("fsas-devices-spec-json"))
 	slog.Debug("Driver", "FSAS devices specification JSON", d.DevicesSpecJson)
@@ -530,7 +519,7 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet UUID", "--fsas-network-provision-uuid")
 	}
 	if d.NetworkProvisionDefaultGW == "" {
-		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet Default GW", "fsas-network-provision-default-gw")
+		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet Default GW", "--fsas-network-provision-default-gw")
 	}
 	if d.DevicesSpecJson == "" {
 		return fmt.Errorf(errorMandatoryOption, "Devices specification (JSON)", "--fsas-devices-spec-json")
@@ -584,9 +573,6 @@ func (d *Driver) checkOnboardNicsConfig() error {
 		if d.NetworkBaremetalUUID == "" {
 			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
 		}
-		if d.NetworkBaremetalDefaultGW == "" {
-			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet Default GW", "--fsas-network-baremetal-default-gw")
-		}
 		if d.NetworkBaremetalPort != -1 {
 			slog.Warn("NetworkBaremetalPort is set but will be ignored because baremetal bonding is enabled; ports 1 and 2 are used for bonding")
 		}
@@ -597,16 +583,13 @@ func (d *Driver) checkOnboardNicsConfig() error {
 		if d.NetworkBaremetalPort == -1 {
 			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet LAN port", "--fsas-network-baremetal-port")
 		}
-		if d.NetworkBaremetalDefaultGW == "" {
-			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet Default GW", "--fsas-network-baremetal-default-gw")
-		}
 		if d.NetworkBaremetalPort == d.NetworkProvisionPort {
 			return fmt.Errorf("baremetal and provisioning lanport idx must not be the same")
 		}
 		if (d.NetworkBaremetalPort == 1 || d.NetworkBaremetalPort == 2) && (d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2) {
 			return fmt.Errorf("baremetal and provisioning subnets cannot both use onboard NICs (lanport idx 1 and 2)")
 		}
-	} else if d.NetworkBaremetalPort != -1 || d.NetworkBaremetalDefaultGW != "" {
+	} else if d.NetworkBaremetalPort != -1 {
 		return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
 	}
 	return nil
@@ -647,7 +630,6 @@ func (d *Driver) innerCreate() error {
 		EnableBaremetalBonding:    d.EnableBaremetalBonding,
 		NetworkBaremetalPort:      d.NetworkBaremetalPort,
 		NetworkBaremetalUUID:      d.NetworkBaremetalUUID,
-		NetworkBaremetalDefaultGW: d.NetworkBaremetalDefaultGW,
 		NetworkProvisionPort:      d.NetworkProvisionPort,
 		NetworkProvisionUUID:      d.NetworkProvisionUUID,
 		NetworkProvisionDefaultGW: d.NetworkProvisionDefaultGW,
