@@ -107,7 +107,6 @@ type BondParameters struct {
 	FailoverMacPolicy string `yaml:"fail-over-mac-policy,omitempty"`
 }
 
-
 // Custom Marshaler to omit "tags", "minresourcecount" and "maxresourcecount"
 /*
 	The reason why a custom marshaller is defined is because some fields
@@ -217,7 +216,6 @@ type MachineSpecsArgs struct {
 	NetworkProvisionPort      int
 	NetworkBaremetalUUID      string
 	NetworkProvisionUUID      string
-	NetworkBaremetalDefaultGW string
 	NetworkProvisionDefaultGW string
 	NtpServer                 string
 	DnsServer                 string

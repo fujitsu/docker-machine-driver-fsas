@@ -204,7 +204,6 @@ func TestPopulateCreateMachineRequest_Success(t *testing.T) {
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
 		NetworkBaremetalPort:      2,
-		NetworkBaremetalDefaultGW: "172.0.0.1",
 		NtpServer:                 "192.168.0.1",
 		DnsServer:                 "8.8.8.8",
 	}
@@ -261,7 +260,6 @@ func TestPopulateCreateMachineRequestBaremetalBondingEnabled_Success(t *testing.
 		NetworkProvisionPort:      1,
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
-		NetworkBaremetalDefaultGW: "172.0.0.1",
 		NtpServer:                 "192.168.0.1",
 		DnsServer:                 "8.8.8.8",
 	}
@@ -293,7 +291,6 @@ func TestPopulateCreateMachineRequestBaremetalBondingDisabled_Success(t *testing
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
 		NetworkBaremetalPort:      2,
-		NetworkBaremetalDefaultGW: "172.0.0.1",
 		NtpServer:                 "192.168.0.1",
 		DnsServer:                 "8.8.8.8",
 	}
@@ -655,7 +652,7 @@ func TestRebootSuccess(t *testing.T) {
 
 	expectedQuery := map[string]string{"tenant_uuid": tenantId}
 	expectedHeaders := map[string]string{
-		"Content-Type": "application/json",
+		"Content-Type":  "application/json",
 		"Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample),
 	}
 	expectedEndpoint := fmt.Sprintf("/machines/%s/reboot", machineId)
@@ -678,7 +675,7 @@ func TestRebootFailed(t *testing.T) {
 
 	expectedQuery := map[string]string{"tenant_uuid": tenantId}
 	expectedHeaders := map[string]string{
-		"Content-Type": "application/json",
+		"Content-Type":  "application/json",
 		"Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample),
 	}
 	expectedEndpoint := fmt.Sprintf("/machines/%s/reboot", machineId)
