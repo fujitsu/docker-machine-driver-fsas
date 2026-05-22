@@ -195,7 +195,7 @@ func TestGetStateRunning(t *testing.T) {
 
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("GetMachineDetails", "cdi-test", driver.MachineUUID, mockKeycloak.GetToken()).Return(
-		models.ExpectedLanports,
+		models.ExpectedLanportsWithType,
 		"902cc002-3775-4be0-be00-535a677b2ab4",
 		13,
 		nil)
@@ -222,7 +222,7 @@ func TestGetStateUnknownStatus(t *testing.T) {
 
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("GetMachineDetails", "cdi-test", driver.MachineUUID, mockKeycloak.GetToken()).Return(
-		models.ExpectedLanports,
+		models.ExpectedLanportsWithType,
 		"902cc002-3775-4be0-be00-535a677b2ab4",
 		987,
 		nil)
@@ -593,7 +593,7 @@ func TestStartGetStateError(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockFM.On("PowerOn", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(
-		models.ExpectedLanports,
+		models.ExpectedLanportsWithType,
 		"902cc002-3775-4be0-be00-535a677b2ab4",
 		987,
 		nil)
@@ -654,7 +654,7 @@ func TestRemoveSuccess(t *testing.T) {
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockSshManager.On("DeregisterOS").Return(nil)
 	mockFM.On("GetMachineDetails", "cdi-test", driver.MachineUUID, models.AccessTokenExample).Return(
-		models.ExpectedLanports,
+		models.ExpectedLanportsWithType,
 		"902cc002-3775-4be0-be00-535a677b2ab4",
 		17,
 		nil)
@@ -742,7 +742,7 @@ func TestRemoveDeregisterOSFail(t *testing.T) {
 	// This error should only notify via WARN log as not removing machine can be disastrous
 	mockSshManager.On("DeregisterOS").Return(mockError)
 	mockFM.On("GetMachineDetails", "cdi-test", driver.MachineUUID, models.AccessTokenExample).Return(
-		models.ExpectedLanports,
+		models.ExpectedLanportsWithType,
 		"902cc002-3775-4be0-be00-535a677b2ab4",
 		17,
 		nil)
@@ -1030,7 +1030,7 @@ func TestWaitForStatusCorrectStatus(t *testing.T) {
 	mockKeycloak.On("GetToken").Return("token")
 	mockFM.On("IsInit").Return(true)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(
-		models.ExpectedLanports,
+		models.ExpectedLanportsWithType,
 		"3129cbdf-345c-43a9-b4dc-34880ceed63d",
 		13,
 		nil)
@@ -1060,8 +1060,8 @@ func TestWaitForStatusCorrectSecondCallStatus(t *testing.T) {
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return("token")
 	mockFM.On("IsInit").Return(true)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 13, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanportsWithType, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanportsWithType, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 13, nil).Once()
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mock_duration := time.Millisecond * 100
 	mockClock.On("Now").Return(mock_now_time)
@@ -1093,7 +1093,7 @@ func TestWaitForStatusTimeout(t *testing.T) {
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return("token")
 	mockFM.On("IsInit").Return(true)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanportsWithType, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mock_time_step := time.Second * 1
 	mockClock.On("Now").Return(mock_now_time)
@@ -1192,12 +1192,12 @@ func TestCreate(t *testing.T) {
 	//waitForStatus
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mockClock.On("Now").Return(mock_now_time)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
 
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
@@ -1278,12 +1278,12 @@ func TestCreateCloudInitFail(t *testing.T) {
 	//waitForStatus
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mockClock.On("Now").Return(mock_now_time)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
@@ -1293,7 +1293,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 	mockSSH.On("WriteFileOnRemoteMachine", userdataPath, "custom-user-data.yaml", fs.FileMode(0700)).Return(fmt.Errorf("WriteFileOnRemoteMachine failed"))
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 17, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 17, nil).Once()
 
 	// Mock implementation of os.ReadFile
 	originalOsReadFile := osReadFile
@@ -1371,7 +1371,7 @@ func TestCreateMachineFail(t *testing.T) {
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return("", testError)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, "", int(UNBUILDED), nil)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, "", int(UNBUILDED), nil)
 
 	mockClock := timeutilsmock.NewMockClock(t)
 	statusClock = mockClock
@@ -1487,10 +1487,10 @@ func TestCreateGetMachineDetailsFail(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// waitForStatus call
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	testError := fmt.Errorf("GetMachineDetails unsucessfull")
 	// bootSSD call
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, testError).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, testError).Once()
 	mockSSH.On("IsInit").Return(true)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
@@ -1545,7 +1545,7 @@ func TestCreateImageInstallFail(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// Create's 1st waitForStatus and 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	testError := fmt.Errorf("ImageInstall unsucessfull")
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(testError)
 	mockSSH.On("IsInit").Return(true)
@@ -1602,12 +1602,12 @@ func TestCreateStartFail(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st waitForStatus and 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 3rd waitForStatus after (OS_INSTALLING)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
 	// 4th waitForStatus after OS is installed
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	testError := fmt.Errorf("PowerOn unsucessfull")
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(testError)
 	mockSSH.On("IsInit").Return(true)
@@ -1665,17 +1665,17 @@ func TestCreateGetMachineDetailsFailSecond(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create and 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 2 OS installation calls (installed and installed check)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Once()
 	// IP addresses call
 	testError := fmt.Errorf("GetMachineDetails unsucessfull")
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, testError).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, testError).Once()
 	mockSSH.On("IsInit").Return(true)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
@@ -1731,14 +1731,14 @@ func TestCreateImplantSSHKeyFail(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 2 OS installation related checks
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
 	testError := fmt.Errorf("ImplantSSHKey unsuccessful")
 	mockCfg.On("IsInit").Return(true)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(testError)
@@ -1798,14 +1798,14 @@ func TestCreateOSRegistrationFail(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 2 OS installation related checks
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
 	mockCfg.On("IsInit").Return(true)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
@@ -1868,14 +1868,14 @@ func TestCreateExecuteScriptFail(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 2 OS installation related checks
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
 	mockCfg.On("IsInit").Return(true)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockError := fmt.Errorf("ExecuteScript unsuccessful")
@@ -1937,14 +1937,14 @@ func TestCreateFailRemoveFail(t *testing.T) {
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 2 OS installation related checks
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && Lanports reading check
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
 	mockCfg.On("IsInit").Return(true)
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockError := fmt.Errorf("ExecuteScript unsuccessful")
@@ -2008,7 +2008,7 @@ func TestKill_success(t *testing.T) {
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("PowerOff", driver.MachineUUID, "cdi-test", models.AccessTokenExample).Return(nil)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanportsWithType, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
 
 	err := driver.Kill()
 	assert.NoError(t, err)
@@ -2073,7 +2073,7 @@ func TestStop_success(t *testing.T) {
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
 	mockFM.On("IsInit").Return(true)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanportsWithType, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 15, nil)
 
 	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil)
 
@@ -2129,7 +2129,7 @@ func TestStop_waitForStatus_failed(t *testing.T) {
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 
 	mockFM.On("IsInit").Return(true)
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanports, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, mockKeycloak.GetToken()).Return(models.ExpectedLanportsWithType, "3129cbdf-345c-43a9-b4dc-34880ceed63d", 99, nil)
 
 	mockFM.On("GracefulShutdown", driver.MachineUUID, "", models.AccessTokenExample).Return(nil)
 
@@ -2229,13 +2229,13 @@ func TestAssignIpAddressesSuccess(t *testing.T) {
 
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(
-		models.ExpectedLanports, bootSsdUUID, 13, nil)
+		models.ExpectedLanportsWithType, bootSsdUUID, 13, nil)
 
 	lanports, err := driver.assignIpAddresses()
 
 	assert.Equal(t, "192.168.2.100", driver.IPAddress)
 	assert.Equal(t, "10.0.0.100", driver.PrivateIPAddress)
-	assert.Equal(t, models.ExpectedLanports, lanports)
+	assert.Equal(t, models.ExpectedLanportsWithType, lanports)
 	assert.NoError(t, err)
 }
 
@@ -2254,16 +2254,74 @@ func TestAssignIpAddressesFailed(t *testing.T) {
 
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(
-		models.ExpectedLanports, bootSsdUUID, 13, nil)
-
-	errorData := "IPAddress must not be empty"
-	mockError := errors.New(errorData)
+		models.ExpectedLanportsWithType, bootSsdUUID, 13, nil)
 
 	lanports, err := driver.assignIpAddresses()
 
 	assert.Nil(t, lanports)
 	assert.Error(t, err)
-	assert.EqualError(t, err, mockError.Error())
+	assert.EqualError(t, err, "IPAddress must not be empty")
+}
+
+func TestAssignIpAddresses_BondingEnabled_Success(t *testing.T) {
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
+	driver := &Driver{
+		BaseDriver:             &drivers.BaseDriver{},
+		FabricManager:          mockFM,
+		Keycloak:               mockKeycloak,
+		TenantUuid:             "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
+		EnableBaremetalBonding: true,
+		NetworkBaremetalUUID:   "78901234-5678-9abc-def0-1234567890ab",
+		NetworkProvisionUUID:   "123e4567-e89b-12d3-a456-426614174000",
+	}
+
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(
+		models.ExpectedLanportsBonding, bootSsdUUID, 13, nil)
+
+	lanports, err := driver.assignIpAddresses()
+
+	assert.Equal(t, "192.168.2.100", driver.IPAddress)
+	assert.Equal(t, "10.0.0.100", driver.PrivateIPAddress)
+	assert.Equal(t, models.ExpectedLanportsBonding, lanports)
+	assert.NoError(t, err)
+}
+
+func TestAssignIpAddresses_NicTypeMismatch_Fails(t *testing.T) {
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
+
+	// Provision subnet exists but only on composable NICs — should not match
+	lanportsComposableOnly := []models.Lanport{
+		{
+			LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
+			SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+			MACAddress:  "00:11:22:33:44:55",
+			LanportIdx:  3,
+			IPAddress:   "192.168.2.100",
+			NicType:     models.NicTypeComposable,
+		},
+	}
+
+	driver := &Driver{
+		BaseDriver:           &drivers.BaseDriver{},
+		FabricManager:        mockFM,
+		Keycloak:             mockKeycloak,
+		TenantUuid:           "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
+		NetworkProvisionUUID: "123e4567-e89b-12d3-a456-426614174000",
+	}
+
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(
+		lanportsComposableOnly, bootSsdUUID, 13, nil)
+
+	lanports, err := driver.assignIpAddresses()
+
+	assert.Nil(t, lanports)
+	assert.EqualError(t, err, "IPAddress must not be empty")
 }
 
 func Test_applyCloudInit_success(t *testing.T) {
@@ -2745,14 +2803,14 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mockClock.On("Now").Return(mock_now_time)
 	// 1st call after Create, 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 2 OS installation related checks
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && assignIpAddresses call
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsBonding, bootSsdUUID, 13, nil).Twice()
 
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", testMachineUUID).Return(nil)
@@ -2774,7 +2832,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
 
 	mockCfg.On("PrepareMetadata", testMachineUUID, driver.MachineName).Return("")
-	mockCfg.On("PrepareNetworkConfig", models.ExpectedLanports, expectedSubnets).Return(networkConfigContent, nil)
+	mockCfg.On("PrepareNetworkConfig", models.ExpectedLanportsBonding, expectedSubnets).Return(networkConfigContent, nil)
 	mockSSH.On("WriteFileOnRemoteMachine", metadataPath, "", fs.FileMode(0700)).Return(nil)
 	mockSSH.On("WriteFileOnRemoteMachine", networkConfigPath, networkConfigContent, fs.FileMode(0700)).Return(nil)
 	mockSSH.On("RebootCloudInit").Return(nil)
@@ -2840,14 +2898,14 @@ func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mockClock.On("Now").Return(mock_now_time)
 	// 1st call after Create, 2nd call for bootSSD
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	// 2 OS installation related checks
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 18, nil).Once()
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 15, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 18, nil).Once()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// PowerOn waitForStatus check && assignIpAddresses call
-	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanports, bootSsdUUID, 13, nil).Twice()
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsBonding, bootSsdUUID, 13, nil).Twice()
 
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", testMachineUUID).Return(nil)

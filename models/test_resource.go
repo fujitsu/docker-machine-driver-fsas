@@ -1090,3 +1090,33 @@ var ExpectedLanportsWithType = []Lanport{
 		NicType:     NicTypeComposable,
 	},
 }
+
+// ExpectedLanportsBonding represents a bonding scenario where:
+// - Baremetal subnet uses onboard NICs (ports 1, 2) for the bond
+// - Provisioning subnet uses an onboard NIC (port 3)
+var ExpectedLanportsBonding = []Lanport{
+	{
+		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:55",
+		LanportIdx:  1,
+		IPAddress:   "10.0.0.100",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		LanportUUID: "01085c2c-15c4-4957-9ad3-7d1ee481f082",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:66",
+		LanportIdx:  2,
+		IPAddress:   "10.0.0.101",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:77",
+		LanportIdx:  3,
+		IPAddress:   "192.168.2.100",
+		NicType:     NicTypeOnboard,
+	},
+}
