@@ -1109,7 +1109,7 @@ func (d *Driver) assignIpAddresses() ([]models.Lanport, error) {
 
 	for idx, lanport := range lanports {
 		slog.Debug(fmt.Sprintf("lanport[%d].SubnetUUID=%s", idx, lanport.SubnetUUID))
-		if lanport.SubnetUUID == d.NetworkProvisionUUID && d.IPAddress == "" {
+		if lanport.SubnetUUID == d.NetworkProvisionUUID && lanport.NicType == models.NicTypeOnboard && d.IPAddress == "" {
 			d.IPAddress = lanport.IPAddress
 			slog.Info("Successfully filled IP Address", "IP", d.IPAddress)
 		}
