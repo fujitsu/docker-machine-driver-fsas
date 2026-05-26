@@ -2289,6 +2289,33 @@ func TestAssignIpAddresses_BondingEnabled_Success(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestAssignIpAddresses_Baremetal_OnboardFirst_Success(t *testing.T) {
+	mockFM := fmmock.NewMockFabricManager(t)
+	mockKeycloak := keycloakMock.NewMockKeycloak(t)
+	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
+	driver := &Driver{
+		BaseDriver:           &drivers.BaseDriver{},
+		FabricManager:        mockFM,
+		Keycloak:             mockKeycloak,
+		TenantUuid:           "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
+		NetworkBaremetalUUID: "78901234-5678-9abc-def0-1234567890ab",
+		NetworkProvisionUUID: "123e4567-e89b-12d3-a456-426614174000",
+	}
+
+	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
+	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(
+		models.ExpectedLanportsBaremetalMixed, bootSsdUUID, 13, nil)
+
+	lanports, err := driver.assignIpAddresses()
+
+	// Onboard NIC (10.0.0.50) must be preferred over composable NIC (10.0.0.200)
+	// even though the composable NIC appears first in the lanports list.
+	assert.Equal(t, "192.168.2.100", driver.IPAddress)
+	assert.Equal(t, "10.0.0.50", driver.PrivateIPAddress)
+	assert.Equal(t, models.ExpectedLanportsBaremetalMixed, lanports)
+	assert.NoError(t, err)
+}
+
 func TestAssignIpAddresses_NicTypeMismatch_Fails(t *testing.T) {
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)

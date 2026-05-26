@@ -1107,6 +1107,7 @@ func (d *Driver) assignIpAddresses() ([]models.Lanport, error) {
 		return nil, err
 	}
 
+	var baremetalFallbackIP string
 	for idx, lanport := range lanports {
 		slog.Debug(fmt.Sprintf("lanport[%d].SubnetUUID=%s", idx, lanport.SubnetUUID))
 		if lanport.SubnetUUID == d.NetworkProvisionUUID && lanport.NicType == models.NicTypeOnboard && d.IPAddress == "" {
@@ -1114,9 +1115,17 @@ func (d *Driver) assignIpAddresses() ([]models.Lanport, error) {
 			slog.Info("Successfully filled IP Address", "IP", d.IPAddress)
 		}
 		if lanport.SubnetUUID == d.NetworkBaremetalUUID && d.PrivateIPAddress == "" {
-			d.PrivateIPAddress = lanport.IPAddress
-			slog.Info("Successfully filled Private IP Address", "IP", d.PrivateIPAddress)
+			if lanport.NicType == models.NicTypeOnboard {
+				d.PrivateIPAddress = lanport.IPAddress
+				slog.Info("Successfully filled Private IP Address", "IP", d.PrivateIPAddress)
+			} else if baremetalFallbackIP == "" {
+				baremetalFallbackIP = lanport.IPAddress
+			}
 		}
+	}
+	if d.PrivateIPAddress == "" && baremetalFallbackIP != "" {
+		d.PrivateIPAddress = baremetalFallbackIP
+		slog.Info("Successfully filled Private IP Address (composable fallback)", "IP", d.PrivateIPAddress)
 	}
 
 	// d.IPAddress is mandatory in the machine creation process
