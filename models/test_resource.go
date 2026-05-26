@@ -1120,3 +1120,35 @@ var ExpectedLanportsBonding = []Lanport{
 		NicType:     NicTypeOnboard,
 	},
 }
+
+// ExpectedLanportsBaremetalMixed represents a scenario where the baremetal subnet
+// has a composable NIC listed before an onboard NIC, to verify the "onboard first"
+// fallback policy: the onboard IP must be preferred over the composable one.
+var ExpectedLanportsBaremetalMixed = []Lanport{
+	{
+		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:55",
+		LanportIdx:  1,
+		IPAddress:   "192.168.2.100",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		// Composable NIC on baremetal subnet — listed first, should lose to onboard
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:77",
+		LanportIdx:  3,
+		IPAddress:   "10.0.0.200",
+		NicType:     NicTypeComposable,
+	},
+	{
+		// Onboard NIC on baremetal subnet — should be preferred
+		LanportUUID: "a7d09755-d5c9-49ae-8f8c-7f53a3ae4f69",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "11:11:11:11:11:11",
+		LanportIdx:  4,
+		IPAddress:   "10.0.0.50",
+		NicType:     NicTypeOnboard,
+	},
+}
