@@ -489,11 +489,11 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 			slog.Error("Could not create SSH Manager because of an error", "err", err)
 			return err
 		}
-		d.SshManager = sshManager
 
-		if err := d.SshManager.HostPublicKeyIsValid(maxAttempts); err != nil {
+		if err := sshManager.HostPublicKeyIsValid(maxAttempts); err != nil {
 			return err
 		}
+		d.SshManager = sshManager
 	}
 
 	return nil

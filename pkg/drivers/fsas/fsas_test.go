@@ -919,8 +919,9 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 	driver.IPAddress = "[test"
 	err = driver.initSshManager(3)
 	assert.Error(t, err)
-	// After successful init, SshManager should have been replaced with a real StandardSshManager
-	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
+	// SshManager must NOT be replaced when HostPublicKeyIsValid fails, so that
+	// subsequent callers (e.g. Remove) correctly see IsInit()==false and skip SSH.
+	assert.IsType(t, &sshMock.MockSshManager{}, driver.SshManager)
 }
 
 func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {

@@ -136,7 +136,6 @@ func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath string, h
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
 	}
 
-	isInit = true
 	return &StandardSshManager{
 		HostName:      hostName,
 		UserName:      userName,
@@ -191,7 +190,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 	config := sc.getSshClientConfig()
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
-	
+
 	for currentAttempt := 1; ; currentAttempt++ {
 		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
 		client, err := gossh.Dial("tcp", address, config)
@@ -200,6 +199,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 			defer client.Close()
 			slog.Info("Host public key verification succeeded")
 			IsPublicKeyValid = true
+			isInit = true
 			return nil
 		}
 
