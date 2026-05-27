@@ -463,7 +463,7 @@ func (d *Driver) initFabricManager() error {
 
 // initSshManager Initialize SSH Manager client
 func (d *Driver) initSshManager(maxAttempts int) error {
-	if !d.SshManager.IsInit() {
+	if !d.SshManager.IsReady() {
 		slog.Warn("SSH Manager is NOT initialized then start init procedure")
 
 		// OsImageSshHostParsedKey may be nil when the driver was restored from JSON
@@ -489,11 +489,11 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 			slog.Error("Could not create SSH Manager because of an error", "err", err)
 			return err
 		}
-		d.SshManager = sshManager
 
-		if err := d.SshManager.HostPublicKeyIsValid(maxAttempts); err != nil {
+		if err := sshManager.HostPublicKeyIsValid(maxAttempts); err != nil {
 			return err
 		}
+		d.SshManager = sshManager
 	}
 
 	return nil

@@ -648,7 +648,7 @@ func TestRemoveSuccess(t *testing.T) {
 	}
 	driver.MachineUUID = "ddb3e14d-b9c8-4500-8377-073ad43a5ff7"
 
-	mockSshManager.On("IsInit").Return(true)
+	mockSshManager.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
@@ -709,7 +709,7 @@ func TestRemoveFMRemoveMachineFail(t *testing.T) {
 	}
 	driver.MachineUUID = "ddb3e14d-b9c8-4500-8377-073ad43a5ff7"
 
-	mockSshManager.On("IsInit").Return(true)
+	mockSshManager.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
@@ -734,7 +734,7 @@ func TestRemoveDeregisterOSFail(t *testing.T) {
 	}
 	driver.MachineUUID = "ddb3e14d-b9c8-4500-8377-073ad43a5ff7"
 
-	mockSshManager.On("IsInit").Return(true)
+	mockSshManager.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockFM.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
@@ -860,7 +860,7 @@ func TestInitSshManagerAlreadyInitialized(t *testing.T) {
 		SshManager: mockSSH,
 	}
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 
 	err := driver.initSshManager(3)
 	assert.NoError(t, err)
@@ -883,7 +883,7 @@ func TestInitSshManagerSuccess(t *testing.T) {
 		SshManager:              mockSSH,
 	}
 
-	mockSSH.On("IsInit").Return(false)
+	mockSSH.On("IsReady").Return(false)
 	old := sshutils.IsPublicKeyValid
 	sshutils.IsPublicKeyValid = true
 	defer func() { sshutils.IsPublicKeyValid = old }()
@@ -913,14 +913,56 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 		SshManager:              mockSSH,
 	}
 
-	mockSSH.On("IsInit").Return(false)
+	mockSSH.On("IsReady").Return(false)
 	// Setting an IP address as a string that starts with "["" will cause an error:
 	// "Failed to dial SSH server: err=dial tcp: address [test:22: missing ']' in address;"
 	driver.IPAddress = "[test"
 	err = driver.initSshManager(3)
 	assert.Error(t, err)
-	// After successful init, SshManager should have been replaced with a real StandardSshManager
-	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
+	// SshManager must NOT be replaced when HostPublicKeyIsValid fails, so that
+	// subsequent callers (e.g. Remove) correctly see IsReady()==false and skip SSH.
+	assert.IsType(t, &sshMock.MockSshManager{}, driver.SshManager)
+}
+
+// TestInitSshManagerRetriggersAfterPublicKeyValidationFailed is the regression
+// test for the bug where isReady was set by NewStandardSshManager *before*
+// HostPublicKeyIsValid was called. When the key check failed, isReady was already
+// true, so a subsequent initSshManager call (e.g. from Remove) would skip
+// initialization entirely and proceed with an unverified SSH connection —
+// potentially hanging on SSH commands.
+// The fix moves isReady=true into HostPublicKeyIsValid (success path only), so
+// a failed key check leaves the manager uninitialized and forces a retry.
+func TestInitSshManagerRetriggersAfterPublicKeyValidationFailed(t *testing.T) {
+	hostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+	parsedKey, err := sshutils.ParseSSHPublicKey(hostPubKeyStr)
+	require.NoError(t, err)
+
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			SSHUser:    "rancher",
+			SSHKeyPath: "/tmp/test-key",
+			IPAddress:  "[test", // malformed address: HostPublicKeyIsValid fails immediately
+		},
+		SSHPassword:             "rancher",
+		OsImageSshHostPubKey:    hostPubKeyStr,
+		OsImageSshHostParsedKey: parsedKey,
+		SshManager:              &sshutils.StandardSshManager{}, // real manager: IsReady() reads the package var
+	}
+
+	oldIsPublicKeyValid := sshutils.IsPublicKeyValid
+	sshutils.IsPublicKeyValid = false
+	defer func() { sshutils.IsPublicKeyValid = oldIsPublicKeyValid }()
+
+	// First call — simulates innerCreate: HostPublicKeyIsValid fails.
+	err1 := driver.initSshManager(1)
+	require.Error(t, err1)
+
+	// Second call — simulates Remove: must retry initialization, NOT silently skip it.
+	// Before the fix: NewStandardSshManager set isReady=true, so this returned nil.
+	// After the fix: isReady stays false until HostPublicKeyIsValid succeeds,
+	// so this also returns an error (initialization is attempted again).
+	err2 := driver.initSshManager(1)
+	assert.Error(t, err2, "initSshManager must retry after a previous HostPublicKeyIsValid failure")
 }
 
 func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
@@ -940,7 +982,7 @@ func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 		SshManager:              mockSSH,
 	}
 
-	mockSSH.On("IsInit").Return(false)
+	mockSSH.On("IsReady").Return(false)
 	sshutils.IsPublicKeyValid = true
 
 	old := sshutils.IsPublicKeyValid
@@ -969,7 +1011,7 @@ func TestInitSshManagerFailInvalidPubKeyFormat(t *testing.T) {
 		SshManager:              mockSSH,
 	}
 
-	mockSSH.On("IsInit").Return(false)
+	mockSSH.On("IsReady").Return(false)
 
 	err := driver.initSshManager(3)
 	assert.Error(t, err)
@@ -985,7 +1027,7 @@ func TestInitSshManagerFailEmptyIPAddress(t *testing.T) {
 		SshManager: mockSSH,
 	}
 
-	mockSSH.On("IsInit").Return(false)
+	mockSSH.On("IsReady").Return(false)
 
 	err := driver.initSshManager(3)
 	assert.Error(t, err)
@@ -1006,7 +1048,7 @@ func TestInitSshManagerFailNewStandardSshManager(t *testing.T) {
 		SshManager:              mockSSH,
 	}
 
-	mockSSH.On("IsInit").Return(false)
+	mockSSH.On("IsReady").Return(false)
 
 	err := driver.initSshManager(3)
 	assert.Error(t, err)
@@ -1171,7 +1213,7 @@ func TestCreate(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -1257,7 +1299,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -1349,7 +1391,7 @@ func TestCreateMachineFail(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -1430,7 +1472,7 @@ func TestCreateWaitForStatusFail(t *testing.T) {
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", int(UNBUILDED), nil)
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockSSH.On("DeregisterOS").Return(nil)
 
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
@@ -1491,7 +1533,7 @@ func TestCreateGetMachineDetailsFail(t *testing.T) {
 	testError := fmt.Errorf("GetMachineDetails unsucessfull")
 	// bootSSD call
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, testError).Once()
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// waitForStatus call in RemoveMachine
@@ -1548,7 +1590,7 @@ func TestCreateImageInstallFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	testError := fmt.Errorf("ImageInstall unsucessfull")
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(testError)
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// Call in Remove
@@ -1610,7 +1652,7 @@ func TestCreateStartFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
 	testError := fmt.Errorf("PowerOn unsucessfull")
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(testError)
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// last waitForStatus in Remove
@@ -1676,7 +1718,7 @@ func TestCreateGetMachineDetailsFailSecond(t *testing.T) {
 	// IP addresses call
 	testError := fmt.Errorf("GetMachineDetails unsucessfull")
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, testError).Once()
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockSSH.On("DeregisterOS").Return(nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// Remove call
@@ -1712,7 +1754,7 @@ func TestCreateImplantSSHKeyFail(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -1779,7 +1821,7 @@ func TestCreateOSRegistrationFail(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -1848,7 +1890,7 @@ func TestCreateExecuteScriptFail(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -1917,7 +1959,7 @@ func TestCreateFailRemoveFail(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -2809,7 +2851,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
@@ -2904,7 +2946,7 @@ func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
 	}
 	driver.MachineName = "machineNameTest"
 
-	mockSSH.On("IsInit").Return(true)
+	mockSSH.On("IsReady").Return(true)
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)

@@ -32,7 +32,7 @@ const (
 
 var (
 	ErrNoneOfConstructorArgsCanBeEmpty = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'sshKeyPath', 'hostPublicKey'")
-	isInit                             = false
+	isReady                            = false
 	IsPublicKeyValid                   = false
 )
 
@@ -74,7 +74,7 @@ var _ SSHKeyParser = (*fileSSHKeyParser)(nil)
 
 // SshManager interface defines the methods for interacting with the SSH Manager.
 type SshManager interface {
-	IsInit() bool
+	IsReady() bool
 	ExecuteScript(scriptPath, scriptContent string, postRemove bool, runWithSudo bool) error
 	WriteFileOnRemoteMachine(path, fileContent string, fileMode os.FileMode) error
 	RebootCloudInit() error
@@ -136,7 +136,6 @@ func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath string, h
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
 	}
 
-	isInit = true
 	return &StandardSshManager{
 		HostName:      hostName,
 		UserName:      userName,
@@ -156,9 +155,12 @@ func (sc *StandardSshManager) String() string {
 		"}"
 }
 
-// IsInit Returns true if constructor succeed else false
-func (sc *StandardSshManager) IsInit() bool {
-	return isInit
+// IsReady Returns true if SSH manager is initialized and connected to the host, false otherwise.
+// Initialization is performed during HostPublicKeyIsValid() method call and is based on successful SSH connection
+//
+//	to the host with provided credentials and host public key
+func (sc *StandardSshManager) IsReady() bool {
+	return isReady
 }
 
 func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
@@ -191,7 +193,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 	config := sc.getSshClientConfig()
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
-	
+
 	for currentAttempt := 1; ; currentAttempt++ {
 		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
 		client, err := gossh.Dial("tcp", address, config)
@@ -200,6 +202,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 			defer client.Close()
 			slog.Info("Host public key verification succeeded")
 			IsPublicKeyValid = true
+			isReady = true
 			return nil
 		}
 
