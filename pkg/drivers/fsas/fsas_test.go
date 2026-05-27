@@ -924,6 +924,47 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 	assert.IsType(t, &sshMock.MockSshManager{}, driver.SshManager)
 }
 
+// TestInitSshManagerRetriggersAfterPublicKeyValidationFailed is the regression
+// test for the bug where isInit was set by NewStandardSshManager *before*
+// HostPublicKeyIsValid was called. When the key check failed, isInit was already
+// true, so a subsequent initSshManager call (e.g. from Remove) would skip
+// initialization entirely and proceed with an unverified SSH connection —
+// potentially hanging on SSH commands.
+// The fix moves isInit=true into HostPublicKeyIsValid (success path only), so
+// a failed key check leaves the manager uninitialized and forces a retry.
+func TestInitSshManagerRetriggersAfterPublicKeyValidationFailed(t *testing.T) {
+	hostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+	parsedKey, err := sshutils.ParseSSHPublicKey(hostPubKeyStr)
+	require.NoError(t, err)
+
+	driver := &Driver{
+		BaseDriver: &drivers.BaseDriver{
+			SSHUser:    "rancher",
+			SSHKeyPath: "/tmp/test-key",
+			IPAddress:  "[test", // malformed address: HostPublicKeyIsValid fails immediately
+		},
+		SSHPassword:             "rancher",
+		OsImageSshHostPubKey:    hostPubKeyStr,
+		OsImageSshHostParsedKey: parsedKey,
+		SshManager:              &sshutils.StandardSshManager{}, // real manager: IsInit() reads the package var
+	}
+
+	oldIsPublicKeyValid := sshutils.IsPublicKeyValid
+	sshutils.IsPublicKeyValid = false
+	defer func() { sshutils.IsPublicKeyValid = oldIsPublicKeyValid }()
+
+	// First call — simulates innerCreate: HostPublicKeyIsValid fails.
+	err1 := driver.initSshManager(1)
+	require.Error(t, err1)
+
+	// Second call — simulates Remove: must retry initialization, NOT silently skip it.
+	// Before the fix: NewStandardSshManager set isInit=true, so this returned nil.
+	// After the fix: isInit stays false until HostPublicKeyIsValid succeeds,
+	// so this also returns an error (initialization is attempted again).
+	err2 := driver.initSshManager(1)
+	assert.Error(t, err2, "initSshManager must retry after a previous HostPublicKeyIsValid failure")
+}
+
 func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 	// Simulates the Remove/JSON-restore path where OsImageSshHostParsedKey is nil
 	// (not serialized) but the raw string is available for lazy re-parsing.
