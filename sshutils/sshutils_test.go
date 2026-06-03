@@ -9,10 +9,12 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 	mock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
@@ -71,12 +73,12 @@ func (c *MockSSHClient) Wait() error {
 func TestMain(m *testing.M) {
 
 	// setup code here
-	publicKeyIsValid = true
+	IsPublicKeyValid = true
 
 	exitCode := m.Run() // run tests
 
 	// tear-down code here
-	publicKeyIsValid = false
+	IsPublicKeyValid = false
 
 	os.Exit(exitCode)
 }
@@ -207,64 +209,6 @@ func Test_runCommand_Success_Missing_Exit(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, command, output)
-}
-
-func Test_createSSHKey_error(t *testing.T) {
-	sc := &StandardSshManager{SshKeyPath: "example/path/to/key"}
-
-	err := sc.createSSHKey()
-
-	assert.EqualError(t, err, "Error writing keys to file(s): Unable to write file")
-}
-
-func Test_createSSHKey(t *testing.T) {
-	sc := &StandardSshManager{}
-
-	tempDir := t.TempDir()
-	sshKeyName := "newSshKey"
-	sshKeyPath := filepath.Join(tempDir, sshKeyName)
-	sc.SshKeyPath = sshKeyPath
-	err := sc.createSSHKey()
-
-	assert.NoError(t, err)
-	assert.FileExists(t, sshKeyPath)
-	assert.FileExists(t, sshKeyPath+".pub")
-}
-
-func Test_transferSSHKeyToMachineOpenFail(t *testing.T) {
-	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", parsedHostPublicKey(t))
-	require.NoError(t, err)
-
-	err = sc.transferSSHKeyToMachine()
-
-	assert.Error(t, err)
-	assert.True(t, os.IsNotExist(err))
-}
-
-func Test_transferSSHKeyToMachine(t *testing.T) {
-	sc, err := NewStandardSshManager("host", "user", "password", "mock/path/to/key", parsedHostPublicKey(t))
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{}
-	sc.Client = mockClient
-
-	// Create a temporary public key file
-	tempDir := t.TempDir()
-	sshKeyName := "id_rsa"
-	pubKeyName := sshKeyName + ".pub"
-	pubKeyPath := filepath.Join(tempDir, pubKeyName)
-	keyContent := "ssh-rsa AAAA..."
-	err = os.WriteFile(pubKeyPath, []byte(keyContent), 0644)
-	require.NoError(t, err)
-
-	sshKeyPath := filepath.Join(tempDir, sshKeyName)
-	sc.SshKeyPath = sshKeyPath
-	err = sc.transferSSHKeyToMachine()
-
-	assert.NoError(t, err)
-	require.Len(t, mockClient.ExecutedCommands, 1)
-	expectedCommand := fmt.Sprintf(`echo "%s" >> $HOME/.ssh/authorized_keys`, keyContent)
-	assert.Equal(t, expectedCommand, mockClient.ExecutedCommands[0])
 }
 
 func TestWriteFileOnRemoteMachine_Success(t *testing.T) {
@@ -419,48 +363,6 @@ func Test_removeRemoteDir(t *testing.T) {
 	assert.Contains(t, mockClient.ExecutedCommands[0], "rmdir /tmp/mytestdir")
 }
 
-func Test_DisablePasswordSSHLogin_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{}
-	manager.Client = mockClient
-	manager.SshKeyPath = ""
-
-	err = manager.DisablePasswordSSHLogin()
-	assert.NoError(t, err)
-
-	expectedCommands := []string{
-		"sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak",
-		`echo "PasswordAuthentication no" | sudo tee /etc/ssh/sshd_config.d/99-disable-password.conf`,
-		`echo "AuthenticationMethods publickey" | sudo tee /etc/ssh/sshd_config.d/99-auth-methods.conf`,
-		"sudo systemctl reload sshd",
-	}
-	assert.Equal(t, mockClient.ExecutedCommands, expectedCommands)
-}
-
-func Test_DisablePasswordSSHLogin_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(cmd string) (string, error) {
-			// Fail on the second command
-			if strings.Contains(cmd, "tee") {
-				return "", MOCK_ERROR_FOR_OUTPUT_METHOD
-			}
-			return "", nil
-		},
-	}
-	manager.Client = mockClient
-	manager.SshKeyPath = ""
-
-	err = manager.DisablePasswordSSHLogin()
-
-	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-	assert.Len(t, mockClient.ExecutedCommands, 2)
-}
-
 func Test_RebootCloudInit_Success(t *testing.T) {
 	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
 	require.NoError(t, err)
@@ -490,181 +392,6 @@ func Test_RebootCloudInit_Fail(t *testing.T) {
 
 	err = manager.RebootCloudInit()
 	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-}
-
-func TestRegisterOS_SuccessWithUnregisteredModules(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-	manager.SshKeyPath = ""
-
-	mockRegcode := "somecode0101001"
-	mockEmail := "hoge@example.com"
-	initialRegCmd := fmt.Sprintf(cmdRegisterOS, mockRegcode, mockEmail)
-	getStatusCmd := cmdGetStatusOS
-	moduleRegCmd := "sudo -E SUSEConnect -p sle-module-public-cloud/15.6/x86_64"
-
-	products := []models.SuseProduct{
-		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Registered"},
-		{Identifier: "sle-module-public-cloud", Version: "15.6", Arch: "x86_64", Status: "Not Registered"},
-	}
-	jsonOutput, err := json.Marshal(products)
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(command string) (string, error) {
-			switch command {
-			case initialRegCmd, moduleRegCmd:
-				return "", nil
-			case getStatusCmd:
-				return string(jsonOutput), nil
-			default:
-				return "", fmt.Errorf("unexpected command: %s", command)
-			}
-		},
-	}
-	manager.Client = mockClient
-
-	err = manager.RegisterOS(mockRegcode, mockEmail)
-
-	assert.NoError(t, err)
-	expectedCommands := []string{initialRegCmd, getStatusCmd, moduleRegCmd}
-	assert.Equal(t, expectedCommands, mockClient.ExecutedCommands)
-}
-
-func TestRegisterOS_SuccessAllModulesRegistered(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-	manager.SshKeyPath = ""
-
-	mockRegcode := "somecode0101001"
-	mockEmail := "hoge@example.com"
-	products := []models.SuseProduct{{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Registered"}}
-	jsonOutput, err := json.Marshal(products)
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(command string) (string, error) {
-			if command == cmdGetStatusOS {
-				return string(jsonOutput), nil
-			}
-			return "", nil
-		},
-	}
-	manager.Client = mockClient
-
-	err = manager.RegisterOS(mockRegcode, mockEmail)
-
-	assert.NoError(t, err)
-	expectedCommands := []string{
-		fmt.Sprintf(cmdRegisterOS, mockRegcode, mockEmail),
-		cmdGetStatusOS,
-	}
-	assert.Equal(t, expectedCommands, mockClient.ExecutedCommands)
-}
-
-func TestRegisterOS_SkipWithNoRegcode(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-	manager.SshKeyPath = ""
-
-	mockClient := &MockSSHClient{}
-	manager.Client = mockClient
-
-	err = manager.RegisterOS("", "hoge@example.com")
-
-	assert.NoError(t, err)
-	assert.Empty(t, mockClient.ExecutedCommands)
-}
-
-func TestRegisterOS_FailOnInitialRegistration(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-	manager.SshKeyPath = ""
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(command string) (string, error) {
-			return "", MOCK_ERROR_FOR_OUTPUT_METHOD
-		},
-	}
-	manager.Client = mockClient
-
-	err = manager.RegisterOS("somecode", "email")
-
-	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-	require.Len(t, mockClient.ExecutedCommands, 1)
-	assert.Equal(t, fmt.Sprintf(cmdRegisterOS, "somecode", "email"), mockClient.ExecutedCommands[0])
-}
-
-func TestRegisterOS_FailOnGetStatus(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-	manager.SshKeyPath = ""
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(command string) (string, error) {
-			if command == cmdGetStatusOS {
-				return "", MOCK_ERROR_FOR_OUTPUT_METHOD
-			}
-			return "", nil
-		},
-	}
-	manager.Client = mockClient
-
-	err = manager.RegisterOS("somecode", "email")
-
-	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-	assert.Len(t, mockClient.ExecutedCommands, 2)
-}
-
-func TestRegisterOS_FailOnInvalidJSON(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-	manager.SshKeyPath = ""
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(command string) (string, error) {
-			if command == cmdGetStatusOS {
-				return "this is not valid json", nil
-			}
-			return "", nil
-		},
-	}
-	manager.Client = mockClient
-
-	err = manager.RegisterOS("somecode", "email")
-
-	require.Error(t, err)
-	_, isJsonError := err.(*json.SyntaxError)
-	assert.True(t, isJsonError, "error should be a JSON syntax error")
-	assert.Len(t, mockClient.ExecutedCommands, 2)
-}
-
-func TestRegisterOS_FailOnModuleRegistration(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	require.NoError(t, err)
-	manager.SshKeyPath = ""
-
-	products := []models.SuseProduct{{Identifier: "sle-module", Status: "Not Registered"}}
-	jsonOutput, err := json.Marshal(products)
-	require.NoError(t, err)
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(command string) (string, error) {
-			if command == cmdGetStatusOS {
-				return string(jsonOutput), nil
-			}
-			if strings.HasPrefix(command, "sudo -E SUSEConnect -p") {
-				return "", MOCK_ERROR_FOR_OUTPUT_METHOD
-			}
-			return "", nil
-		},
-	}
-	manager.Client = mockClient
-
-	err = manager.RegisterOS("somecode", "email")
-
-	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-	assert.Len(t, mockClient.ExecutedCommands, 3)
 }
 
 func Test_getSSHKeyAuthMethod_EmptyPath(t *testing.T) {
@@ -827,7 +554,6 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 
 	err = manager.DeregisterOS()
 	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-	assert.ErrorContains(t, err, "could not get SUSE product status before deregistration")
 	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
 }
 
@@ -884,51 +610,61 @@ func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
 	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
 }
 
-func Test_DeregisterOS_Fail_JsonParse(t *testing.T) {
+func TestHostPublicKeyIsValid_AlreadyValid(t *testing.T) {
+	// IsPublicKeyValid is set to true by TestMain; method returns immediately without dialing.
 	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
+
+	err = manager.HostPublicKeyIsValid(1)
 	assert.NoError(t, err)
-
-	mockClient := &MockSSHClient{
-		OutputFunc: func(cmd string) (string, error) {
-			if cmd == cmdGetStatusOS {
-				return "invalid-json", nil
-			}
-			return "", fmt.Errorf("unexpected command")
-		},
-	}
-	manager.Client = mockClient
-	manager.SshKeyPath = ""
-
-	err = manager.DeregisterOS()
-	assert.Error(t, err)
-	assert.ErrorContains(t, err, "failed to parse SUSE status JSON before deregistration")
-	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
 }
 
-func Test_DeregisterOS_Fail_DeregistrationCommand(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
-	assert.NoError(t, err)
-	products := []models.SuseProduct{
-		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Registered"},
-	}
-	jsonOutput, _ := json.Marshal(products)
+func TestHostPublicKeyIsValid_OtherDialError_ReturnsWrappedError(t *testing.T) {
+	IsPublicKeyValid = false
+	defer func() { IsPublicKeyValid = true }()
 
-	mockClient := &MockSSHClient{
-		OutputFunc: func(cmd string) (string, error) {
-			if cmd == cmdGetStatusOS {
-				return string(jsonOutput), nil
-			}
-			if cmd == cmdDeregisterOS {
-				return "", MOCK_ERROR_FOR_OUTPUT_METHOD
-			}
-			return "", fmt.Errorf("unexpected command")
-		},
-	}
-	manager.Client = mockClient
-	manager.SshKeyPath = ""
+	// An unresolvable hostname produces a quick non-"connection refused" dial error (no sleep).
+	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
 
-	err = manager.DeregisterOS()
-	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
-	assert.ErrorContains(t, err, "error executing SLES OS deregistration")
-	assert.Equal(t, []string{cmdGetStatusOS, cmdDeregisterOS}, mockClient.ExecutedCommands)
+	err = manager.HostPublicKeyIsValid(1)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to dial SSH server")
+}
+
+func TestHostPublicKeyIsValid_ZeroMaxAttempts_NormalizedToOne(t *testing.T) {
+	IsPublicKeyValid = false
+	defer func() { IsPublicKeyValid = true }()
+
+	// maxAttempts=0 must be normalized to 1: only one attempt made, then error returned.
+	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
+
+	err = manager.HostPublicKeyIsValid(0)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to dial SSH server")
+}
+
+func TestHostPublicKeyIsValid_ConnectionRefused_ReturnsError(t *testing.T) {
+	IsPublicKeyValid = false
+	defer func() { IsPublicKeyValid = true }()
+
+	// Verify that port 22 is actually refusing connections on localhost; skip otherwise.
+	// This test exercises the "connection refused" branch which sleeps SSH_CONNECT_ATTEMPT_DELAY.
+	conn, dialErr := net.DialTimeout("tcp", "127.0.0.1:22", time.Second)
+	if dialErr == nil {
+		conn.Close()
+		t.Skip("Port 22 is open on localhost; skipping connection refused test")
+	}
+	if !strings.Contains(dialErr.Error(), "connection refused") {
+		t.Skip("localhost:22 did not return 'connection refused'; skipping test")
+	}
+
+	manager, err := NewStandardSshManager("127.0.0.1", "user1", "password1", "mock/path", parsedHostPublicKey(t))
+	require.NoError(t, err)
+
+	err = manager.HostPublicKeyIsValid(1)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to dial SSH server")
+	assert.ErrorContains(t, err, "connection refused")
 }

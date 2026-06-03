@@ -7,22 +7,23 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestCreateMachineRequestToJSON(t *testing.T) {
 	request := CreateMachineRequest{
-		Tenants: CreateMachineTenantsRequest{
+		Tenants: CreateMachineRequestBodyTenants{
 			TenantUUID: "b3b65e79-ad41-4367-89d6-e4e7315141ef",
 			Machines: []CreateMachineSpec{
 				{
-					Machine: "test-machine-001",
-					Resources: []ResSpecs{
+					MachineName: "test-machine-001",
+					Resources: []CreateMachineResources{
 						{
 							ResourceSpecifications: []Resource{
 								{
 									ResourceType: "compute",
 									ResourceNum:  1,
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "model", Operator: "eq", Value: "PRIMERGY-RX2540M6"},
 										},
@@ -31,7 +32,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 								{
 									ResourceType: "storage",
 									ResourceNum:  2, // Added a second storage resource
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "type", Operator: "eq", Value: "NVMe"},
 										},
@@ -40,7 +41,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 								{
 									ResourceType: "network",
 									ResourceNum:  1,
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "name", Operator: "eq", Value: "baremetal-mgmt"},
 										},
@@ -62,7 +63,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 								{
 									ResourceType: "network",
 									ResourceNum:  2,
-									ResourceSpec: &ResSpec{
+									ResourceSpec: &ResourceSpecification{
 										Condition: []Condition{
 											{Column: "name", Operator: "eq", Value: "provisioning-net"},
 										},
@@ -96,7 +97,7 @@ func TestCreateMachineRequestToJSON(t *testing.T) {
 }
 
 func TestUnmarshalPostMachinesResponse(t *testing.T) {
-	var postResponse MachinesRequestResponse
+	var postResponse MachineResponse
 	err := json.Unmarshal([]byte(PostMachinesResponseExample), &postResponse)
 	assert.NoError(t, err)
 
@@ -134,7 +135,7 @@ func TestUnmarshalPostMachinesResponse(t *testing.T) {
 	assert.Equal(t, "network", networkProvisioningResource.ResourceType)
 	assert.Equal(t, "provisioning", networkProvisioningResource.ResourceSpec.Condition[0].Value)
 	assert.NotNil(t, networkProvisioningResource.Network)
-	assert.Equal(t, 1, networkProvisioningResource.Network.NicType)
+	assert.Equal(t, NicTypeOnboard, networkProvisioningResource.Network.NicType)
 	assert.Equal(t, 1, len(networkProvisioningResource.Network.Subnets))
 	assert.Equal(t, "6b5f0567-921f-4ef3-a6e5-11f7e2609857", networkProvisioningResource.Network.Subnets[0].SubnetUUID)
 	assert.Equal(t, 1, networkProvisioningResource.Network.Subnets[0].LanportIdx)
@@ -147,7 +148,7 @@ func TestUnmarshalPostMachinesResponse(t *testing.T) {
 	assert.Equal(t, "network", networkClusterResource.ResourceType)
 	assert.Equal(t, "cluster", networkClusterResource.ResourceSpec.Condition[0].Value)
 	assert.NotNil(t, networkClusterResource.Network)
-	assert.Equal(t, 2, networkClusterResource.Network.NicType)
+	assert.Equal(t, NicTypeComposable, networkClusterResource.Network.NicType)
 	assert.Equal(t, 1, len(networkClusterResource.Network.Subnets))
 	assert.Equal(t, "991fbfd5-3521-4098-880e-1d9d2c8d2705", networkClusterResource.Network.Subnets[0].SubnetUUID)
 	assert.Equal(t, 2, networkClusterResource.Network.Subnets[0].LanportIdx)
@@ -155,7 +156,7 @@ func TestUnmarshalPostMachinesResponse(t *testing.T) {
 }
 
 func TestUnmarshalGetMachineResponse(t *testing.T) {
-	var getResponse MachinesRequestResponse
+	var getResponse MachineResponse
 	err := json.Unmarshal([]byte(GetMachineResponseExample), &getResponse)
 	assert.NoError(t, err)
 
@@ -179,14 +180,14 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 	lanport1 := machine.Lanports[0]
 	assert.Equal(t, "d8c7b6a5-4321-0987-6543-210fedcba098", lanport1.LanportUUID)
 	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", lanport1.SubnetUUID)
-	assert.Equal(t, "00:11:22:33:44:55", lanport1.MacAddress)
+	assert.Equal(t, "00:11:22:33:44:55", lanport1.MACAddress)
 	assert.Equal(t, 1, lanport1.LanportIdx)
 	assert.Equal(t, "192.168.2.100", lanport1.IPAddress)
 
 	lanport2 := machine.Lanports[1] // Assertions for the second lanport
 	assert.Equal(t, "01085c2c-15c4-4957-9ad3-7d1ee481f082", lanport2.LanportUUID)
 	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", lanport2.SubnetUUID)
-	assert.Equal(t, "00:11:22:33:44:66", lanport2.MacAddress)
+	assert.Equal(t, "00:11:22:33:44:66", lanport2.MACAddress)
 	assert.Equal(t, 2, lanport2.LanportIdx)
 	assert.Equal(t, "192.168.2.150", lanport2.IPAddress)
 
@@ -203,6 +204,17 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 	assert.Equal(t, "cpu_cores", resourceCPU.ResourceSpec.Condition[0].Column)
 	assert.Equal(t, "eq", resourceCPU.ResourceSpec.Condition[0].Operator)
 	assert.Equal(t, "4", resourceCPU.ResourceSpec.Condition[0].Value)
+	assert.NotNil(t, resourceCPU.Network)
+	assert.Equal(t, NicTypeOnboard, resourceCPU.Network.NicType)
+	assert.Equal(t, 2, len(resourceCPU.Network.Subnets))
+	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", resourceCPU.Network.Subnets[0].SubnetUUID)
+	assert.Equal(t, 1, resourceCPU.Network.Subnets[0].LanportIdx)
+	assert.Equal(t, "d8c7b6a5-4321-0987-6543-210fedcba098", resourceCPU.Network.Subnets[0].LanportUUID)
+	assert.Equal(t, "00:11:22:33:44:55", resourceCPU.Network.Subnets[0].MACAddress)
+	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", resourceCPU.Network.Subnets[1].SubnetUUID)
+	assert.Equal(t, 2, resourceCPU.Network.Subnets[1].LanportIdx)
+	assert.Equal(t, "01085c2c-15c4-4957-9ad3-7d1ee481f082", resourceCPU.Network.Subnets[1].LanportUUID)
+	assert.Equal(t, "00:11:22:33:44:66", resourceCPU.Network.Subnets[1].MACAddress)
 
 	resourceStorage1 := machine.Resources[1]
 	assert.Equal(t, "a5432109-8765-4321-0fed-cba098765432", resourceStorage1.ResourceUUID)
@@ -245,7 +257,7 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 	assert.Equal(t, "eq", resourceNetworkProvisioning.ResourceSpec.Condition[0].Operator)
 	assert.Equal(t, "provisioning", resourceNetworkProvisioning.ResourceSpec.Condition[0].Value)
 	assert.NotNil(t, resourceNetworkProvisioning.Network)
-	assert.Equal(t, 1, resourceNetworkProvisioning.Network.NicType)
+	assert.Equal(t, NicTypeOnboard, resourceNetworkProvisioning.Network.NicType)
 	assert.Equal(t, "123e4567-e89b-12d3-a456-426614174000", resourceNetworkProvisioning.Network.Subnets[0].SubnetUUID)
 	assert.Equal(t, 1, resourceNetworkProvisioning.Network.Subnets[0].LanportIdx)
 	assert.Equal(t, "192.168.2.1", resourceNetworkProvisioning.Network.Subnets[0].DefaultGW)
@@ -264,7 +276,7 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 	assert.Equal(t, "eq", resourceNetworkCluster.ResourceSpec.Condition[0].Operator)
 	assert.Equal(t, "cluster", resourceNetworkCluster.ResourceSpec.Condition[0].Value)
 	assert.NotNil(t, resourceNetworkCluster.Network)
-	assert.Equal(t, 1, resourceNetworkCluster.Network.NicType)
+	assert.Equal(t, NicTypeOnboard, resourceNetworkCluster.Network.NicType)
 	assert.Equal(t, "78901234-5678-9abc-def0-1234567890ab", resourceNetworkCluster.Network.Subnets[0].SubnetUUID)
 	assert.Equal(t, "78901234-5678-9abc-def0-1234567890ab", resourceNetworkCluster.Network.Subnets[0].SubnetUUID)
 	assert.Equal(t, 2, resourceNetworkCluster.Network.Subnets[0].LanportIdx)
@@ -276,7 +288,7 @@ func TestUnmarshalGetMachineResponse(t *testing.T) {
 }
 
 func TestUnmarshalDeleteMachineResponse(t *testing.T) {
-	var deleteResponse MachinesRequestResponse
+	var deleteResponse MachineResponse
 	err := json.Unmarshal([]byte(DeleteMachineResponseExample), &deleteResponse)
 	assert.NoError(t, err)
 
@@ -308,69 +320,18 @@ func TestMarshalImageInstallToJSON(t *testing.T) {
 	assert.Equal(t, ImageInstallPutResponseExample, string(rawJSON))
 }
 
-func Test_customUnmarshallerForResourceStruct(t *testing.T) {
-	testCases := []struct {
-		name       string
-		jsonString string
-		expected   *ResSpec
-	}{
-		{name: "valid response without typo",
-			jsonString: `{
-					"res_uuid":"b6a54321-0987-6543-210f-edcba0987654",
-					"res_name":"compute-resource-1",
-					"res_type":"compute",
-					"res_status":1,
-					"res_op_status":"0",
-					"res_spec":{
-					"condition":[
-						{
-						"column":"cpu_cores",
-						"operator":"eq",
-						"value":"4"
-						}
-					]
-					}
-				}`,
-			expected: &ResSpec{[]Condition{{Column: "cpu_cores", Operator: "eq", Value: "4"}}}},
+func TestNetworkConfigOnboardComposable(t *testing.T) {
+	// Test Unmarshalling
+	var decodedNetworkConfig NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardComposableYaml), &decodedNetworkConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, decodedNetworkConfig, ValidNetworkConfigOnboardComposable)
+}
 
-		{name: "not valid response with typo",
-			jsonString: `{
-					"res_uuid":"b6a54321-0987-6543-210f-edcba0987654",
-					"res_name":"compute-resource-1",
-					"res_type":"compute",
-					"res_status":1,
-					"res_op_status":"0",
-					"res_spcec":{
-					"condition":[
-						{
-						"column":"cpu_cores",
-						"operator":"eq",
-						"value":"4"
-						}
-					]
-					}
-				}`,
-			expected: &ResSpec{[]Condition{{Column: "cpu_cores", Operator: "eq", Value: "4"}}}},
-
-		{name: "response without res_spec field at all, neither valid nor invalid",
-			jsonString: `{
-					"res_uuid":"b6a54321-0987-6543-210f-edcba0987654",
-					"res_name":"compute-resource-1",
-					"res_type":"compute",
-					"res_status":1,
-					"res_op_status":"0"
-				}`,
-			expected: nil},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var resource Resource
-
-			err := json.Unmarshal([]byte(tc.jsonString), &resource)
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expected, resource.ResourceSpec)
-		})
-	}
-
+func TestNetworkConfigOnboard(t *testing.T) {
+	// Test Unmarshalling
+	var decodedNetworkConfig NetworkConfig
+	err := yaml.Unmarshal([]byte(NetworkConfigValidOnboardYaml), &decodedNetworkConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, validNetworkConfigOnboard, decodedNetworkConfig)
 }

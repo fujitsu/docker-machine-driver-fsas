@@ -2,8 +2,9 @@ package models
 
 const (
 	PostMachinesRequestExpected                        = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test-machine-001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]}},{"res_type":"storage","res_num":2,"res_spec":{"condition":[{"column":"type","operator":"eq","value":"NVMe"}]}},{"res_type":"network","res_num":1,"res_spec":{"condition":[{"column":"name","operator":"eq","value":"baremetal-mgmt"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":1,"default_gw":"192.168.1.1","lease_time":"86400s","ntp":"ntp.example.com","dns":"8.8.8.8"}]}},{"res_type":"network","res_num":2,"res_spec":{"condition":[{"column":"name","operator":"eq","value":"provisioning-net"}]},"network":{"nic_type":2,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":2,"default_gw":"10.0.0.1","lease_time":"1209600000000000s","ntp":"time.google.com"}]}}]}]}]}}`
-	CreateMachineRequestExpected                       = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":1,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":2,"default_gw":"172.0.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
+	CreateMachineRequestExpected                       = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":1,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":2,"ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
 	CreateMachineRequestOneProvisioningNetworkExpected = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":2,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
+	CreateMachineRequestBaremetalBondingExpected       = `{"tenants":{"tenant_uuid":"b3b65e79-ad41-4367-89d6-e4e7315141ef","machines":[{"mach_name":"test_machine_001","resources":[{"res_specs":[{"res_type":"compute","res_num":1,"res_spec":{"condition":[{"column":"model","operator":"eq","value":"PRIMERGY-RX2540M6"}]},"network":{"nic_type":1,"subnets":[{"subnet_uuid":"5dc4769c-eef2-407f-b729-fec926ec9eda","lanport_idx":1,"default_gw":"192.168.0.1","ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":1,"ntp":"192.168.0.1","dns":"8.8.8.8"},{"subnet_uuid":"75e6b24f-c1cc-4009-a871-b5828a468f4f","lanport_idx":2,"ntp":"192.168.0.1","dns":"8.8.8.8"}]}},{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]}]}]}}`
 	PostMachinesResponseExample                        = `{
 		"data":{
 			"machines":[
@@ -183,6 +184,23 @@ const (
 						"value":"4"
 						}
 					]
+					},
+					"network":{
+					"nic_type":1,
+					"subnets":[
+						{
+						"subnet_uuid":"123e4567-e89b-12d3-a456-426614174000",
+						"lanport_idx":1,
+						"lanport_uuid":"d8c7b6a5-4321-0987-6543-210fedcba098",
+						"mac_address":"00:11:22:33:44:55"
+						},
+						{
+						"subnet_uuid":"123e4567-e89b-12d3-a456-426614174000",
+						"lanport_idx":2,
+						"lanport_uuid":"01085c2c-15c4-4957-9ad3-7d1ee481f082",
+						"mac_address":"00:11:22:33:44:66"
+						}
+					]
 					}
 				},
 				{
@@ -299,6 +317,7 @@ const (
 			]
 		}
 	}`
+
 	GetMachineResponseExampleWithTypoInStorageResSpec = `{
 		"data":{
 			"machines":[
@@ -370,6 +389,23 @@ const (
 						"column":"cpu_cores",
 						"operator":"eq",
 						"value":"4"
+						}
+					]
+					},
+					"network":{
+					"nic_type":1,
+					"subnets":[
+						{
+						"subnet_uuid":"123e4567-e89b-12d3-a456-426614174000",
+						"lanport_idx":1,
+						"lanport_uuid":"d8c7b6a5-4321-0987-6543-210fedcba098",
+						"mac_address":"00:11:22:33:44:55"
+						},
+						{
+						"subnet_uuid":"123e4567-e89b-12d3-a456-426614174000",
+						"lanport_idx":2,
+						"lanport_uuid":"01085c2c-15c4-4957-9ad3-7d1ee481f082",
+						"mac_address":"00:11:22:33:44:66"
 						}
 					]
 					}
@@ -828,42 +864,291 @@ done
 			}
 		}
 	]`
+
+	NetworkConfigValidOnboardYaml = `network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    bare0:
+      match:
+        macaddress: 52:54:00:a6:36:86
+    bare1:
+      match:
+        macaddress: 52:54:00:32:72:16
+    prov:
+      match:
+        macaddress: 52:54:00:7e:de:e2
+      dhcp4: true
+  bonds:
+    bond0:
+      interfaces:
+      - bare0
+      - bare1
+      dhcp4: true
+      parameters:
+        mode: active-backup
+        fail-over-mac-policy: active
+`
+
+	NetworkConfigValidOnboardComposableYaml = `network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    bare0:
+      match:
+        macaddress: 00:11:22:33:44:55
+      dhcp4: true
+    bare1:
+      match:
+        macaddress: 00:11:22:33:44:66
+      dhcp4: true
+    prov2:
+      match:
+        macaddress: 00:11:22:33:44:77
+      dhcp4: true
+    prov3:
+      match:
+        macaddress: 11:11:11:11:11:11
+      dhcp4: true
+    prov4:
+      match:
+        macaddress: 22:22:22:22:22:22
+      dhcp4: true
+  bonds:
+    bond0:
+      interfaces:
+      - bare0
+      - bare1
+      dhcp4: true
+      parameters:
+        mode: active-backup
+        fail-over-mac-policy: active
+`
 )
+
+var validNetworkConfigOnboard = NetworkConfig{
+	Network: NetworkSpec{
+		SchemaVersion: NetworkConfigVersion2,
+		Renderer:      RendererNetworkManager,
+		Ethernets: map[string]Ethernet{
+			"prov": {
+				Match: Match{MACAddress: "52:54:00:7e:de:e2"},
+				DHCP4: true,
+			},
+			"bare0": {
+				Match: Match{MACAddress: "52:54:00:a6:36:86"},
+			},
+			"bare1": {
+				Match: Match{MACAddress: "52:54:00:32:72:16"},
+			},
+		},
+		Bonds: map[string]Bond{
+			"bond0": {
+				Interfaces: []string{"bare0", "bare1"},
+				DHCP4:      true,
+				Parameters: BondParameters{
+					Mode:              BondModeActiveBackup,
+					FailoverMacPolicy: FailoverMacPolicyActive,
+				},
+			},
+		},
+	},
+}
+
+var ValidNetworkConfigOnboardComposable = NetworkConfig{
+	Network: NetworkSpec{
+		SchemaVersion: NetworkConfigVersion2,
+		Renderer:      RendererNetworkManager,
+		Ethernets: map[string]Ethernet{
+			"bare0": {
+				Match: Match{
+					MACAddress: "00:11:22:33:44:55",
+				},
+				DHCP4: true,
+			},
+			"bare1": {
+				Match: Match{
+					MACAddress: "00:11:22:33:44:66",
+				},
+				DHCP4: true,
+			},
+			"prov2": {
+				Match: Match{
+					MACAddress: "00:11:22:33:44:77",
+				},
+				DHCP4: true,
+			},
+			"prov3": {
+				Match: Match{
+					MACAddress: "11:11:11:11:11:11",
+				},
+				DHCP4: true,
+			},
+			"prov4": {
+				Match: Match{
+					MACAddress: "22:22:22:22:22:22",
+				},
+				DHCP4: true,
+			},
+		},
+		Bonds: map[string]Bond{
+			"bond0": {
+				Interfaces: []string{"bare0", "bare1"},
+				DHCP4:      true,
+				Parameters: BondParameters{
+					Mode:              BondModeActiveBackup,
+					FailoverMacPolicy: FailoverMacPolicyActive,
+				},
+			},
+		},
+	},
+}
+
+var ExpectedSubnets = map[string]string{
+	"baremetal":    "123e4567-e89b-12d3-a456-426614174000",
+	"provisioning": "78901234-5678-9abc-def0-1234567890ab",
+}
 
 var ExpectedLanports = []Lanport{
 	{
 		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
 		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		MacAddress:  "00:11:22:33:44:55",
+		MACAddress:  "00:11:22:33:44:55",
 		LanportIdx:  1,
 		IPAddress:   "192.168.2.100",
 	},
 	{
 		LanportUUID: "01085c2c-15c4-4957-9ad3-7d1ee481f082",
 		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		MacAddress:  "00:11:22:33:44:66",
+		MACAddress:  "00:11:22:33:44:66",
 		LanportIdx:  2,
 		IPAddress:   "192.168.2.150",
 	},
 	{
 		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
 		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
-		MacAddress:  "00:11:22:33:44:77",
+		MACAddress:  "00:11:22:33:44:77",
 		LanportIdx:  3,
 		IPAddress:   "10.0.0.100",
 	},
 	{
 		LanportUUID: "a7d09755-d5c9-49ae-8f8c-7f53a3ae4f69",
 		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
-		MacAddress:  "11:11:11:11:11:11",
+		MACAddress:  "11:11:11:11:11:11",
 		LanportIdx:  4,
 		IPAddress:   "10.0.0.200",
 	},
 	{
 		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
 		SubnetUUID:  "03aa247b-dd21-4dd0-943c-1b878bb6cccc",
-		MacAddress:  "22:22:22:22:22:22",
+		MACAddress:  "22:22:22:22:22:22",
 		LanportIdx:  0,
 		IPAddress:   "",
+	},
+}
+
+// ExpectedLanportsWithType is ExpectedLanports with NicType populated (as returned by GetMachineDetails)
+var ExpectedLanportsWithType = []Lanport{
+	{
+		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:55",
+		LanportIdx:  1,
+		IPAddress:   "192.168.2.100",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		LanportUUID: "01085c2c-15c4-4957-9ad3-7d1ee481f082",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:66",
+		LanportIdx:  2,
+		IPAddress:   "192.168.2.150",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:77",
+		LanportIdx:  3,
+		IPAddress:   "10.0.0.100",
+		NicType:     NicTypeComposable,
+	},
+	{
+		LanportUUID: "a7d09755-d5c9-49ae-8f8c-7f53a3ae4f69",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "11:11:11:11:11:11",
+		LanportIdx:  4,
+		IPAddress:   "10.0.0.200",
+		NicType:     NicTypeComposable,
+	},
+	{
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "03aa247b-dd21-4dd0-943c-1b878bb6cccc",
+		MACAddress:  "22:22:22:22:22:22",
+		LanportIdx:  0,
+		IPAddress:   "",
+		NicType:     NicTypeComposable,
+	},
+}
+
+// ExpectedLanportsBonding represents a bonding scenario where:
+// - Baremetal subnet uses onboard NICs (ports 1, 2) for the bond
+// - Provisioning subnet uses an onboard NIC (port 3)
+var ExpectedLanportsBonding = []Lanport{
+	{
+		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:55",
+		LanportIdx:  1,
+		IPAddress:   "10.0.0.100",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		LanportUUID: "01085c2c-15c4-4957-9ad3-7d1ee481f082",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:66",
+		LanportIdx:  2,
+		IPAddress:   "10.0.0.101",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:77",
+		LanportIdx:  3,
+		IPAddress:   "192.168.2.100",
+		NicType:     NicTypeOnboard,
+	},
+}
+
+// ExpectedLanportsBaremetalMixed represents a scenario where the baremetal subnet
+// has a composable NIC listed before an onboard NIC, to verify the "onboard first"
+// fallback policy: the onboard IP must be preferred over the composable one.
+var ExpectedLanportsBaremetalMixed = []Lanport{
+	{
+		LanportUUID: "d8c7b6a5-4321-0987-6543-210fedcba098",
+		SubnetUUID:  "123e4567-e89b-12d3-a456-426614174000",
+		MACAddress:  "00:11:22:33:44:55",
+		LanportIdx:  1,
+		IPAddress:   "192.168.2.100",
+		NicType:     NicTypeOnboard,
+	},
+	{
+		// Composable NIC on baremetal subnet — listed first, should lose to onboard
+		LanportUUID: "c7b6a543-2109-8765-4321-0fedcba09876",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "00:11:22:33:44:77",
+		LanportIdx:  3,
+		IPAddress:   "10.0.0.200",
+		NicType:     NicTypeComposable,
+	},
+	{
+		// Onboard NIC on baremetal subnet — should be preferred
+		LanportUUID: "a7d09755-d5c9-49ae-8f8c-7f53a3ae4f69",
+		SubnetUUID:  "78901234-5678-9abc-def0-1234567890ab",
+		MACAddress:  "11:11:11:11:11:11",
+		LanportIdx:  4,
+		IPAddress:   "10.0.0.50",
+		NicType:     NicTypeOnboard,
 	},
 }

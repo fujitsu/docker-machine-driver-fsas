@@ -4,6 +4,15 @@ import (
 	"encoding/json"
 )
 
+// NicType represents the type of a NIC: undetermined, onboard, or composable.
+type NicType int
+
+const (
+	NicTypeUndetermined NicType = iota // 0 — not determined
+	NicTypeOnboard                     // 1 — onboard NIC
+	NicTypeComposable                  // 2 — composable NIC
+)
+
 // VMRequestPayload struct represents the payload for requesting a new VM.
 type VMRequestPayload struct {
 	MachineName string `json:"machine_name"`
@@ -17,24 +26,26 @@ type Condition struct {
 	Value    string `json:"value"`
 }
 
-type ResSpec struct {
+type ResourceSpecification struct {
 	// TODO: confirm if list below is 1-element only when physical fm environment is available
 	Condition []Condition `json:"condition"` // List containing only 1 element by design of fabric manager
 }
 
 type Subnet struct {
-	SubnetUUID string `json:"subnet_uuid"`
-	LanportIdx int    `json:"lanport_idx"`
-	DefaultGW  string `json:"default_gw,omitempty"`
-	LeaseTime  string `json:"lease_time,omitempty"`
-	Ntp        string `json:"ntp"`
-	Dns        string `json:"dns,omitempty"`
-	Fqdn       string `json:"fqdn,omitempty"`
+	SubnetUUID  string `json:"subnet_uuid"`            // POST request & response
+	LanportIdx  int    `json:"lanport_idx"`            // POST request & response
+	LanportUUID string `json:"lanport_uuid,omitempty"` // POST response
+	MACAddress  string `json:"mac_address,omitempty"`  // POST response
+	DefaultGW   string `json:"default_gw,omitempty"`   // POST request
+	LeaseTime   string `json:"lease_time,omitempty"`   // POST request
+	Ntp         string `json:"ntp,omitempty"`          // POST request
+	Dns         string `json:"dns,omitempty"`          // POST request
+	Fqdn        string `json:"fqdn,omitempty"`         // POST request
 }
 
 type Network struct {
-	NicType int      `json:"nic_type"`
-	Subnets []Subnet `json:"subnets"` // Expected 1-element arrays only
+	NicType NicType  `json:"nic_type"`
+	Subnets []Subnet `json:"subnets"` // Expected up to 3-elements in arrays: bare-metal, provisioning, iRMC
 }
 
 type ResStorageTags struct {
@@ -42,48 +53,58 @@ type ResStorageTags struct {
 }
 
 type Resource struct {
-	ResourceType     string          `json:"res_type"`
-	ResourceNum      int             `json:"res_num,omitempty"` // Present only in payload of POST /machines
-	ResourceSpec     *ResSpec        `json:"res_spec,omitempty"`
-	Tags             *ResStorageTags `json:"tags,omitempty"`
-	Network          *Network        `json:"network,omitempty"`            // It's the only localization where network data are processed
-	ResourceUUID     string          `json:"res_uuid,omitempty"`           // Present only in responses
-	ResourceName     string          `json:"res_name,omitempty"`           // Present only in responses
-	ResourceStatus   int             `json:"res_status,omitempty"`         // Present only in responses
-	ResourceOpStatus string          `json:"res_op_status,omitempty"`      // Present only in responses
-	MinResourceCount int             `json:"min_resource_count,omitempty"` // GPU field (read-only and optional)
-	MaxResourceCount int             `json:"max_resource_count,omitempty"` // GPU field (read-only and optional)
+	ResourceType         string                 `json:"res_type"`
+	ResourceNum          int                    `json:"res_num,omitempty"` // Present only in payload of POST /machines
+	ResourceSpec         *ResourceSpecification `json:"res_spec,omitempty"`
+	Tags                 *ResStorageTags        `json:"tags,omitempty"`
+	Network              *Network               `json:"network,omitempty"`            // It's the only localization where network data are processed
+	ResourceUUID         string                 `json:"res_uuid,omitempty"`           // Present only in responses
+	ResourceName         string                 `json:"res_name,omitempty"`           // Present only in responses
+	ResourceStatus       int                    `json:"res_status,omitempty"`         // Present only in responses
+	ResourceOpStatus     string                 `json:"res_op_status,omitempty"`      // Present only in responses
+	MinResourceCount     int                    `json:"min_resource_count,omitempty"` // GPU field (read-only and optional)
+	MaxResourceCount     int                    `json:"max_resource_count,omitempty"` // GPU field (read-only and optional)
+	ResourceCollectionID int                    `json:"res_collection_id,omitempty"`  // POST response, GET response
+	ConditionUUID        string                 `json:"condition_uuid,omitempty"`     // POST response
+	ResourceSerialNumber string                 `json:"res_serial_num,omitempty"`     // POST response, GET response
 }
 
-// Custom Unmarshaler to handle both "res_spec" and "res_spcec"
-/*
-	The reason why there is a defined custom unmarshaller is a typo
-	in the production Fabric Manager code: response for the Get request
-	returns JSON with field: 'res_spcec' instead of 'res_spec'.
-	This is only a temporary workaround until the typo is corrected
-	and merged to the release branch.
-*/
-// TODO: Remove this custom unmarshaller when the typo is fixed
-func (r *Resource) UnmarshalJSON(data []byte) error {
-	// Define a temporary type to avoid recursion during unmarshaling.
-	type Alias Resource
-	aux := &struct {
-		*Alias
-		ResSpcec *ResSpec `json:"res_spcec,omitempty"`
-	}{
-		Alias: (*Alias)(r),
-	}
+const (
+	NetworkConfigVersion2   int    = 2
+	RendererNetworkManager  string = "NetworkManager"
+	BondModeActiveBackup    string = "active-backup"
+	FailoverMacPolicyActive string = "active"
+)
 
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
+type NetworkConfig struct {
+	Network NetworkSpec `yaml:"network"`
+}
 
-	// If "res_spcec" was present, move its value to ResourceSpec.
-	if aux.ResSpcec != nil {
-		r.ResourceSpec = aux.ResSpcec
-	}
+type NetworkSpec struct {
+	SchemaVersion int                 `yaml:"version"`
+	Renderer      string              `yaml:"renderer"`
+	Ethernets     map[string]Ethernet `yaml:"ethernets,omitempty"`
+	Bonds         map[string]Bond     `yaml:"bonds,omitempty"`
+}
 
-	return nil
+type Ethernet struct {
+	Match Match `yaml:"match,omitempty"`
+	DHCP4 bool  `yaml:"dhcp4,omitempty"`
+}
+
+type Match struct {
+	MACAddress string `yaml:"macaddress,omitempty"`
+}
+
+type Bond struct {
+	Interfaces []string       `yaml:"interfaces,omitempty"`
+	DHCP4      bool           `yaml:"dhcp4,omitempty"`
+	Parameters BondParameters `yaml:"parameters,omitempty"`
+}
+
+type BondParameters struct {
+	Mode              string `yaml:"mode,omitempty"`
+	FailoverMacPolicy string `yaml:"fail-over-mac-policy,omitempty"`
 }
 
 // Custom Marshaler to omit "tags", "minresourcecount" and "maxresourcecount"
@@ -100,7 +121,7 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 func (r *Resource) MarshalJSON() ([]byte, error) {
 	// Create a temporary struct without the Tags, MinResourceCount and MaxResourceCount fields
 	type OutgoingResource Resource
-	alias := &OutgoingResource {
+	alias := &OutgoingResource{
 		ResourceType:     r.ResourceType,
 		ResourceNum:      r.ResourceNum,
 		ResourceSpec:     r.ResourceSpec,
@@ -119,31 +140,35 @@ func (r *Resource) MarshalJSON() ([]byte, error) {
 	return data, nil
 }
 
-type ResSpecs struct {
+type CreateMachineResources struct {
 	ResourceSpecifications []Resource `json:"res_specs"` // Many resources allowed & expected
 }
 
 type CreateMachineSpec struct {
-	Machine   string     `json:"mach_name"`
-	Resources []ResSpecs `json:"resources"` // List containing only 1 element by design of fabric manager
+	MachineName string                   `json:"mach_name"`
+	Resources   []CreateMachineResources `json:"resources"` // List containing only 1 element by design of fabric manager
 }
 
 type CreateMachineRequest struct {
-	Tenants CreateMachineTenantsRequest `json:"tenants"`
+	Tenants CreateMachineRequestBodyTenants `json:"tenants"`
 }
 
-type CreateMachineTenantsRequest struct {
+type CreateMachineRequestBodyTenants struct {
 	TenantUUID string              `json:"tenant_uuid"`
 	Machines   []CreateMachineSpec `json:"machines"` // Many machines allowed but for node driver it is always one
 }
 
 // Structures necessary to deserialize response from POST /machines & GET /machines/<uuid> requests
 type Lanport struct {
-	LanportUUID string `json:"lanport_uuid"`
-	SubnetUUID  string `json:"subnet_uuid"`
-	MacAddress  string `json:"mac_address"`
-	LanportIdx  int    `json:"lanport_idx"`
-	IPAddress   string `json:"ip_address"`
+	LanportUUID               string `json:"lanport_uuid"`
+	SubnetUUID                string `json:"subnet_uuid"`
+	MACAddress                string `json:"mac_address"`
+	LanportIdx                int    `json:"lanport_idx"`
+	IPAddress                 string `json:"ip_address"`
+	NetworkClassConfiguration string `json:"nw_class_cu,omitempty"`
+	// NicType is not part of the API response; it is populated internally to distinguish NIC types:
+	// NicTypeUndetermined, NicTypeOnboard, NicTypeComposable
+	NicType NicType `json:"-"`
 }
 
 type MachineDetails struct {
@@ -161,14 +186,15 @@ type MachineDetails struct {
 	BootSSD             string     `json:"boot_ssd,omitempty"`
 	Lanports            []Lanport  `json:"lanports,omitempty"`
 	Resources           []Resource `json:"resources,omitempty"`
+	TenantUUID          string     `json:"tenant_uuid,omitempty"` // GET response
 }
 
-type MachinesResponseData struct {
+type MachineResponseData struct {
 	Machines []MachineDetails `json:"machines"`
 }
 
-type MachinesRequestResponse struct {
-	Data MachinesResponseData `json:"data"`
+type MachineResponse struct {
+	Data MachineResponseData `json:"data"`
 }
 
 // Structures necesary to handle OS image installation
@@ -185,11 +211,11 @@ type ImageInstallation struct {
 type MachineSpecsArgs struct {
 	ComputeConditionsJson     string
 	DevicesSpecJson           string
+	EnableBaremetalBonding    bool
 	NetworkBaremetalPort      int
 	NetworkProvisionPort      int
 	NetworkBaremetalUUID      string
 	NetworkProvisionUUID      string
-	NetworkBaremetalDefaultGW string
 	NetworkProvisionDefaultGW string
 	NtpServer                 string
 	DnsServer                 string

@@ -55,8 +55,8 @@ func TestCreateMachine_Success(t *testing.T) {
 		DnsServer:             "8.8.8.8",
 	}
 
-	getEntryData := func(index int) models.MachinesRequestResponse {
-		var entryData models.MachinesRequestResponse
+	getEntryData := func(index int) models.MachineResponse {
+		var entryData models.MachineResponse
 		json.Unmarshal([]byte(models.PostMachinesResponseExample), &entryData)
 
 		switch index {
@@ -64,17 +64,17 @@ func TestCreateMachine_Success(t *testing.T) {
 			// happy path
 			return entryData
 		case 1:
-			return func() models.MachinesRequestResponse {
+			return func() models.MachineResponse {
 				entryData.Data.Machines[0].MachineUUID = ""
 				return entryData
 			}()
 		case 2:
-			return func() models.MachinesRequestResponse {
+			return func() models.MachineResponse {
 				entryData.Data.Machines = []models.MachineDetails{}
 				return entryData
 			}()
 		case 3:
-			return func() models.MachinesRequestResponse {
+			return func() models.MachineResponse {
 				entryData.Data.Machines = nil
 				return entryData
 			}()
@@ -86,7 +86,7 @@ func TestCreateMachine_Success(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		entryData    models.MachinesRequestResponse
+		entryData    models.MachineResponse
 		err          error
 		expectedUUID string
 	}{
@@ -120,10 +120,10 @@ func TestCreateMachine_Success(t *testing.T) {
 		expectedJSONPayload, _ := json.Marshal(expectedPayload)
 		expectedQuery := map[string]string{"tenant_uuid": expectedPayload.Tenants.TenantUUID}
 		expectedHeaders := map[string]string{"Content-Type": "application/json", "Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample)}
-		var responseData models.MachinesRequestResponse
+		var responseData models.MachineResponse
 
 		helperSetResponseMachineUUID := func(payload []byte, endpoint string, queryParams map[string]string, response interface{}, headers map[string]string) {
-			resp := response.(*models.MachinesRequestResponse)
+			resp := response.(*models.MachineResponse)
 			resp.Data = tc.entryData.Data
 		}
 
@@ -167,7 +167,7 @@ func TestCreateMachine_PostError(t *testing.T) {
 	expectedQuery := map[string]string{"tenant_uuid": expectedPayload.Tenants.TenantUUID}
 	expectedHeaders := map[string]string{"Content-Type": "application/json", "Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample)}
 
-	var responseData, entryData models.MachinesRequestResponse
+	var responseData, entryData models.MachineResponse
 
 	json.Unmarshal([]byte(models.PostMachinesResponseExample), &entryData)
 
@@ -204,7 +204,6 @@ func TestPopulateCreateMachineRequest_Success(t *testing.T) {
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
 		NetworkBaremetalPort:      2,
-		NetworkBaremetalDefaultGW: "172.0.0.1",
 		NtpServer:                 "192.168.0.1",
 		DnsServer:                 "8.8.8.8",
 	}
@@ -244,6 +243,67 @@ func TestPopulateCreateMachineRequestOneProvisioningNetwork_Success(t *testing.T
 	rawJSON, err := json.Marshal(createMachineRequest)
 	assert.NoError(t, err, "Marshaling JSON should not return an error")
 	assert.Equal(t, models.CreateMachineRequestOneProvisioningNetworkExpected, string(rawJSON))
+}
+
+func TestPopulateCreateMachineRequestBaremetalBondingEnabled_Success(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	machineName := "test-machine-001"
+	tenantId := "b3b65e79-ad41-4367-89d6-e4e7315141ef"
+
+	machineSpecsArgs := models.MachineSpecsArgs{
+		ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
+		EnableBaremetalBonding:    true,
+		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+		NetworkProvisionPort:      1,
+		NetworkProvisionDefaultGW: "192.168.0.1",
+		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
+		NtpServer:                 "192.168.0.1",
+		DnsServer:                 "8.8.8.8",
+	}
+
+	createRequest, err := fmc.populateCreateMachineRequest(machineName, tenantId, machineSpecsArgs)
+
+	assert.NoError(t, err, "populateCreateMachineRequest should not return an error")
+
+	rawJSON, err := json.Marshal(createRequest)
+	assert.NoError(t, err, "Marshaling JSON should not return an error")
+
+	// Expect two baremetal subnets with lanport_idx 1 and 2
+	assert.Equal(t, models.CreateMachineRequestBaremetalBondingExpected, string(rawJSON))
+}
+
+func TestPopulateCreateMachineRequestBaremetalBondingDisabled_Success(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	machineName := "test-machine-001"
+	tenantId := "b3b65e79-ad41-4367-89d6-e4e7315141ef"
+
+	machineSpecsArgs := models.MachineSpecsArgs{
+		ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
+		EnableBaremetalBonding:    false,
+		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+		NetworkProvisionPort:      1,
+		NetworkProvisionDefaultGW: "192.168.0.1",
+		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
+		NetworkBaremetalPort:      2,
+		NtpServer:                 "192.168.0.1",
+		DnsServer:                 "8.8.8.8",
+	}
+
+	createRequest, err := fmc.populateCreateMachineRequest(machineName, tenantId, machineSpecsArgs)
+
+	assert.NoError(t, err, "populateCreateMachineRequest should not return an error")
+
+	rawJSON, err := json.Marshal(createRequest)
+	assert.NoError(t, err, "Marshaling JSON should not return an error")
+
+	// Expect a single baremetal subnet using the configured NetworkBaremetalPort
+	assert.Equal(t, models.CreateMachineRequestExpected, string(rawJSON))
 }
 
 func TestCheckDeviceSpecJson(t *testing.T) {
@@ -294,8 +354,8 @@ func getSpecArgs(tagsValue string) models.MachineSpecsArgs {
 }
 
 func getResourcesForTest() []models.Resource {
-	var mrr models.MachinesRequestResponse
-	err := json.Unmarshal([]byte(models.GetMachineResponseExampleWithTypoInStorageResSpec), &mrr)
+	var mrr models.MachineResponse
+	err := json.Unmarshal([]byte(models.GetMachineResponseExample), &mrr)
 	if err != nil {
 		slog.Error("Error unmarshalling devices specification from JSON: ", "err", err)
 		log.Fatalf("error while unmarshallig struct: %+v", err)
@@ -583,6 +643,54 @@ func TestGracefulShutdownFailed(t *testing.T) {
 	assert.EqualError(t, err, "Request failed")
 }
 
+func TestRebootSuccess(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	tenantId := "cdi-test"
+	machineId := "cdd792f2-5591-4c18-a8bd-1c39e55dedfa"
+
+	expectedQuery := map[string]string{"tenant_uuid": tenantId}
+	expectedHeaders := map[string]string{
+		"Content-Type":  "application/json",
+		"Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample),
+	}
+	expectedEndpoint := fmt.Sprintf("/machines/%s/reboot", machineId)
+	expectedPayload := []byte{}
+
+	mockClient.EXPECT().
+		Put(expectedPayload, expectedEndpoint, expectedQuery, nil, expectedHeaders).
+		Return(http.StatusOK, nil)
+
+	err := fmc.Reboot(machineId, tenantId, models.AccessTokenExample)
+	assert.NoError(t, err)
+}
+
+func TestRebootFailed(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+
+	tenantId := "cdi-test"
+	machineId := "cdd792f2-5591-4c18-a8bd-1c39e55dedfa"
+
+	expectedQuery := map[string]string{"tenant_uuid": tenantId}
+	expectedHeaders := map[string]string{
+		"Content-Type":  "application/json",
+		"Authorization": fmt.Sprintf("Bearer %s", models.AccessTokenExample),
+	}
+	expectedEndpoint := fmt.Sprintf("/machines/%s/reboot", machineId)
+	expectedPayload := []byte{}
+
+	mockError := errors.New("Request failed")
+	mockClient.EXPECT().
+		Put(expectedPayload, expectedEndpoint, expectedQuery, nil, expectedHeaders).
+		Return(http.StatusInternalServerError, mockError)
+
+	err := fmc.Reboot(machineId, tenantId, models.AccessTokenExample)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "Request failed")
+}
+
 func TestImageInstallSuccess(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}
@@ -677,9 +785,9 @@ func TestGetMachineDetailsSuccess(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}
 	fmc.bootStorageCondition = getBootStorageConditionForTest()
-	var responseData, entryData models.MachinesRequestResponse
+	var responseData, entryData models.MachineResponse
 
-	json.Unmarshal([]byte(models.GetMachineResponseExampleWithTypoInStorageResSpec), &entryData)
+	json.Unmarshal([]byte(models.GetMachineResponseExample), &entryData)
 
 	tenantId := "cdi-test"
 	machineUUID := "a1b2c3d4-e5f6-7890-1234-567890abcdef"
@@ -689,7 +797,7 @@ func TestGetMachineDetailsSuccess(t *testing.T) {
 	expectedEndpoint := fmt.Sprintf("/machines/%s", machineUUID)
 
 	helperSetMachineDetails := func(endpoint string, queryParams map[string]string, responseAddress interface{}, headers map[string]string) {
-		resp := responseAddress.(*models.MachinesRequestResponse)
+		resp := responseAddress.(*models.MachineResponse)
 		resp.Data = entryData.Data
 	}
 
@@ -703,7 +811,7 @@ func TestGetMachineDetailsSuccess(t *testing.T) {
 
 	machineLanports, machineSsd, machineStatus, err := fmc.GetMachineDetails(tenantId, machineUUID, models.AccessTokenExample)
 	assert.NoError(t, err)
-	assert.Equal(t, models.ExpectedLanports, machineLanports)
+	assert.Equal(t, models.ExpectedLanportsWithType, machineLanports)
 	assert.Equal(t, "bbb32109-8765-4321-0fed-cba098765432", machineSsd)
 	assert.Equal(t, 1, machineStatus)
 }
@@ -712,7 +820,7 @@ func TestGetMachineDetailsSuccessDeleted(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}
 	fmc.bootStorageCondition = getBootStorageConditionForTest()
-	var responseData, entryData models.MachinesRequestResponse
+	var responseData, entryData models.MachineResponse
 
 	json.Unmarshal([]byte(models.GetMachineResponseExampleDeletedMachine), &entryData)
 
@@ -724,7 +832,7 @@ func TestGetMachineDetailsSuccessDeleted(t *testing.T) {
 	expectedEndpoint := fmt.Sprintf("/machines/%s", machineUUID)
 
 	helperSetMachineDetails := func(endpoint string, queryParams map[string]string, responseAddress interface{}, headers map[string]string) {
-		resp := responseAddress.(*models.MachinesRequestResponse)
+		resp := responseAddress.(*models.MachineResponse)
 		resp.Data = entryData.Data
 	}
 
@@ -748,7 +856,7 @@ func TestGetMachineDetailsFailed(t *testing.T) {
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	fmc := &FabricManagerClient{cdiClient: mockClient}
 
-	var responseData models.MachinesRequestResponse
+	var responseData models.MachineResponse
 
 	tenantId := "cdi-test"
 	machineUUID := "a1b2c3d4-e5f6-7890-1234-567890abcdef"
@@ -823,6 +931,121 @@ func Test_getBootStorageCondition(t *testing.T) {
 			bsc, err := getBootStorageCondition(tc.deviceSpec)
 			assert.Equal(t, tc.err, err)
 			assert.Equal(t, tc.expected, bsc)
+		})
+	}
+}
+
+func Test_populateLanportNicTypes(t *testing.T) {
+	makeLanport := func(mac, subnetUUID string) models.Lanport {
+		return models.Lanport{MACAddress: mac, SubnetUUID: subnetUUID}
+	}
+	computeResource := func(macs ...string) models.Resource {
+		subnets := make([]models.Subnet, len(macs))
+		for i, m := range macs {
+			subnets[i] = models.Subnet{MACAddress: m}
+		}
+		return models.Resource{
+			ResourceType: "compute",
+			Network:      &models.Network{Subnets: subnets},
+		}
+	}
+
+	testCases := []struct {
+		name      string
+		lanports  []models.Lanport
+		resources []models.Resource
+		expected  []models.Lanport
+	}{
+		{
+			name: "3 onboard interfaces only (2 subnet UUIDs)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:03", "subnet-B"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:03", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+			},
+		},
+		{
+			name: "2 onboard interfaces only (2 subnet UUIDs)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-B"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+			},
+		},
+		{
+			name: "1 onboard interface only (1 subnet UUID)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+			},
+		},
+		{
+			name: "3 onboards + 2 composable (2 subnets for onboard, 1 separate subnet for composable)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:03", "subnet-B"),
+				makeLanport("AA:BB:CC:DD:EE:04", "subnet-C"),
+				makeLanport("AA:BB:CC:DD:EE:05", "subnet-C"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:03", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:04", SubnetUUID: "subnet-C", NicType: models.NicTypeComposable},
+				{MACAddress: "AA:BB:CC:DD:EE:05", SubnetUUID: "subnet-C", NicType: models.NicTypeComposable},
+			},
+		},
+		{
+			// subnet-A is shared between onboard and composable lanports;
+			// classification must be based on MAC address match, not subnet UUID.
+			name: "3 onboards + 2 composable (composables share subnet UUID with onboards)",
+			lanports: []models.Lanport{
+				makeLanport("AA:BB:CC:DD:EE:01", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:02", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:03", "subnet-B"),
+				makeLanport("AA:BB:CC:DD:EE:04", "subnet-A"),
+				makeLanport("AA:BB:CC:DD:EE:05", "subnet-A"),
+			},
+			resources: []models.Resource{
+				computeResource("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"),
+			},
+			expected: []models.Lanport{
+				{MACAddress: "AA:BB:CC:DD:EE:01", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:02", SubnetUUID: "subnet-A", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:03", SubnetUUID: "subnet-B", NicType: models.NicTypeOnboard},
+				{MACAddress: "AA:BB:CC:DD:EE:04", SubnetUUID: "subnet-A", NicType: models.NicTypeComposable},
+				{MACAddress: "AA:BB:CC:DD:EE:05", SubnetUUID: "subnet-A", NicType: models.NicTypeComposable},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			populateLanportNicTypes(tc.lanports, tc.resources)
+			assert.Equal(t, tc.expected, tc.lanports)
 		})
 	}
 }

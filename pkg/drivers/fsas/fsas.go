@@ -18,6 +18,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	"github.com/rancher/machine/libmachine/drivers"
+	"github.com/rancher/machine/libmachine/ssh"
 	gossh "golang.org/x/crypto/ssh"
 
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
@@ -50,9 +51,9 @@ type Driver struct {
 	DnsIp                     string
 	ComputeConditionsJson     string
 	DevicesSpecJson           string
+	EnableBaremetalBonding    bool
 	NetworkBaremetalPort      int
 	NetworkBaremetalUUID      string
-	NetworkBaremetalDefaultGW string
 	NetworkProvisionPort      int
 	NetworkProvisionUUID      string
 	NetworkProvisionDefaultGW string
@@ -83,9 +84,9 @@ func NewDriver() *Driver {
 		DnsIp:                     "",
 		ComputeConditionsJson:     "",
 		DevicesSpecJson:           "",
+		EnableBaremetalBonding:    false,
 		NetworkBaremetalPort:      -1,
 		NetworkBaremetalUUID:      "",
-		NetworkBaremetalDefaultGW: "",
 		NetworkProvisionPort:      -1,
 		NetworkProvisionUUID:      "",
 		NetworkProvisionDefaultGW: "",
@@ -112,6 +113,11 @@ const (
 	cloudInitDirPath             = "/etc/cdi/cloud-init-discovery/"
 )
 
+const (
+	INNER_CREATE_SSH_MAX_ATTEMPTS = 5
+	REMOVE_SSH_MAX_ATTEMPTS       = 1
+)
+
 func (d *Driver) String() string {
 	return "{" +
 		fmt.Sprintf("Tenant: %s, ", d.TenantUuid) +
@@ -121,9 +127,9 @@ func (d *Driver) String() string {
 		fmt.Sprintf("DnsIp: %s, ", d.DnsIp) +
 		fmt.Sprintf("ComputeConditionsJson: %s, ", d.ComputeConditionsJson) +
 		fmt.Sprintf("DevicesSpecJson: %s, ", d.DevicesSpecJson) +
+		fmt.Sprintf("EnableBaremetalBonding: %t, ", d.EnableBaremetalBonding) +
 		fmt.Sprintf("NetworkBaremetalPort: %d, ", d.NetworkBaremetalPort) +
 		fmt.Sprintf("NetworkBaremetalUUID: %s, ", d.NetworkBaremetalUUID) +
-		fmt.Sprintf("NetworkBaremetalDefaultGW: %s, ", d.NetworkBaremetalDefaultGW) +
 		fmt.Sprintf("NetworkProvisionPort: %d, ", d.NetworkProvisionPort) +
 		fmt.Sprintf("NetworkProvisionUUID: %s, ", d.NetworkProvisionUUID) +
 		fmt.Sprintf("NetworkProvisionDefaultGW: %s, ", d.NetworkProvisionDefaultGW) +
@@ -131,7 +137,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("OsImageName: %s, ", d.OsImageName) +
 		fmt.Sprintf("OsImageSshHostPubKey: %s, ", d.OsImageSshHostPubKey) +
 		fmt.Sprintf("MachineUUID: %s, ", d.MachineUUID) +
-		fmt.Sprintf("UserDataFile: %s", d.UserDataFile) +
+		fmt.Sprintf("UserDataFile: %s, ", d.UserDataFile) +
 		fmt.Sprintf("SlesRegistrationEmail: %s", d.SlesRegistrationEmail) +
 		"}"
 }
@@ -188,9 +194,15 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  `FSAS CDI compute conditions JSON (string with CPU spec, e.g. "[{"column":"model","operator":"eq","value":"PRIMERGYRX2540M6"}]")`,
 			EnvVar: "FSAS_COMPUTE_CONDITIONS_JSON",
 		},
+		mcnflag.BoolFlag{
+			Name:   "fsas-enable-baremetal-bonding",
+			Usage:  "Enable baremetal bonding",
+			EnvVar: "FSAS_ENABLE_BAREMETAL_BONDING",
+		},
 		mcnflag.IntFlag{
 			Name:   "fsas-network-baremetal-port",
 			Usage:  "Node LAN port index for baremetal subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_BAREMETAL_PORT",
 		},
 		mcnflag.StringFlag{
@@ -198,24 +210,20 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  `Node subnet UUID for baremetal-baremetal communication`,
 			EnvVar: "FSAS_NETWORK_BAREMETAL_UUID",
 		},
-		mcnflag.StringFlag{
-			Name:   "fsas-network-baremetal-default-gw",
-			Usage:  `Node subnet default gateway for baremetal-baremetal communication`,
-			EnvVar: "FSAS_NETWORK_BAREMETAL_DEFAULT_GW",
-		},
 		mcnflag.IntFlag{
 			Name:   "fsas-network-provision-port",
 			Usage:  "Node LAN port index for provisioning subnet communication, e.g. 1",
+			Value:  -1,
 			EnvVar: "FSAS_NETWORK_PROVISION_PORT",
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-network-provision-uuid",
-			Usage:  `Node subnet UUID for Rancher-baremetal communication`,
+			Usage:  `Node subnet UUID for Rancher-provisioning communication`,
 			EnvVar: "FSAS_NETWORK_PROVISION_UUID",
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-network-provision-default-gw",
-			Usage:  `Node subnet default gateway for Rancher-baremetal communication`,
+			Usage:  `Node subnet default gateway for Rancher-provisioning communication`,
 			EnvVar: "FSAS_NETWORK_PROVISION_DEFAULT_GW",
 		},
 		mcnflag.StringFlag{
@@ -316,7 +324,7 @@ func (d *Driver) UnmarshalJSON(data []byte) error {
 // DriverName returns the name of the driver
 func (d *Driver) DriverName() string {
 	driverName := "fsas"
-	slog.Debug("Driver ", "name", driverName)
+	slog.Debug("Driver", "name", driverName)
 	return driverName
 
 }
@@ -327,58 +335,61 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	slog.Debug("Try to set config from flags")
 
 	d.SSHUser = strings.TrimSpace(flags.String("fsas-ssh-user"))
-	slog.Debug("Driver ", "ssh-user", d.SSHUser)
+	slog.Debug("Driver", "ssh-user", d.SSHUser)
+
+	d.SSHPort = drivers.DefaultSSHPort
+	slog.Debug("Driver", "ssh-port", d.SSHPort)
 
 	d.SSHPassword = flags.String("fsas-ssh-password")
-	slog.Debug("Driver ", "ssh-password", "<hidden-for-security-reasons>")
+	slog.Debug("Driver", "ssh-password", "<hidden-for-security-reasons>")
 
 	d.TenantUuid = strings.TrimSpace(flags.String("fsas-tenant-uuid"))
-	slog.Debug("Driver ", "Tenant Uuid", d.TenantUuid)
+	slog.Debug("Driver", "Tenant Uuid", d.TenantUuid)
 
 	d.Username = strings.TrimSpace(flags.String("fsas-credentials-username"))
-	slog.Debug("Driver ", "Credentials Username", d.Username)
+	slog.Debug("Driver", "Credentials Username", d.Username)
 
 	d.Password = flags.String("fsas-credentials-password")
-	slog.Debug("Driver ", "Credentials Password", "<hidden-for-security-reasons>")
+	slog.Debug("Driver", "Credentials Password", "<hidden-for-security-reasons>")
 
 	d.ApiUrl = strings.TrimSpace(flags.String("fsas-api-url"))
-	slog.Debug("Driver ", "FSAS API url", d.ApiUrl)
+	slog.Debug("Driver", "FSAS API url", d.ApiUrl)
 
 	d.NtpUrl = strings.TrimSpace(flags.String("fsas-ntp-url"))
-	slog.Debug("Driver ", "FSAS NTP Server url", d.NtpUrl)
+	slog.Debug("Driver", "FSAS NTP Server url", d.NtpUrl)
 
 	d.DnsIp = strings.TrimSpace(flags.String("fsas-dns-ip"))
-	slog.Debug("Driver ", "FSAS DNS Server IP", d.DnsIp)
+	slog.Debug("Driver", "FSAS DNS Server IP", d.DnsIp)
 
 	d.ComputeConditionsJson = strings.TrimSpace(flags.String("fsas-compute-conditions-json"))
-	slog.Debug("Driver ", "FSAS compute conditions JSON", d.ComputeConditionsJson)
+	slog.Debug("Driver", "FSAS compute conditions JSON", d.ComputeConditionsJson)
+
+	d.EnableBaremetalBonding = flags.Bool("fsas-enable-baremetal-bonding")
+	slog.Debug("Driver", "FSAS enable baremetal bonding", d.EnableBaremetalBonding)
 
 	d.NetworkBaremetalPort = flags.Int("fsas-network-baremetal-port")
-	slog.Debug("Driver ", "FSAS baremetal subnet LAN port index", d.NetworkBaremetalPort)
+	slog.Debug("Driver", "FSAS baremetal subnet LAN port index", d.NetworkBaremetalPort)
 
 	d.NetworkBaremetalUUID = strings.TrimSpace(flags.String("fsas-network-baremetal-uuid"))
-	slog.Debug("Driver ", "FSAS baremetal subnet UUID", d.NetworkBaremetalUUID)
-
-	d.NetworkBaremetalDefaultGW = strings.TrimSpace(flags.String("fsas-network-baremetal-default-gw"))
-	slog.Debug("Driver ", "FSAS baremetal subnet Default GW", d.NetworkBaremetalDefaultGW)
+	slog.Debug("Driver", "FSAS baremetal subnet UUID", d.NetworkBaremetalUUID)
 
 	d.NetworkProvisionPort = flags.Int("fsas-network-provision-port")
-	slog.Debug("Driver ", "FSAS provosioning subnet LAN port index", d.NetworkProvisionPort)
+	slog.Debug("Driver", "FSAS provosioning subnet LAN port index", d.NetworkProvisionPort)
 
 	d.NetworkProvisionUUID = strings.TrimSpace(flags.String("fsas-network-provision-uuid"))
-	slog.Debug("Driver ", "FSAS provisioning subnet UUID", d.NetworkProvisionUUID)
+	slog.Debug("Driver", "FSAS provisioning subnet UUID", d.NetworkProvisionUUID)
 
 	d.NetworkProvisionDefaultGW = strings.TrimSpace(flags.String("fsas-network-provision-default-gw"))
-	slog.Debug("Driver ", "FSAS provisioning subnet Default GW", d.NetworkBaremetalDefaultGW)
+	slog.Debug("Driver", "FSAS provisioning subnet Default GW", d.NetworkProvisionDefaultGW)
 
 	d.DevicesSpecJson = strings.TrimSpace(flags.String("fsas-devices-spec-json"))
-	slog.Debug("Driver ", "FSAS devices specification JSON", d.DevicesSpecJson)
+	slog.Debug("Driver", "FSAS devices specification JSON", d.DevicesSpecJson)
 
 	d.OsImageName = strings.TrimSpace(flags.String("fsas-os-image-name"))
-	slog.Debug("Driver ", "FSAS OS image name", d.OsImageName)
+	slog.Debug("Driver", "FSAS OS image name", d.OsImageName)
 
 	d.UserDataFile = strings.TrimSpace(flags.String("fsas-userdata"))
-	slog.Debug("Driver ", "FSAS user data file", d.UserDataFile)
+	slog.Debug("Driver", "FSAS user data file", d.UserDataFile)
 
 	if err := d.initClients(); err != nil {
 		slog.Error("Error while initializing Keycloak and Fabric Manager clients", "err", err)
@@ -386,13 +397,13 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	}
 
 	d.OsImageSshHostPubKey = strings.TrimSpace(flags.String("fsas-image-os-ssh-host-pub-key"))
-	slog.Debug("Driver ", "FSAS OS image ssh host public key ", d.OsImageSshHostPubKey)
+	slog.Debug("Driver", "FSAS OS image ssh host public key", d.OsImageSshHostPubKey)
 
 	d.SlesRegistrationCode = strings.TrimSpace(flags.String("fsas-sles-registration-code"))
-	slog.Debug("Driver ", "FSAS SLES registration code", "<hidden-for-security-reasons>")
+	slog.Debug("Driver", "FSAS SLES registration code", "<hidden-for-security-reasons>")
 
 	d.SlesRegistrationEmail = strings.TrimSpace(flags.String("fsas-sles-registration-email"))
-	slog.Debug("Driver ", "FSAS SLES registration email", d.SlesRegistrationEmail)
+	slog.Debug("Driver", "FSAS SLES registration email", d.SlesRegistrationEmail)
 
 	return d.checkConfig()
 }
@@ -441,7 +452,7 @@ func (d *Driver) initFabricManager() error {
 		slog.Warn("Fabric Manager is NOT initialized then start init procedure")
 		fmc, err := fm.NewFabricManagerClient(d.ApiUrl, defaultFabricManagerEndpoint, d.DevicesSpecJson)
 		if err != nil {
-			slog.Error("Could not create Fabric Manager client because of an error: ", "err", err)
+			slog.Error("Could not create Fabric Manager client because of an error", "err", err)
 			return err
 		}
 		d.FabricManager = fmc
@@ -451,8 +462,8 @@ func (d *Driver) initFabricManager() error {
 }
 
 // initSshManager Initialize SSH Manager client
-func (d *Driver) initSshManager() error {
-	if !d.SshManager.IsInit() {
+func (d *Driver) initSshManager(maxAttempts int) error {
+	if !d.SshManager.IsReady() {
 		slog.Warn("SSH Manager is NOT initialized then start init procedure")
 
 		// OsImageSshHostParsedKey may be nil when the driver was restored from JSON
@@ -461,7 +472,7 @@ func (d *Driver) initSshManager() error {
 		if d.OsImageSshHostParsedKey == nil && d.OsImageSshHostPubKey != "" {
 			parsedKey, err := sshutils.ParseSSHPublicKey(d.OsImageSshHostPubKey)
 			if err != nil {
-				slog.Error("Could not parse SSH host public key:", "err", err)
+				slog.Error("Could not parse SSH host public key", "err", err)
 				return fmt.Errorf("invalid SSH host public key format: %w", err)
 			}
 			d.OsImageSshHostParsedKey = parsedKey
@@ -469,13 +480,17 @@ func (d *Driver) initSshManager() error {
 
 		hostName, err := d.GetSSHHostname()
 		if err != nil {
-			slog.Error("Could not acquire target SSH hostname because of an error: ", "err", err)
+			slog.Error("Could not acquire target SSH hostname because of an error", "err", err)
 			return err
 		}
-		slog.Info("Acquired SSH hostname: ", "hostname", hostName)
+		slog.Info("Acquired SSH hostname", "hostname", hostName)
 		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostParsedKey)
 		if err != nil {
-			slog.Error("Could not create SSH Manager because of an error: ", "err", err)
+			slog.Error("Could not create SSH Manager because of an error", "err", err)
+			return err
+		}
+
+		if err := sshManager.HostPublicKeyIsValid(maxAttempts); err != nil {
 			return err
 		}
 		d.SshManager = sshManager
@@ -504,7 +519,7 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet UUID", "--fsas-network-provision-uuid")
 	}
 	if d.NetworkProvisionDefaultGW == "" {
-		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet Default GW", "fsas-network-provision-default-gw")
+		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet Default GW", "--fsas-network-provision-default-gw")
 	}
 	if d.DevicesSpecJson == "" {
 		return fmt.Errorf(errorMandatoryOption, "Devices specification (JSON)", "--fsas-devices-spec-json")
@@ -516,11 +531,15 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image name", "--fsas-os-image-name")
 	}
 
-	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {
-		slog.Error("tenant_uuid validation unsuccessful: ", "err", err)
+	if err := d.checkOnboardNicsConfig(); err != nil {
 		return err
 	}
-	slog.Debug("Driver ", "tenant_uuid validation successful", d.TenantUuid)
+
+	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {
+		slog.Error("tenant_uuid validation unsuccessful", "err", err)
+		return err
+	}
+	slog.Debug("Driver", "tenant_uuid validation successful", d.TenantUuid)
 
 	if d.OsImageSshHostPubKey == "" {
 		return fmt.Errorf(errorMandatoryOption, "OS image ssh host public key", "--fsas-image-os-ssh-host-pub-key")
@@ -545,13 +564,44 @@ func (d *Driver) checkConfig() error {
 	return nil
 }
 
+// checkOnboardNicsConfig validates that onboard NIC ports (1 and 2) are not misconfigured.
+// When baremetal bonding is enabled, ports 1 and 2 are reserved for bonding and the provisioning
+// subnet must use a different port. When bonding is disabled, the baremetal and provisioning
+// subnets must not share the same port and must not both occupy the two onboard NIC slots.
+func (d *Driver) checkOnboardNicsConfig() error {
+	if d.EnableBaremetalBonding {
+		if d.NetworkBaremetalUUID == "" {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
+		}
+		if d.NetworkBaremetalPort != -1 {
+			slog.Warn("NetworkBaremetalPort is set but will be ignored because baremetal bonding is enabled; ports 1 and 2 are used for bonding")
+		}
+		if d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2 {
+			return fmt.Errorf("provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled; ports 1 and 2 are reserved for bonding")
+		}
+	} else if d.NetworkBaremetalUUID != "" {
+		if d.NetworkBaremetalPort == -1 {
+			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet LAN port", "--fsas-network-baremetal-port")
+		}
+		if d.NetworkBaremetalPort == d.NetworkProvisionPort {
+			return fmt.Errorf("baremetal and provisioning lanport idx must not be the same")
+		}
+		if (d.NetworkBaremetalPort == 1 || d.NetworkBaremetalPort == 2) && (d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2) {
+			return fmt.Errorf("baremetal and provisioning subnets cannot both use onboard NICs (lanport idx 1 and 2)")
+		}
+	} else if d.NetworkBaremetalPort != -1 {
+		return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
+	}
+	return nil
+}
+
 // Create a host using the driver's config
 func (d *Driver) Create() error {
 	if err := d.innerCreate(); err != nil {
-		slog.Error("Error encountered during instance creation: ", "err", err)
-		slog.Info("Attempting to remove partially created machine: ", "machineUUID", d.MachineUUID)
+		slog.Error("Error encountered during instance creation", "err", err)
+		slog.Info("Attempting to remove partially created machine", "machineUUID", d.MachineUUID)
 		if removalErr := d.Remove(); removalErr != nil {
-			slog.Error("The attempt to remove partially provisioned machine failed: ", "err", removalErr)
+			slog.Error("The attempt to remove partially provisioned machine failed", "err", removalErr)
 			return fmt.Errorf("error during Create: '%s'; followed by error during Remove: '%s'", err.Error(), removalErr.Error())
 		}
 		return err
@@ -559,6 +609,8 @@ func (d *Driver) Create() error {
 
 	return nil
 }
+
+var generateSSHKey = ssh.GenerateSSHKey
 
 func (d *Driver) innerCreate() error {
 	slog.Debug("Attempting to create FSAS CDI machine instance.")
@@ -575,9 +627,9 @@ func (d *Driver) innerCreate() error {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson:     d.ComputeConditionsJson,
 		DevicesSpecJson:           d.DevicesSpecJson,
+		EnableBaremetalBonding:    d.EnableBaremetalBonding,
 		NetworkBaremetalPort:      d.NetworkBaremetalPort,
 		NetworkBaremetalUUID:      d.NetworkBaremetalUUID,
-		NetworkBaremetalDefaultGW: d.NetworkBaremetalDefaultGW,
 		NetworkProvisionPort:      d.NetworkProvisionPort,
 		NetworkProvisionUUID:      d.NetworkProvisionUUID,
 		NetworkProvisionDefaultGW: d.NetworkProvisionDefaultGW,
@@ -591,9 +643,9 @@ func (d *Driver) innerCreate() error {
 	}
 
 	d.MachineUUID = machineUUID
-	slog.Info("Successfully filled MachineUUID: ", "MachineUUID", d.MachineUUID)
+	slog.Info("Successfully filled MachineUUID", "MachineUUID", d.MachineUUID)
 
-	slog.Info("Waiting for status: ", "status", ACTIVE_POFF)
+	slog.Info("Waiting for status", "status", ACTIVE_POFF)
 	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
 		return err
 	}
@@ -607,14 +659,14 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	slog.Info("Waiting for the installation of the operating system: ", "status", OS_INSTALLING)
+	slog.Info("Waiting for the installation of the operating system", "status", OS_INSTALLING)
 	if err := d.waitForStatus(OS_INSTALLING, WAIT_FOR_STATUS_STEP_FOR_INSTALLATION, WAIT_FOR_STATUS_TIMEOUT); err != nil {
 		return err
 	}
 
-	slog.Info("Installing operating system: ", "OS", d.OsImageName)
+	slog.Info("Installing operating system", "OS", d.OsImageName)
 
-	slog.Info("Waiting for operating system installation to complete: ", "status", ACTIVE_POFF)
+	slog.Info("Waiting for operating system installation to complete", "status", ACTIVE_POFF)
 	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_INSTALL_STEP, WAIT_FOR_STATUS_INSTALL_TIMEOUT); err != nil {
 		return err
 	}
@@ -623,49 +675,67 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.assignIpAddresses(); err != nil {
+	lanports, err := d.assignIpAddresses()
+	if err != nil {
 		return err
 	}
 
-	if err := d.initSshManager(); err != nil {
+	hostName, err := d.GetSSHHostname()
+	if err != nil {
+		slog.Error("Could not acquire target SSH hostname because of an error", "err", err)
+		return err
+	}
+	slog.Info("Acquired ssh hostname", "hostname", hostName)
+
+	if !d.CfgManager.IsInit() {
+		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
+		d.CfgManager = cfgManager
+	}
+
+	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
+		return err
+	}
+
+	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {
+		return err
+	}
+
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata", "err", err)
+		return err
+	}
+
+	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
+		slog.Error("Failed to inject OS registration data into config file", "err", err)
+		return err
+	}
+
+	if err := d.CfgManager.DisableSSHLogin(); err != nil {
+		slog.Error("Failed to disable SSH login via cloud config", "err", err)
+		return err
+	}
+
+	if d.EnableBaremetalBonding {
+		if err := d.CfgManager.ExtendUserdataBootCmd([]string{
+			`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
+		}); err != nil {
+			slog.Error("Failed to inject bootcmd for baremetal bonding", "err", err)
+			return err
+		}
+	}
+
+	if err := d.initSshManager(INNER_CREATE_SSH_MAX_ATTEMPTS); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
 	}
 
-	if err := d.SshManager.ExchangeKeys(); err != nil {
+	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
+		slog.Error("Error while applying cloud init", "err", err)
 		return err
 	}
 
-	if err := d.SshManager.RegisterOS(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
-		slog.Error("Failed to register OS via SSH using SUSEConnect: ", "err", err, "email", d.SlesRegistrationEmail)
-		return err
-	}
-
-	if !d.CfgManager.IsInit() {
-		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson)
-		d.CfgManager = cfgManager
-	}
-
-	// Prepare scripts execution parameters
-	scriptPath := "" // Random paths
-	removeOnFinish := true
-	runSudo := true
-
-	// Generate script content for RKE2 setup
-	overrideProviderIdScriptContent := d.CfgManager.PrepareRke2ConfigScript("100-fsas-providerid", d.MachineUUID)
-
-	if err := d.SshManager.ExecuteScript(scriptPath, overrideProviderIdScriptContent, removeOnFinish, runSudo); err != nil {
-		return err
-	}
-
-	if err := d.applyCloudInit(d.GetMachineName()); err != nil {
-		return err
-	}
-
-	if err := d.SshManager.DisablePasswordSSHLogin(); err != nil {
-		slog.Error("Failed to disable password login: ", "err", err)
-		return err
-	}
+	slog.Info("Logging content of cloud config file at the end of method innerCreate")
+	logContentOfCloudConfigFile(d.UserDataFile)
 
 	return nil
 }
@@ -673,9 +743,10 @@ func (d *Driver) innerCreate() error {
 var osReadFile = os.ReadFile
 
 // applyCloudInit Save user-data and meta-data files on remote machine
-func (d *Driver) applyCloudInit(sshHostName string) error {
+func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
+	networkConfigPath := filepath.Join(cloudInitDirPath, "network-config")
 
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
@@ -693,8 +764,27 @@ func (d *Driver) applyCloudInit(sshHostName string) error {
 		return err
 	}
 
+	if d.EnableBaremetalBonding {
+		subnets := map[string]string{
+			"baremetal":    d.NetworkBaremetalUUID,
+			"provisioning": d.NetworkProvisionUUID,
+		}
+		networkConfigContent, err := d.CfgManager.PrepareNetworkConfig(lanports, subnets)
+		if err != nil {
+			slog.Error("Failed to prepare network config", "err", err)
+			return err
+		}
+		if err := d.SshManager.WriteFileOnRemoteMachine(networkConfigPath, networkConfigContent, 0700); err != nil {
+			slog.Error("Failed to write network config to remote machine", "err", err)
+			return err
+		}
+		slog.Info("Successfully wrote network config to remote machine", "path", networkConfigPath)
+	} else {
+		slog.Info("Skipping network-config generation: baremetal bonding is disabled")
+	}
+
 	if err := d.SshManager.RebootCloudInit(); err != nil {
-		slog.Error("Potential error while rebooting cloud init: ", "err", err)
+		slog.Error("Potential error while rebooting cloud init", "err", err)
 		return err
 	}
 
@@ -706,14 +796,14 @@ func (d *Driver) applyCloudInit(sshHostName string) error {
 
 // GetSSHHostname returns hostname for use with ssh
 func (d *Driver) GetSSHHostname() (string, error) {
-	slog.Debug("SSH host name as Machine name: ", "name", d.MachineName)
+	slog.Debug("SSH host name as Machine name", "name", d.MachineName)
 	// Machine name sometimes is not written to the machine
 	return d.GetIP()
 }
 
 // GetIP returns IP to use in communication
 func (d *Driver) GetIP() (string, error) {
-	slog.Info("IP ", "address", d.IPAddress)
+	slog.Info("IP", "address", d.IPAddress)
 	if d.IPAddress == "" {
 		return "", fmt.Errorf("IPAddress is empty")
 	}
@@ -737,7 +827,7 @@ func (d *Driver) getCdiState() (CdiMachineState, error) {
 
 	// error when MachineUUID is empty, return state.Error
 	if d.MachineUUID == "" {
-		slog.Error("Machine's UUID was unexpectedly empty: ", "machine_name", d.MachineName)
+		slog.Error("Machine's UUID was unexpectedly empty", "machine_name", d.MachineName)
 		return ERROR, fmt.Errorf("machine uuid is empty")
 	}
 
@@ -751,7 +841,7 @@ func (d *Driver) getCdiState() (CdiMachineState, error) {
 		d.FabricManager.GetMachineDetails(d.TenantUuid, d.MachineUUID, d.Keycloak.GetToken())
 
 	if err != nil {
-		slog.Error("Could not get Machine status: ", "err", err)
+		slog.Error("Could not get Machine status", "err", err)
 		return ERROR, err
 	}
 
@@ -776,7 +866,7 @@ func (d *Driver) mapMachineStatusToState(cdiState CdiMachineState) state.State {
 	case ERROR:
 		return state.Error
 	default:
-		slog.Warn("Unrecognized machine status: ", "machineStatus", cdiState)
+		slog.Warn("Unrecognized machine status", "machineStatus", cdiState)
 		return state.None
 	}
 }
@@ -789,7 +879,7 @@ func (d *Driver) GetURL() (string, error) {
 	slog.Info("ip= " + ip)
 
 	if err != nil {
-		slog.Error("Error: ", "err", err)
+		slog.Error("Error", "err", err)
 		return "", err
 	}
 
@@ -803,7 +893,7 @@ func (d *Driver) waitForStatus(expectedState CdiMachineState, step, timeout time
 	for {
 		currentState, err := d.getCdiState()
 		if err != nil {
-			slog.Error("Error while checking state: ", "err", err)
+			slog.Error("Error while checking state", "err", err)
 			return fmt.Errorf("error getting state: %w", err)
 		}
 
@@ -813,16 +903,16 @@ func (d *Driver) waitForStatus(expectedState CdiMachineState, step, timeout time
 		}
 
 		if currentState == expectedState {
-			slog.Debug("Successfully received the required status: ", "status", currentState)
+			slog.Debug("Successfully received the required status", "status", currentState)
 			return nil
 		}
 
 		if statusClock.Since(startTime) >= timeout {
-			slog.Error("Required status was not achieved within the specified time: ", "expected state", expectedState, "current state", currentState, "timeout", WAIT_FOR_STATUS_TIMEOUT)
+			slog.Error("Required status was not achieved within the specified time", "expected state", expectedState, "current state", currentState, "timeout", WAIT_FOR_STATUS_TIMEOUT)
 			return fmt.Errorf("error: required status was not achieved within the specified time")
 		}
 
-		slog.Debug("Required status is not equal to received status, another attempt will occur: ", "expected state", expectedState, "current state", currentState)
+		slog.Debug("Required status is not equal to received status, another attempt will occur", "expected state", expectedState, "current state", currentState)
 		statusClock.Sleep(step)
 	}
 }
@@ -838,23 +928,23 @@ func (d *Driver) Kill() error {
 	}
 
 	if d.MachineUUID == "" {
-		slog.Error("Machine's UUID was unexpectedly empty: ", "machine_name", d.MachineName)
+		slog.Error("Machine's UUID was unexpectedly empty", "machine_name", d.MachineName)
 		return fmt.Errorf("machine uuid is empty")
 	}
 
 	if err := d.FabricManager.PowerOff(d.MachineUUID, d.TenantUuid,
 		d.Keycloak.GetToken()); err != nil {
-		slog.Error("Could not kill Machine: ", "machineUUID", d.MachineUUID, "err", err)
+		slog.Error("Could not kill Machine", "machineUUID", d.MachineUUID, "err", err)
 		return err
 	}
 
-	slog.Info("Waiting for status: ", "status", ACTIVE_POFF)
+	slog.Info("Waiting for status", "status", ACTIVE_POFF)
 	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_STOPPED_TIMEOUT); err != nil {
-		slog.Error("Error while waiting for status: ", "status", ACTIVE_POFF, "err", err)
+		slog.Error("Error while waiting for status", "status", ACTIVE_POFF, "err", err)
 		return err
 	}
 
-	slog.Info("Successfully killed Machine: ", "machineUUID", d.MachineUUID)
+	slog.Info("Successfully killed Machine", "machineUUID", d.MachineUUID)
 	return nil
 }
 
@@ -865,7 +955,7 @@ func (d *Driver) Remove() error {
 	slog.Debug(fmt.Sprintf("Driver struct: %+v", d))
 
 	if d.MachineUUID == "" {
-		slog.Warn("Machine's UUID was unexpectedly empty: ", "machine_name", d.MachineName)
+		slog.Warn("Machine's UUID was unexpectedly empty", "machine_name", d.MachineName)
 		/*
 			The return value must be 'nil' instead of 'err' because when creating machine procedure fails and
 			machine uuid is empty then Rancher tries to remove machine endlessly.
@@ -879,49 +969,54 @@ func (d *Driver) Remove() error {
 		return err
 	}
 
-	// Check if ssh manager is available for e.g. OS deregistration, if not - proceed with machine removal anyway
-	if err := d.initSshManager(); err != nil {
+	// Attempt OS deregistration during machine removal
+	if err := d.initSshManager(REMOVE_SSH_MAX_ATTEMPTS); err != nil {
 		// If ssh manager cannot be initialized then do not return error and proceed with machine removal
-		slog.Warn("error while initializing SSH Manager, proceeding with machine removal: ", "err", err)
+		slog.Warn("SSH unavailable - could not read registration status; proceeding with machine removal; if the machine was previously registered, manual action might be required", "err", err)
 	} else {
 		if err := d.SshManager.DeregisterOS(); err != nil {
-			slog.Warn("Could not deregister SLES OS, manual action might be required if node was previously registered:", "err", err)
+			slog.Warn("Could not deregister SLES OS, manual action might be required", "err", err)
 		}
 	}
 
 	if err := d.FabricManager.RemoveMachine(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
-		slog.Error("Could not remove Machine: ", "machineUUID", d.MachineUUID, "err", err)
+		slog.Error("Could not remove Machine", "machineUUID", d.MachineUUID, "err", err)
 		return err
 	}
 
-	slog.Info("Waiting for status: ", "status", UNBUILDED)
+	slog.Info("Waiting for status", "status", UNBUILDED)
 	if err := d.waitForStatus(UNBUILDED, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_NOT_FOUND_TIMEOUT); err != nil {
-		slog.Error("Error while waiting for status: ", "status", UNBUILDED, "err", err)
+		slog.Error("Error while waiting for status", "status", UNBUILDED, "err", err)
 		return err
 	}
 
-	slog.Info("Successfully removed Machine: ", "machineUUID", d.MachineUUID)
+	slog.Info("Successfully removed Machine", "machineUUID", d.MachineUUID)
 	return nil
 }
 
-// Restart a host. This may just call Stop(); Start() if the provider does not
-// have any special restart behaviour.
+// Restart requests a host restart using Fabric Manager reboot operation.
+// The method returns after Fabric Manager accepts the reboot request.
+// It does not wait until the node finishes rebooting or becomes SSH-ready.
 func (d *Driver) Restart() error {
-	slog.Debug("Restarting host: ", "machineName", d.MachineName)
+	slog.Debug("Attempting to restart host")
+	slog.Debug(fmt.Sprintf("BaseDriver struct: %+v", d.BaseDriver))
+	slog.Debug(fmt.Sprintf("Driver struct: %+v", d))
 
-	slog.Debug("Attempting to Stop: ", "machineName", d.MachineName)
-	if err := d.Stop(); err != nil {
-		slog.Error("Issue during attempt to Stop the host: ", "err", err)
+	if err := d.initClients(); err != nil {
 		return err
 	}
 
-	slog.Debug("Attempting to Start: ", "machineName", d.MachineName)
-	if err := d.Start(); err != nil {
-		slog.Error("Issue during attempt to Start the host: ", "err", err)
+	if d.MachineUUID == "" {
+		slog.Error("Machine's UUID was unexpectedly empty", "machine_name", d.MachineName)
+		return fmt.Errorf("machine uuid is empty")
+	}
+
+	if err := d.FabricManager.Reboot(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
+		slog.Error("Could not reboot Machine", "machineUUID", d.MachineUUID, "err", err)
 		return err
 	}
 
-	slog.Info("Successfully restarted host: ", "machineName", d.MachineName)
+	slog.Info("Successfully requested machine restart", "machineUUID", d.MachineUUID)
 	return nil
 }
 
@@ -937,20 +1032,20 @@ func (d *Driver) Start() error {
 
 	// error MachineUUID is empty
 	if d.MachineUUID == "" {
-		slog.Error("Machine's UUID was unexpectedly empty: ", "machine_name", d.MachineName)
+		slog.Error("Machine's UUID was unexpectedly empty", "machine_name", d.MachineName)
 		return fmt.Errorf("machine uuid is empty")
 	}
 
 	// Power on the machine
 	if err := d.FabricManager.PowerOn(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
-		slog.Error("Could not Power On the machine: ", "err", err)
+		slog.Error("Could not Power On the machine", "err", err)
 		return err
 	}
 
 	// Wait for the machine to reach the Running state
-	slog.Info("Waiting for status: ", "status", ACTIVE_PON)
+	slog.Info("Waiting for status", "status", ACTIVE_PON)
 	if err := d.waitForStatus(ACTIVE_PON, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_TIMEOUT); err != nil {
-		slog.Error("Error occured during waitForStatus execution: ", "err", err)
+		slog.Error("Error occured during waitForStatus execution", "err", err)
 		return err
 	}
 
@@ -964,24 +1059,24 @@ func (d *Driver) Stop() error {
 
 	if !d.FabricManager.IsInit() {
 		if err := d.initFabricManager(); err != nil {
-			slog.Error("error while initializing Fabric Manager: ", "err", err)
+			slog.Error("error while initializing Fabric Manager", "err", err)
 			return err
 		}
 	}
 
-	slog.Info("requesting graceful shutdown for machine: ", "machine_uuid", d.MachineUUID)
+	slog.Info("requesting graceful shutdown for machine", "machine_uuid", d.MachineUUID)
 	if err := d.FabricManager.GracefulShutdown(d.MachineUUID, d.TenantUuid, d.Keycloak.GetToken()); err != nil {
-		slog.Error("Graceful shutdown failed for: ", "machine_uuid", d.MachineUUID, "err", err)
+		slog.Error("Graceful shutdown failed for", "machine_uuid", d.MachineUUID, "err", err)
 		return err
 	}
 
-	slog.Info("Waiting for status: ", "status", ACTIVE_POFF)
+	slog.Info("Waiting for status", "status", ACTIVE_POFF)
 	if err := d.waitForStatus(ACTIVE_POFF, WAIT_FOR_STATUS_STEP, WAIT_FOR_STATUS_STOPPED_TIMEOUT); err != nil {
-		slog.Error("Error while waiting for status: ", "status", ACTIVE_POFF, "err", err)
+		slog.Error("Error while waiting for status", "status", ACTIVE_POFF, "err", err)
 		return err
 	}
 
-	slog.Info("Successfully stopped Machine: ", "machineUUID", d.MachineUUID)
+	slog.Info("Successfully stopped Machine", "machineUUID", d.MachineUUID)
 	return nil
 
 }
@@ -994,7 +1089,7 @@ func (d *Driver) PreCreateCheck() error {
 
 // GetSSHUsername Returns username for use with ssh
 func (d *Driver) GetSSHUsername() string {
-	slog.Info("SSH ", "username", d.SSHUser)
+	slog.Info("SSH", "username", d.SSHUser)
 	return d.SSHUser
 }
 
@@ -1005,31 +1100,40 @@ func (d *Driver) setTokenToEmptySTring() {
 
 }
 
-func (d *Driver) assignIpAddresses() error {
+func (d *Driver) assignIpAddresses() ([]models.Lanport, error) {
 	slog.Debug("Trying to assign IP Address")
 	lanports, _, _, err := d.FabricManager.GetMachineDetails(d.TenantUuid, d.MachineUUID, d.Keycloak.GetToken())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var baremetalFallbackIP string
 	for idx, lanport := range lanports {
 		slog.Debug(fmt.Sprintf("lanport[%d].SubnetUUID=%s", idx, lanport.SubnetUUID))
-		if lanport.SubnetUUID == d.NetworkProvisionUUID && d.IPAddress == "" {
+		if lanport.SubnetUUID == d.NetworkProvisionUUID && lanport.NicType == models.NicTypeOnboard && d.IPAddress == "" {
 			d.IPAddress = lanport.IPAddress
-			slog.Info("Successfully filled IP Address: ", "IP", d.IPAddress)
+			slog.Info("Successfully filled IP Address", "IP", d.IPAddress)
 		}
 		if lanport.SubnetUUID == d.NetworkBaremetalUUID && d.PrivateIPAddress == "" {
-			d.PrivateIPAddress = lanport.IPAddress
-			slog.Info("Successfully filled Private IP Address: ", "IP", d.PrivateIPAddress)
+			if lanport.NicType == models.NicTypeOnboard {
+				d.PrivateIPAddress = lanport.IPAddress
+				slog.Info("Successfully filled Private IP Address", "IP", d.PrivateIPAddress)
+			} else if baremetalFallbackIP == "" {
+				baremetalFallbackIP = lanport.IPAddress
+			}
 		}
+	}
+	if d.PrivateIPAddress == "" && baremetalFallbackIP != "" {
+		d.PrivateIPAddress = baremetalFallbackIP
+		slog.Info("Successfully filled Private IP Address (composable fallback)", "IP", d.PrivateIPAddress)
 	}
 
 	// d.IPAddress is mandatory in the machine creation process
 	if d.IPAddress == "" {
-		return fmt.Errorf("IPAddress must not be empty")
+		return nil, fmt.Errorf("IPAddress must not be empty")
 	}
 
-	return nil
+	return lanports, nil
 }
 
 func logContentOfCloudConfigFile(cloudConfigFilePath string) {
@@ -1037,21 +1141,21 @@ func logContentOfCloudConfigFile(cloudConfigFilePath string) {
 		slog.Error("cloud config file not set (empty string)")
 		return
 	}
-	slog.Info("user-data cloud config file: ", "ccf", cloudConfigFilePath)
+	slog.Info("user-data cloud config file", "ccf", cloudConfigFilePath)
 
 	if _, err := os.Stat(cloudConfigFilePath); os.IsNotExist(err) {
-		slog.Error("Provided cloud config file does not exist: ", "path", cloudConfigFilePath, "err", err)
-		slog.Error("Current host: ", "hostname",
+		slog.Error("Provided cloud config file does not exist", "path", cloudConfigFilePath, "err", err)
+		slog.Error("Current host", "hostname",
 			func() string { h, _ := os.Hostname(); return h }())
-		slog.Error("Current working dir: ", "cwd",
+		slog.Error("Current working dir", "cwd",
 			func() string { c, _ := os.Getwd(); return c }())
 		return
 	}
 
 	content, err := os.ReadFile(cloudConfigFilePath)
 	if err != nil {
-		slog.Error("Error while reading cloud config file: ", "path", cloudConfigFilePath, "err", err)
+		slog.Error("Error while reading cloud config file", "path", cloudConfigFilePath, "err", err)
 	}
-	slog.Debug("Cloud config file content: ")
+	slog.Debug("Cloud config file content")
 	slog.Debug(string(content))
 }
