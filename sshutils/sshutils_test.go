@@ -553,6 +553,8 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
+	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
+	assert.ErrorContains(t, err, "could not get SUSE product status before deregistration")
 	assert.Equal(t, []string{cmdGetStatusOS}, mockClient.ExecutedCommands)
 }
 
