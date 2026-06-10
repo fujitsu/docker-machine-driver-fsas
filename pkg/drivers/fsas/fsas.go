@@ -52,9 +52,7 @@ type Driver struct {
 	ComputeConditionsJson     string
 	DevicesSpecJson           string
 	EnableBaremetalBonding    bool
-	NetworkBaremetalPort      int
 	NetworkBaremetalUUID      string
-	NetworkProvisionPort      int
 	NetworkProvisionUUID      string
 	NetworkProvisionDefaultGW string
 	PrivateIPAddress          string
@@ -85,9 +83,7 @@ func NewDriver() *Driver {
 		ComputeConditionsJson:     "",
 		DevicesSpecJson:           "",
 		EnableBaremetalBonding:    false,
-		NetworkBaremetalPort:      -1,
 		NetworkBaremetalUUID:      "",
-		NetworkProvisionPort:      -1,
 		NetworkProvisionUUID:      "",
 		NetworkProvisionDefaultGW: "",
 		PrivateIPAddress:          "",
@@ -106,7 +102,6 @@ func NewDriver() *Driver {
 const (
 	defaultSSHUser               = "rancher"
 	defaultSSHPassword           = "rancher"
-	defaultMachineType           = "ALL"
 	defaultFabricManagerEndpoint = "/fabric_manager/api/v1"
 	defaultKeycloakEndpoint      = "/id_manager"
 	errorMandatoryOption         = "%s must be specified using the CLI option %s"
@@ -128,9 +123,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("ComputeConditionsJson: %s, ", d.ComputeConditionsJson) +
 		fmt.Sprintf("DevicesSpecJson: %s, ", d.DevicesSpecJson) +
 		fmt.Sprintf("EnableBaremetalBonding: %t, ", d.EnableBaremetalBonding) +
-		fmt.Sprintf("NetworkBaremetalPort: %d, ", d.NetworkBaremetalPort) +
 		fmt.Sprintf("NetworkBaremetalUUID: %s, ", d.NetworkBaremetalUUID) +
-		fmt.Sprintf("NetworkProvisionPort: %d, ", d.NetworkProvisionPort) +
 		fmt.Sprintf("NetworkProvisionUUID: %s, ", d.NetworkProvisionUUID) +
 		fmt.Sprintf("NetworkProvisionDefaultGW: %s, ", d.NetworkProvisionDefaultGW) +
 		fmt.Sprintf("PrivateIPAddress: %s, ", d.PrivateIPAddress) +
@@ -199,22 +192,10 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Enable baremetal bonding",
 			EnvVar: "FSAS_ENABLE_BAREMETAL_BONDING",
 		},
-		mcnflag.IntFlag{
-			Name:   "fsas-network-baremetal-port",
-			Usage:  "Node LAN port index for baremetal subnet communication, e.g. 1",
-			Value:  -1,
-			EnvVar: "FSAS_NETWORK_BAREMETAL_PORT",
-		},
 		mcnflag.StringFlag{
 			Name:   "fsas-network-baremetal-uuid",
 			Usage:  `Node subnet UUID for baremetal-baremetal communication`,
 			EnvVar: "FSAS_NETWORK_BAREMETAL_UUID",
-		},
-		mcnflag.IntFlag{
-			Name:   "fsas-network-provision-port",
-			Usage:  "Node LAN port index for provisioning subnet communication, e.g. 1",
-			Value:  -1,
-			EnvVar: "FSAS_NETWORK_PROVISION_PORT",
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-network-provision-uuid",
@@ -367,14 +348,8 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.EnableBaremetalBonding = flags.Bool("fsas-enable-baremetal-bonding")
 	slog.Debug("Driver", "FSAS enable baremetal bonding", d.EnableBaremetalBonding)
 
-	d.NetworkBaremetalPort = flags.Int("fsas-network-baremetal-port")
-	slog.Debug("Driver", "FSAS baremetal subnet LAN port index", d.NetworkBaremetalPort)
-
 	d.NetworkBaremetalUUID = strings.TrimSpace(flags.String("fsas-network-baremetal-uuid"))
 	slog.Debug("Driver", "FSAS baremetal subnet UUID", d.NetworkBaremetalUUID)
-
-	d.NetworkProvisionPort = flags.Int("fsas-network-provision-port")
-	slog.Debug("Driver", "FSAS provosioning subnet LAN port index", d.NetworkProvisionPort)
 
 	d.NetworkProvisionUUID = strings.TrimSpace(flags.String("fsas-network-provision-uuid"))
 	slog.Debug("Driver", "FSAS provisioning subnet UUID", d.NetworkProvisionUUID)
@@ -512,9 +487,6 @@ func (d *Driver) checkConfig() error {
 	if d.ComputeConditionsJson == "" {
 		return fmt.Errorf(errorMandatoryOption, "Compute conditions (JSON)", "--fsas-compute-conditions-json")
 	}
-	if d.NetworkProvisionPort == -1 {
-		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet LAN port", "--fsas-network-provision-port")
-	}
 	if d.NetworkProvisionUUID == "" {
 		return fmt.Errorf(errorMandatoryOption, "Provisioning subnet UUID", "--fsas-network-provision-uuid")
 	}
@@ -531,8 +503,8 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image name", "--fsas-os-image-name")
 	}
 
-	if err := d.checkOnboardNicsConfig(); err != nil {
-		return err
+	if d.EnableBaremetalBonding && d.NetworkBaremetalUUID == "" {
+		return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
 	}
 
 	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {
@@ -560,37 +532,6 @@ func (d *Driver) checkConfig() error {
 				return fmt.Errorf("Email address is not valid: %s", d.SlesRegistrationEmail)
 			}
 		}
-	}
-	return nil
-}
-
-// checkOnboardNicsConfig validates that onboard NIC ports (1 and 2) are not misconfigured.
-// When baremetal bonding is enabled, ports 1 and 2 are reserved for bonding and the provisioning
-// subnet must use a different port. When bonding is disabled, the baremetal and provisioning
-// subnets must not share the same port and must not both occupy the two onboard NIC slots.
-func (d *Driver) checkOnboardNicsConfig() error {
-	if d.EnableBaremetalBonding {
-		if d.NetworkBaremetalUUID == "" {
-			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
-		}
-		if d.NetworkBaremetalPort != -1 {
-			slog.Warn("NetworkBaremetalPort is set but will be ignored because baremetal bonding is enabled; ports 1 and 2 are used for bonding")
-		}
-		if d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2 {
-			return fmt.Errorf("provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled; ports 1 and 2 are reserved for bonding")
-		}
-	} else if d.NetworkBaremetalUUID != "" {
-		if d.NetworkBaremetalPort == -1 {
-			return fmt.Errorf(errorMandatoryOption, "Baremetal subnet LAN port", "--fsas-network-baremetal-port")
-		}
-		if d.NetworkBaremetalPort == d.NetworkProvisionPort {
-			return fmt.Errorf("baremetal and provisioning lanport idx must not be the same")
-		}
-		if (d.NetworkBaremetalPort == 1 || d.NetworkBaremetalPort == 2) && (d.NetworkProvisionPort == 1 || d.NetworkProvisionPort == 2) {
-			return fmt.Errorf("baremetal and provisioning subnets cannot both use onboard NICs (lanport idx 1 and 2)")
-		}
-	} else if d.NetworkBaremetalPort != -1 {
-		return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
 	}
 	return nil
 }
@@ -628,9 +569,7 @@ func (d *Driver) innerCreate() error {
 		ComputeConditionsJson:     d.ComputeConditionsJson,
 		DevicesSpecJson:           d.DevicesSpecJson,
 		EnableBaremetalBonding:    d.EnableBaremetalBonding,
-		NetworkBaremetalPort:      d.NetworkBaremetalPort,
 		NetworkBaremetalUUID:      d.NetworkBaremetalUUID,
-		NetworkProvisionPort:      d.NetworkProvisionPort,
 		NetworkProvisionUUID:      d.NetworkProvisionUUID,
 		NetworkProvisionDefaultGW: d.NetworkProvisionDefaultGW,
 		NtpServer:                 d.NtpUrl,
