@@ -226,6 +226,36 @@ const (
 	PROVISIONING_LANPORT_IDX = 3
 )
 
+func composableNicContainsBaremetalSubnet(baremetalSubnet string, deviceSpec []models.Resource) bool {
+	if baremetalSubnet == "" {
+		return false
+	}
+
+	composableSubnets := getComposableSubnets(deviceSpec)
+
+	for _, cs := range composableSubnets {
+		if baremetalSubnet == cs {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getComposableSubnets(deviceSpec []models.Resource) []string {
+	composableSubnets := make([]string, 0)
+
+	for _, d := range deviceSpec {
+		if d.ResourceType == "network" && d.Network.NicType == 2 {
+			// iterate over subnets
+			for _, s := range d.Network.Subnets {
+				composableSubnets = append(composableSubnets, s.SubnetUUID)
+			}
+		}
+	}
+	return composableSubnets
+}
+
 // populateCreateMachineRequest constructs a CreateMachineRequest from machineName, tenantId and parameters from models.MachineSpecsArgs
 func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenantId string, machineSpecs models.MachineSpecsArgs) (*models.CreateMachineRequest, error) {
 
@@ -271,12 +301,15 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 				},
 			)
 		} else {
-			subnets = append(subnets, models.Subnet{
-				SubnetUUID: machineSpecs.NetworkBaremetalUUID,
-				LanportIdx: BAREMETAL_LANPORT_IDX_1,
-				Ntp:        machineSpecs.NtpServer,
-				Dns:        machineSpecs.DnsServer,
-			})
+			if !composableNicContainsBaremetalSubnet(machineSpecs.NetworkBaremetalUUID, devicesSpec) {
+
+				subnets = append(subnets, models.Subnet{
+					SubnetUUID: machineSpecs.NetworkBaremetalUUID,
+					LanportIdx: BAREMETAL_LANPORT_IDX_1,
+					Ntp:        machineSpecs.NtpServer,
+					Dns:        machineSpecs.DnsServer,
+				})
+			}
 		}
 	}
 
@@ -402,9 +435,9 @@ func populateLanportNicTypes(lanports []models.Lanport, resources []models.Resou
 		}
 	}
 
-	for i := range lanports {
+	for d := range lanports {
 		if computeMACs[lanports[i].MACAddress] {
-			lanports[i].NicType = models.NicTypeOnboard
+			lanports[d].NicType = models.NicTypeOnboard
 		} else {
 			lanports[i].NicType = models.NicTypeComposable
 		}
