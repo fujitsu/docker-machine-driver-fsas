@@ -227,10 +227,6 @@ const (
 )
 
 func composableNicContainsBaremetalSubnet(baremetalSubnet string, deviceSpec []models.Resource) bool {
-	if baremetalSubnet == "" {
-		return false
-	}
-
 	composableSubnets := getComposableSubnets(deviceSpec)
 
 	for _, cs := range composableSubnets {
@@ -246,7 +242,7 @@ func getComposableSubnets(deviceSpec []models.Resource) []string {
 	composableSubnets := make([]string, 0)
 
 	for _, d := range deviceSpec {
-		if d.ResourceType == "network" && d.Network.NicType == 2 {
+		if d.ResourceType == "network" && d.Network.NicType == models.NicTypeComposable {
 			// iterate over subnets
 			for _, s := range d.Network.Subnets {
 				composableSubnets = append(composableSubnets, s.SubnetUUID)
@@ -300,16 +296,14 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 					Dns:        machineSpecs.DnsServer,
 				},
 			)
-		} else {
-			if !composableNicContainsBaremetalSubnet(machineSpecs.NetworkBaremetalUUID, devicesSpec) {
+		} else if !composableNicContainsBaremetalSubnet(machineSpecs.NetworkBaremetalUUID, devicesSpec) {
+			subnets = append(subnets, models.Subnet{
+				SubnetUUID: machineSpecs.NetworkBaremetalUUID,
+				LanportIdx: BAREMETAL_LANPORT_IDX_1,
+				Ntp:        machineSpecs.NtpServer,
+				Dns:        machineSpecs.DnsServer,
+			})
 
-				subnets = append(subnets, models.Subnet{
-					SubnetUUID: machineSpecs.NetworkBaremetalUUID,
-					LanportIdx: BAREMETAL_LANPORT_IDX_1,
-					Ntp:        machineSpecs.NtpServer,
-					Dns:        machineSpecs.DnsServer,
-				})
-			}
 		}
 	}
 
@@ -435,9 +429,9 @@ func populateLanportNicTypes(lanports []models.Lanport, resources []models.Resou
 		}
 	}
 
-	for d := range lanports {
+	for i := range lanports {
 		if computeMACs[lanports[i].MACAddress] {
-			lanports[d].NicType = models.NicTypeOnboard
+			lanports[i].NicType = models.NicTypeOnboard
 		} else {
 			lanports[i].NicType = models.NicTypeComposable
 		}
