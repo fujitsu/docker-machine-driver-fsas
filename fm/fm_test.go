@@ -307,7 +307,7 @@ func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testi
 		machSpecsArgs             models.MachineSpecsArgs
 		expectedComputeSubnets    []models.Subnet
 		expectedComposableSubnets []models.Subnet
-		nr_compute_subnets        int
+		nrComputeSubnets          int
 	}{
 		{name: "provision, baremetal, composable NIC subnet the same as baremetal, no bonding",
 			machSpecsArgs: models.MachineSpecsArgs{
@@ -335,7 +335,7 @@ func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testi
 				Ntp:        "192.168.0.99",
 				Dns:        "8.8.8.99",
 			}},
-			nr_compute_subnets: 1,
+			nrComputeSubnets: 1,
 		},
 
 		{name: "provision, NO baremetal, composable NIC subnet other than provisioning, no bonding",
@@ -362,7 +362,7 @@ func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testi
 				Ntp:        "192.168.0.99",
 				Dns:        "8.8.8.99",
 			}},
-			nr_compute_subnets: 1,
+			nrComputeSubnets: 1,
 		},
 
 		{name: "provision, baremetal, composable NIC subnet the same as baremetal, bonding",
@@ -405,7 +405,7 @@ func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testi
 					Dns:        "8.8.8.99",
 				},
 			},
-			nr_compute_subnets: 3,
+			nrComputeSubnets: 3,
 		},
 
 		{name: "provision, baremetal, composable NIC 3rd subnet, bonding",
@@ -448,7 +448,7 @@ func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testi
 					Dns:        "8.8.8.99",
 				},
 			},
-			nr_compute_subnets: 3,
+			nrComputeSubnets: 3,
 		},
 
 		{name: "provision, baremetal, composable NIC 3rd subnet, no bonding",
@@ -485,7 +485,7 @@ func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testi
 					Dns:        "8.8.8.99",
 				},
 			},
-			nr_compute_subnets: 2,
+			nrComputeSubnets: 2,
 		},
 	}
 
@@ -501,8 +501,100 @@ func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testi
 			assert.Equal(t, expectedMachRequest, *createRequest)
 
 			computeResource := createRequest.Tenants.Machines[0].Resources[0].ResourceSpecifications[0]
-			assert.Len(t, computeResource.Network.Subnets, tc.nr_compute_subnets)
+			assert.Len(t, computeResource.Network.Subnets, tc.nrComputeSubnets)
 			assert.Equal(t, tc.machSpecsArgs.NetworkProvisionUUID, computeResource.Network.Subnets[0].SubnetUUID)
+		})
+	}
+}
+
+func TestComposableNicContainsBaremetalSubnet(t *testing.T) {
+
+	testCases := []struct {
+		name              string
+		composableSubnets []models.Subnet
+		baremetalSubnet   string
+		expected          bool
+		modifyDeviceSpec  func(deviceSpec *[]models.Resource)
+	}{
+		{name: "composable NIC contains the baremetal subnet",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000002-0000-0000-0000-000000000000",
+			expected:        true,
+		},
+		{name: "composable NIC does not contain the baremetal subnet",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000004-0000-0000-0000-000000000000",
+			expected:        false,
+		},
+		{name: "empty baremetal subnet",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "",
+			expected:        false,
+		},
+		{name: "empty composable",
+			composableSubnets: []models.Subnet{},
+			baremetalSubnet:   "00000004-0000-0000-0000-000000000000",
+			expected:          false,
+		},
+		{name: "empty composable, empty baremetal",
+			composableSubnets: []models.Subnet{},
+			baremetalSubnet:   "",
+			expected:          false,
+		},
+
+		{name: "no network resource defined in the device spec",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000002-0000-0000-0000-000000000000",
+			expected:        false,
+			modifyDeviceSpec: func(deviceSpec *[]models.Resource) {
+				/*delete the network resource from the device spec;
+				leave storage resource at index 0 and
+				delete network resource at index 1 */
+				*deviceSpec = (*deviceSpec)[:1]
+			},
+		},
+		{name: "composable NIC contains the baremetal subnet but filed NicType is not of type composable",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000002-0000-0000-0000-000000000000",
+			expected:        false,
+			modifyDeviceSpec: func(deviceSpec *[]models.Resource) {
+				/*change NicType to invalid one e.g. onboard */
+				(*deviceSpec)[1].Network.NicType = models.NicTypeOnboard
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			deviceSpec := templateDeviceSpecStorageAndComposableNetwork
+			deviceSpec[1].Network.Subnets = tc.composableSubnets
+
+			if tc.modifyDeviceSpec != nil {
+				tc.modifyDeviceSpec(&deviceSpec)
+			}
+
+			observed := composableNicContainsBaremetalSubnet(tc.baremetalSubnet, deviceSpec)
+			assert.Equal(t, tc.expected, observed)
 		})
 	}
 }

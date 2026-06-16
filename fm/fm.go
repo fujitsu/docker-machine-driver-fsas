@@ -226,18 +226,14 @@ const (
 	PROVISIONING_LANPORT_IDX = 3
 )
 
+// composableNicContainsBaremetalSubnet checks if the subnet used for baremetal provisioning is also included
+// in any composable NICs defined in the device spec.
 func composableNicContainsBaremetalSubnet(baremetalSubnet string, deviceSpec []models.Resource) bool {
 	composableSubnets := getComposableSubnets(deviceSpec)
-
-	for _, cs := range composableSubnets {
-		if baremetalSubnet == cs {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(composableSubnets, baremetalSubnet)
 }
 
+// getComposableSubnets iterates over the device spec and collects the subnet UUIDs of all composable NICs into a slice.
 func getComposableSubnets(deviceSpec []models.Resource) []string {
 	composableSubnets := make([]string, 0)
 
@@ -303,7 +299,6 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 				Ntp:        machineSpecs.NtpServer,
 				Dns:        machineSpecs.DnsServer,
 			})
-
 		}
 	}
 

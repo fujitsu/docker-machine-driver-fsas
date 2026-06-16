@@ -44,6 +44,32 @@ var (
         }
     ]`
 
+	templateDeviceSpecStorageAndComposableNetwork = []models.Resource{
+		{
+			ResourceType: "storage",
+			ResourceNum:  1,
+			ResourceSpec: &models.ResourceSpecification{Condition: []models.Condition{{
+				Column:   "vendor",
+				Operator: "eq",
+				Value:    "Samsung",
+			}}},
+			Tags: &models.ResStorageTags{IsBootStorage: true},
+		},
+		{
+			ResourceType: "network",
+			ResourceNum:  1,
+			ResourceSpec: &models.ResourceSpecification{Condition: []models.Condition{{
+				Column:   "vendor",
+				Operator: "eq",
+				Value:    "Mellanox",
+			}}},
+			Network: &models.Network{
+				NicType: models.NicTypeComposable,
+				Subnets: []models.Subnet{},
+			},
+		},
+	}
+
 	deviceSpecStorageAndComposableNetwork3rdSubnet = `[
         {
             "res_type": "storage",
