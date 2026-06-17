@@ -47,9 +47,7 @@ func TestCreateMachine_Success(t *testing.T) {
 	machineSpecsArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
 		DevicesSpecJson:       `[{"res_type":"storage","res_num":1,"tags":{"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "75e6b24f-c1cc-4009-a871-b5828a468f4f",
-		NetworkProvisionPort:  2,
 		NetworkProvisionUUID:  "5dc4769c-eef2-407f-b729-fec926ec9eda",
 		NtpServer:             "ntp.example.com",
 		DnsServer:             "8.8.8.8",
@@ -153,9 +151,7 @@ func TestCreateMachine_PostError(t *testing.T) {
 	machineSpecsArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
 		DevicesSpecJson:       `[{"res_type":"storage","res_num":1,"tags":{"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "75e6b24f-c1cc-4009-a871-b5828a468f4f",
-		NetworkProvisionPort:  2,
 		NetworkProvisionUUID:  "5dc4769c-eef2-407f-b729-fec926ec9eda",
 		NtpServer:             "ntp.example.com",
 		DnsServer:             "8.8.8.8",
@@ -200,10 +196,8 @@ func TestPopulateCreateMachineRequest_Success(t *testing.T) {
 		ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
 		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
 		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
-		NetworkProvisionPort:      1,
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
-		NetworkBaremetalPort:      2,
 		NtpServer:                 "192.168.0.1",
 		DnsServer:                 "8.8.8.8",
 	}
@@ -229,7 +223,6 @@ func TestPopulateCreateMachineRequestOneProvisioningNetwork_Success(t *testing.T
 		ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
 		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
 		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
-		NetworkProvisionPort:      2,
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NtpServer:                 "192.168.0.1",
 		DnsServer:                 "8.8.8.8",
@@ -257,7 +250,6 @@ func TestPopulateCreateMachineRequestBaremetalBondingEnabled_Success(t *testing.
 		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
 		EnableBaremetalBonding:    true,
 		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
-		NetworkProvisionPort:      1,
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
 		NtpServer:                 "192.168.0.1",
@@ -287,10 +279,8 @@ func TestPopulateCreateMachineRequestBaremetalBondingDisabled_Success(t *testing
 		DevicesSpecJson:           `[{"res_type":"storage","res_num":1,	"tags": {"is_bootstorage":true},"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
 		EnableBaremetalBonding:    false,
 		NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
-		NetworkProvisionPort:      1,
 		NetworkProvisionDefaultGW: "192.168.0.1",
 		NetworkBaremetalUUID:      "75e6b24f-c1cc-4009-a871-b5828a468f4f",
-		NetworkBaremetalPort:      2,
 		NtpServer:                 "192.168.0.1",
 		DnsServer:                 "8.8.8.8",
 	}
@@ -304,6 +294,309 @@ func TestPopulateCreateMachineRequestBaremetalBondingDisabled_Success(t *testing
 
 	// Expect a single baremetal subnet using the configured NetworkBaremetalPort
 	assert.Equal(t, models.CreateMachineRequestExpected, string(rawJSON))
+}
+
+func TestPopulateCreateMachineComposableContainsBaremetalSubnet_Success(t *testing.T) {
+	mockClient := httputils.NewMockCdiHTTPClient(t)
+	fmc := &FabricManagerClient{cdiClient: mockClient}
+	machineName := "test-machine-001"
+	tenantId := "b3b65e79-ad41-4367-89d6-e4e7315141ef"
+
+	testCases := []struct {
+		name                      string
+		machSpecsArgs             models.MachineSpecsArgs
+		expectedComputeSubnets    []models.Subnet
+		expectedComposableSubnets []models.Subnet
+		nrComputeSubnets          int
+	}{
+		{name: "provision, baremetal, composable NIC subnet the same as baremetal, no bonding",
+			machSpecsArgs: models.MachineSpecsArgs{
+				ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+				DevicesSpecJson:           deviceSpecStorageAndComposableNetwork,
+				EnableBaremetalBonding:    false,
+				NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+				NetworkProvisionDefaultGW: "192.168.0.1",
+				NetworkBaremetalUUID:      "75e6b24f-baee-baee-baee-b5828a468f4f",
+				NtpServer:                 "192.168.0.1",
+				DnsServer:                 "8.8.8.8",
+			},
+			expectedComputeSubnets: []models.Subnet{
+				{
+					SubnetUUID: "5dc4769c-eef2-407f-b729-fec926ec9eda",
+					LanportIdx: 3,
+					DefaultGW:  "192.168.0.1",
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+			},
+			expectedComposableSubnets: []models.Subnet{{
+				SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+				LanportIdx: 1,
+				Ntp:        "192.168.0.99",
+				Dns:        "8.8.8.99",
+			}},
+			nrComputeSubnets: 1,
+		},
+
+		{name: "provision, NO baremetal, composable NIC subnet other than provisioning, no bonding",
+			machSpecsArgs: models.MachineSpecsArgs{
+				ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+				DevicesSpecJson:           deviceSpecStorageAndComposableNetwork,
+				EnableBaremetalBonding:    false,
+				NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+				NetworkProvisionDefaultGW: "192.168.0.1",
+				NetworkBaremetalUUID:      "",
+				NtpServer:                 "192.168.0.1",
+				DnsServer:                 "8.8.8.8",
+			},
+			expectedComputeSubnets: []models.Subnet{{
+				SubnetUUID: "5dc4769c-eef2-407f-b729-fec926ec9eda",
+				LanportIdx: 3,
+				DefaultGW:  "192.168.0.1",
+				Ntp:        "192.168.0.1",
+				Dns:        "8.8.8.8",
+			}},
+			expectedComposableSubnets: []models.Subnet{{
+				SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+				LanportIdx: 1,
+				Ntp:        "192.168.0.99",
+				Dns:        "8.8.8.99",
+			}},
+			nrComputeSubnets: 1,
+		},
+
+		{name: "provision, baremetal, composable NIC subnet the same as baremetal, bonding",
+			machSpecsArgs: models.MachineSpecsArgs{
+				ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+				DevicesSpecJson:           deviceSpecStorageAndComposableNetwork,
+				EnableBaremetalBonding:    true,
+				NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+				NetworkProvisionDefaultGW: "192.168.0.1",
+				NetworkBaremetalUUID:      "75e6b24f-baee-baee-baee-b5828a468f4f",
+				NtpServer:                 "192.168.0.1",
+				DnsServer:                 "8.8.8.8",
+			},
+			expectedComputeSubnets: []models.Subnet{
+				{
+					SubnetUUID: "5dc4769c-eef2-407f-b729-fec926ec9eda",
+					LanportIdx: 3,
+					DefaultGW:  "192.168.0.1",
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+				{
+					SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+					LanportIdx: 1,
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+				{
+					SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+					LanportIdx: 2,
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+			},
+			expectedComposableSubnets: []models.Subnet{
+				{
+					SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+					LanportIdx: 1,
+					Ntp:        "192.168.0.99",
+					Dns:        "8.8.8.99",
+				},
+			},
+			nrComputeSubnets: 3,
+		},
+
+		{name: "provision, baremetal, composable NIC 3rd subnet, bonding",
+			machSpecsArgs: models.MachineSpecsArgs{
+				ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+				DevicesSpecJson:           deviceSpecStorageAndComposableNetwork3rdSubnet,
+				EnableBaremetalBonding:    true,
+				NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+				NetworkProvisionDefaultGW: "192.168.0.1",
+				NetworkBaremetalUUID:      "75e6b24f-baee-baee-baee-b5828a468f4f",
+				NtpServer:                 "192.168.0.1",
+				DnsServer:                 "8.8.8.8",
+			},
+			expectedComputeSubnets: []models.Subnet{
+				{
+					SubnetUUID: "5dc4769c-eef2-407f-b729-fec926ec9eda",
+					LanportIdx: 3,
+					DefaultGW:  "192.168.0.1",
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+				{
+					SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+					LanportIdx: 1,
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+				{
+					SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+					LanportIdx: 2,
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+			},
+			expectedComposableSubnets: []models.Subnet{
+				{
+					SubnetUUID: "abc6b24f-3333-3333-3333-b5828a468f4f",
+					LanportIdx: 1,
+					Ntp:        "192.168.0.99",
+					Dns:        "8.8.8.99",
+				},
+			},
+			nrComputeSubnets: 3,
+		},
+
+		{name: "provision, baremetal, composable NIC 3rd subnet, no bonding",
+			machSpecsArgs: models.MachineSpecsArgs{
+				ComputeConditionsJson:     `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
+				DevicesSpecJson:           deviceSpecStorageAndComposableNetwork3rdSubnet,
+				EnableBaremetalBonding:    false,
+				NetworkProvisionUUID:      "5dc4769c-eef2-407f-b729-fec926ec9eda",
+				NetworkProvisionDefaultGW: "192.168.0.1",
+				NetworkBaremetalUUID:      "75e6b24f-baee-baee-baee-b5828a468f4f",
+				NtpServer:                 "192.168.0.1",
+				DnsServer:                 "8.8.8.8",
+			},
+			expectedComputeSubnets: []models.Subnet{
+				{
+					SubnetUUID: "5dc4769c-eef2-407f-b729-fec926ec9eda",
+					LanportIdx: 3,
+					DefaultGW:  "192.168.0.1",
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+				{
+					SubnetUUID: "75e6b24f-baee-baee-baee-b5828a468f4f",
+					LanportIdx: 1,
+					Ntp:        "192.168.0.1",
+					Dns:        "8.8.8.8",
+				},
+			},
+			expectedComposableSubnets: []models.Subnet{
+				{
+					SubnetUUID: "abc6b24f-3333-3333-3333-b5828a468f4f",
+					LanportIdx: 1,
+					Ntp:        "192.168.0.99",
+					Dns:        "8.8.8.99",
+				},
+			},
+			nrComputeSubnets: 2,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			createRequest, err := fmc.populateCreateMachineRequest(machineName, tenantId, tc.machSpecsArgs)
+
+			assert.NoError(t, err, "populateCreateMachineRequest should not return an error")
+			expectedMachRequest := *templateExpectedMachRequest
+			expectedMachRequest.Tenants.Machines[0].Resources[0].ResourceSpecifications[0].Network.Subnets = tc.expectedComputeSubnets
+			expectedMachRequest.Tenants.Machines[0].Resources[0].ResourceSpecifications[2].Network.Subnets = tc.expectedComposableSubnets
+
+			assert.Equal(t, expectedMachRequest, *createRequest)
+
+			computeResource := createRequest.Tenants.Machines[0].Resources[0].ResourceSpecifications[0]
+			assert.Len(t, computeResource.Network.Subnets, tc.nrComputeSubnets)
+			assert.Equal(t, tc.machSpecsArgs.NetworkProvisionUUID, computeResource.Network.Subnets[0].SubnetUUID)
+		})
+	}
+}
+
+func TestComposableNicContainsBaremetalSubnet(t *testing.T) {
+
+	testCases := []struct {
+		name              string
+		composableSubnets []models.Subnet
+		baremetalSubnet   string
+		expected          bool
+		modifyDeviceSpec  func(deviceSpec *[]models.Resource)
+	}{
+		{name: "composable NIC contains the baremetal subnet",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000002-0000-0000-0000-000000000000",
+			expected:        true,
+		},
+		{name: "composable NIC does not contain the baremetal subnet",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000004-0000-0000-0000-000000000000",
+			expected:        false,
+		},
+		{name: "empty baremetal subnet",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "",
+			expected:        false,
+		},
+		{name: "empty composable",
+			composableSubnets: []models.Subnet{},
+			baremetalSubnet:   "00000004-0000-0000-0000-000000000000",
+			expected:          false,
+		},
+		{name: "empty composable, empty baremetal",
+			composableSubnets: []models.Subnet{},
+			baremetalSubnet:   "",
+			expected:          false,
+		},
+
+		{name: "no network resource defined in the device spec",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000002-0000-0000-0000-000000000000",
+			expected:        false,
+			modifyDeviceSpec: func(deviceSpec *[]models.Resource) {
+				/*delete the network resource from the device spec;
+				leave storage resource at index 0 and
+				delete network resource at index 1 */
+				*deviceSpec = (*deviceSpec)[:1]
+			},
+		},
+		{name: "composable NIC contains the baremetal subnet but filed NicType is not of type composable",
+			composableSubnets: []models.Subnet{
+				{SubnetUUID: "00000001-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000002-0000-0000-0000-000000000000"},
+				{SubnetUUID: "00000003-0000-0000-0000-000000000000"},
+			},
+			baremetalSubnet: "00000002-0000-0000-0000-000000000000",
+			expected:        false,
+			modifyDeviceSpec: func(deviceSpec *[]models.Resource) {
+				/*change NicType to invalid one e.g. onboard */
+				(*deviceSpec)[1].Network.NicType = models.NicTypeOnboard
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			deviceSpec := templateDeviceSpecStorageAndComposableNetwork
+			deviceSpec[1].Network.Subnets = tc.composableSubnets
+
+			if tc.modifyDeviceSpec != nil {
+				tc.modifyDeviceSpec(&deviceSpec)
+			}
+
+			observed := composableNicContainsBaremetalSubnet(tc.baremetalSubnet, deviceSpec)
+			assert.Equal(t, tc.expected, observed)
+		})
+	}
 }
 
 func TestCheckDeviceSpecJson(t *testing.T) {
@@ -343,9 +636,7 @@ func getSpecArgs(tagsValue string) models.MachineSpecsArgs {
 	return models.MachineSpecsArgs{
 		ComputeConditionsJson: `[{"column": "model","operator": "eq","value": "PRIMERGY-RX2540M6"}]`,
 		DevicesSpecJson:       deviceSpecJson,
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "75e6b24f-c1cc-4009-a871-b5828a468f4f",
-		NetworkProvisionPort:  2,
 		NetworkProvisionUUID:  "5dc4769c-eef2-407f-b729-fec926ec9eda",
 		NtpServer:             "ntp.example.com",
 		DnsServer:             "8.8.8.8",
@@ -443,9 +734,7 @@ func TestPopulateCreateMachineRequest_Error(t *testing.T) {
 	machineSpecsArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: "<invalid_string>",
 		DevicesSpecJson:       `[{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]}},{"res_type":"gpu","res_num":2,"res_spec":{"condition":[{"column":"gpu_model","operator":"eq","value":"NVIDIA Tesla T4"}]}}]`,
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "75e6b24f-c1cc-4009-a871-b5828a468f4f",
-		NetworkProvisionPort:  2,
 		NetworkProvisionUUID:  "5dc4769c-eef2-407f-b729-fec926ec9eda",
 		NtpServer:             "ntp.example.com",
 		DnsServer:             "8.8.8.8",
