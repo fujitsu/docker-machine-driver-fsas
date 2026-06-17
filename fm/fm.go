@@ -220,6 +220,34 @@ func getBootStorageCondition(devicesSpec string) ([]models.Condition, error) {
 	return nil, ErrBootStorageConditionNotFound
 }
 
+const (
+	BAREMETAL_LANPORT_IDX_1  = 1
+	BAREMETAL_LANPORT_IDX_2  = 2
+	PROVISIONING_LANPORT_IDX = 3
+)
+
+// composableNicContainsBaremetalSubnet checks if the subnet used for baremetal provisioning is also included
+// in any composable NICs defined in the device spec.
+func composableNicContainsBaremetalSubnet(baremetalSubnet string, deviceSpec []models.Resource) bool {
+	composableSubnets := getComposableSubnets(deviceSpec)
+	return slices.Contains(composableSubnets, baremetalSubnet)
+}
+
+// getComposableSubnets iterates over the device spec and collects the subnet UUIDs of all composable NICs into a slice.
+func getComposableSubnets(deviceSpec []models.Resource) []string {
+	composableSubnets := make([]string, 0)
+
+	for _, d := range deviceSpec {
+		if d.ResourceType == "network" && d.Network.NicType == models.NicTypeComposable {
+			// iterate over subnets
+			for _, s := range d.Network.Subnets {
+				composableSubnets = append(composableSubnets, s.SubnetUUID)
+			}
+		}
+	}
+	return composableSubnets
+}
+
 // populateCreateMachineRequest constructs a CreateMachineRequest from machineName, tenantId and parameters from models.MachineSpecsArgs
 func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenantId string, machineSpecs models.MachineSpecsArgs) (*models.CreateMachineRequest, error) {
 
@@ -241,7 +269,7 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 	subnets := []models.Subnet{
 		{
 			SubnetUUID: machineSpecs.NetworkProvisionUUID,
-			LanportIdx: machineSpecs.NetworkProvisionPort,
+			LanportIdx: PROVISIONING_LANPORT_IDX,
 			Ntp:        machineSpecs.NtpServer,
 			Dns:        machineSpecs.DnsServer,
 			DefaultGW:  machineSpecs.NetworkProvisionDefaultGW,
@@ -253,21 +281,21 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 			subnets = append(subnets,
 				models.Subnet{
 					SubnetUUID: machineSpecs.NetworkBaremetalUUID,
-					LanportIdx: 1,
+					LanportIdx: BAREMETAL_LANPORT_IDX_1,
 					Ntp:        machineSpecs.NtpServer,
 					Dns:        machineSpecs.DnsServer,
 				},
 				models.Subnet{
 					SubnetUUID: machineSpecs.NetworkBaremetalUUID,
-					LanportIdx: 2,
+					LanportIdx: BAREMETAL_LANPORT_IDX_2,
 					Ntp:        machineSpecs.NtpServer,
 					Dns:        machineSpecs.DnsServer,
 				},
 			)
-		} else {
+		} else if !composableNicContainsBaremetalSubnet(machineSpecs.NetworkBaremetalUUID, devicesSpec) {
 			subnets = append(subnets, models.Subnet{
 				SubnetUUID: machineSpecs.NetworkBaremetalUUID,
-				LanportIdx: machineSpecs.NetworkBaremetalPort,
+				LanportIdx: BAREMETAL_LANPORT_IDX_1,
 				Ntp:        machineSpecs.NtpServer,
 				Dns:        machineSpecs.DnsServer,
 			})

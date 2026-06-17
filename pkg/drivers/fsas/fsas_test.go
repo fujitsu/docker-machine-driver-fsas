@@ -1,7 +1,6 @@
 package fsas
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -20,7 +19,6 @@ import (
 	fmmock "github.com/fujitsu/docker-machine-driver-fsas/fm/mock"
 	"github.com/fujitsu/docker-machine-driver-fsas/keycloak"
 	keycloakMock "github.com/fujitsu/docker-machine-driver-fsas/keycloak/mock"
-	fsaslog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	sshMock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
@@ -285,9 +283,7 @@ func TestCheckConfigTenantSuccess(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
-		NetworkProvisionPort:      1,
 		NetworkProvisionUUID:      "test",
 		NetworkProvisionDefaultGW: "192.168.0.254",
 		DevicesSpecJson:           models.DeviceSpecsValid,
@@ -318,9 +314,7 @@ func TestCheckConfigEmptySshHostPubKey(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
-		NetworkProvisionPort:      1,
 		NetworkProvisionUUID:      "test",
 		NetworkProvisionDefaultGW: "192.168.0.254",
 		DevicesSpecJson:           models.DeviceSpecsValid,
@@ -350,9 +344,7 @@ func TestCheckConfigInvalidSshHostPubKey(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
-		NetworkProvisionPort:      1,
 		NetworkProvisionUUID:      "test",
 		NetworkProvisionDefaultGW: "192.168.0.254",
 		DevicesSpecJson:           models.DeviceSpecsValid,
@@ -383,9 +375,7 @@ func TestCheckConfig_SlesParamsFail(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
-		NetworkProvisionPort:      1,
 		NetworkProvisionUUID:      "test",
 		NetworkProvisionDefaultGW: "192.168.0.254",
 		DevicesSpecJson:           models.DeviceSpecsValid,
@@ -451,9 +441,7 @@ func TestCheckConfigTenantFailed(t *testing.T) {
 		Keycloak:                  mockKeycloak,
 		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
-		NetworkBaremetalPort:      3,
 		NetworkBaremetalUUID:      "test",
-		NetworkProvisionPort:      1,
 		NetworkProvisionUUID:      "test",
 		NetworkProvisionDefaultGW: "192.168.0.254",
 		DevicesSpecJson:           models.DeviceSpecsValid,
@@ -480,16 +468,12 @@ func TestCheckConfigSSHUserFailed(t *testing.T) {
 		FabricManager:         mockFM,
 		SSHPassword:           "pass",
 		ComputeConditionsJson: "test",
-
-		NetworkBaremetalPort: 1,
-		NetworkBaremetalUUID: "test",
-
-		NetworkProvisionPort: 1,
-		NetworkProvisionUUID: "test",
-		DevicesSpecJson:      "test",
-		ApiUrl:               "http://192.168.0.1",
-		TenantUuid:           "cdi-test",
-		OsImageName:          "Ubuntu",
+		NetworkBaremetalUUID:  "test",
+		NetworkProvisionUUID:  "test",
+		DevicesSpecJson:       "test",
+		ApiUrl:                "http://192.168.0.1",
+		TenantUuid:            "cdi-test",
+		OsImageName:           "Ubuntu",
 	}
 
 	err := driver.checkConfig()
@@ -1202,9 +1186,7 @@ func TestCreate(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		NetworkProvisionPort:  1,
 		NetworkProvisionUUID:  "123e4567-e89b-12d3-a456-426614174000",
 		NtpUrl:                "test",
 		DnsIp:                 "test",
@@ -1222,9 +1204,7 @@ func TestCreate(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-		NetworkBaremetalPort:  driver.NetworkBaremetalPort,
 		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
-		NetworkProvisionPort:  driver.NetworkProvisionPort,
 		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
 		NtpServer:             driver.NtpUrl,
 		DnsServer:             driver.DnsIp,
@@ -1288,9 +1268,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		NetworkProvisionPort:  1,
 		NetworkProvisionUUID:  "123e4567-e89b-12d3-a456-426614174000",
 		NtpUrl:                "test",
 		DnsIp:                 "test",
@@ -1308,9 +1286,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-		NetworkBaremetalPort:  driver.NetworkBaremetalPort,
 		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
-		NetworkProvisionPort:  driver.NetworkProvisionPort,
 		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
 		NtpServer:             driver.NtpUrl,
 		DnsServer:             driver.DnsIp,
@@ -1380,14 +1356,10 @@ func TestCreateMachineFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-
-		NetworkBaremetalPort: 1,
-		NetworkBaremetalUUID: "6aaf2935-6a66-4f29-8dcc-1367688960ea",
-
-		NetworkProvisionPort: 1,
-		NetworkProvisionUUID: "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
-		NtpUrl:               "test",
-		DnsIp:                "test",
+		NetworkBaremetalUUID:  "6aaf2935-6a66-4f29-8dcc-1367688960ea",
+		NetworkProvisionUUID:  "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
+		NtpUrl:                "test",
+		DnsIp:                 "test",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1399,14 +1371,10 @@ func TestCreateMachineFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 
 	testError := fmt.Errorf("CreateMachine unsucessfull")
@@ -1442,14 +1410,10 @@ func TestCreateWaitForStatusFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-
-		NetworkBaremetalPort: 1,
-		NetworkBaremetalUUID: "6aaf2935-6a66-4f29-8dcc-1367688960ea",
-
-		NetworkProvisionPort: 1,
-		NetworkProvisionUUID: "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
-		NtpUrl:               "test",
-		DnsIp:                "test",
+		NetworkBaremetalUUID:  "6aaf2935-6a66-4f29-8dcc-1367688960ea",
+		NetworkProvisionUUID:  "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
+		NtpUrl:                "test",
+		DnsIp:                 "test",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1460,14 +1424,10 @@ func TestCreateWaitForStatusFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
@@ -1500,14 +1460,10 @@ func TestCreateGetMachineDetailsFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-
-		NetworkBaremetalPort: 1,
-		NetworkBaremetalUUID: "6aaf2935-6a66-4f29-8dcc-1367688960ea",
-
-		NetworkProvisionPort: 1,
-		NetworkProvisionUUID: "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
-		NtpUrl:               "test",
-		DnsIp:                "test",
+		NetworkBaremetalUUID:  "6aaf2935-6a66-4f29-8dcc-1367688960ea",
+		NetworkProvisionUUID:  "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
+		NtpUrl:                "test",
+		DnsIp:                 "test",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1518,14 +1474,10 @@ func TestCreateGetMachineDetailsFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// waitForStatus call
@@ -1558,14 +1510,10 @@ func TestCreateImageInstallFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-
-		NetworkBaremetalPort: 1,
-		NetworkBaremetalUUID: "6aaf2935-6a66-4f29-8dcc-1367688960ea",
-
-		NetworkProvisionPort: 1,
-		NetworkProvisionUUID: "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
-		NtpUrl:               "test",
-		DnsIp:                "test",
+		NetworkBaremetalUUID:  "6aaf2935-6a66-4f29-8dcc-1367688960ea",
+		NetworkProvisionUUID:  "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
+		NtpUrl:                "test",
+		DnsIp:                 "test",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1576,14 +1524,10 @@ func TestCreateImageInstallFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// Create's 1st waitForStatus and 2nd call for bootSSD
@@ -1615,14 +1559,10 @@ func TestCreateStartFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-
-		NetworkBaremetalPort: 1,
-		NetworkBaremetalUUID: "6aaf2935-6a66-4f29-8dcc-1367688960ea",
-
-		NetworkProvisionPort: 1,
-		NetworkProvisionUUID: "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
-		NtpUrl:               "test",
-		DnsIp:                "test",
+		NetworkBaremetalUUID:  "6aaf2935-6a66-4f29-8dcc-1367688960ea",
+		NetworkProvisionUUID:  "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
+		NtpUrl:                "test",
+		DnsIp:                 "test",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1633,14 +1573,10 @@ func TestCreateStartFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st waitForStatus and 2nd call for bootSSD
@@ -1678,14 +1614,10 @@ func TestCreateGetMachineDetailsFailSecond(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-
-		NetworkBaremetalPort: 1,
-		NetworkBaremetalUUID: "6aaf2935-6a66-4f29-8dcc-1367688960ea",
-
-		NetworkProvisionPort: 1,
-		NetworkProvisionUUID: "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
-		NtpUrl:               "test",
-		DnsIp:                "test",
+		NetworkBaremetalUUID:  "6aaf2935-6a66-4f29-8dcc-1367688960ea",
+		NetworkProvisionUUID:  "f7294e52-228a-4ef1-b9ca-3d3402e49cf6",
+		NtpUrl:                "test",
+		DnsIp:                 "test",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1696,14 +1628,10 @@ func TestCreateGetMachineDetailsFailSecond(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create and 2nd call for bootSSD
@@ -1745,9 +1673,7 @@ func TestCreateImplantSSHKeyFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		NetworkProvisionPort:  1,
 		NetworkProvisionUUID:  "123e4567-e89b-12d3-a456-426614174000",
 		NtpUrl:                "test",
 		DnsIp:                 "test",
@@ -1762,14 +1688,10 @@ func TestCreateImplantSSHKeyFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
@@ -1810,9 +1732,7 @@ func TestCreateOSRegistrationFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		NetworkProvisionPort:  1,
 		NetworkProvisionUUID:  "123e4567-e89b-12d3-a456-426614174000",
 		NtpUrl:                "test",
 		DnsIp:                 "test",
@@ -1829,14 +1749,10 @@ func TestCreateOSRegistrationFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
@@ -1879,9 +1795,7 @@ func TestCreateExecuteScriptFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		NetworkProvisionPort:  1,
 		NetworkProvisionUUID:  "123e4567-e89b-12d3-a456-426614174000",
 		NtpUrl:                "test",
 		DnsIp:                 "test",
@@ -1899,14 +1813,10 @@ func TestCreateExecuteScriptFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
@@ -1948,9 +1858,7 @@ func TestCreateFailRemoveFail(t *testing.T) {
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
 		DevicesSpecJson:       "testJson",
-		NetworkBaremetalPort:  1,
 		NetworkBaremetalUUID:  "123e4567-e89b-12d3-a456-426614174000",
-		NetworkProvisionPort:  1,
 		NetworkProvisionUUID:  "123e4567-e89b-12d3-a456-426614174000",
 		NtpUrl:                "test",
 		DnsIp:                 "test",
@@ -1968,14 +1876,10 @@ func TestCreateFailRemoveFail(t *testing.T) {
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
 		DevicesSpecJson:       driver.DevicesSpecJson,
-
-		NetworkBaremetalPort: driver.NetworkBaremetalPort,
-		NetworkBaremetalUUID: driver.NetworkBaremetalUUID,
-
-		NetworkProvisionPort: driver.NetworkProvisionPort,
-		NetworkProvisionUUID: driver.NetworkProvisionUUID,
-		NtpServer:            driver.NtpUrl,
-		DnsServer:            driver.DnsIp,
+		NetworkBaremetalUUID:  driver.NetworkBaremetalUUID,
+		NetworkProvisionUUID:  driver.NetworkProvisionUUID,
+		NtpServer:             driver.NtpUrl,
+		DnsServer:             driver.DnsIp,
 	}
 	mockFM.On("CreateMachine", driver.MachineName, driver.TenantUuid, machineSpecArgs, models.AccessTokenExample).Return(testMachineUUID, nil)
 	// 1st call after Create, 2nd call for bootSSD
@@ -1997,42 +1901,6 @@ func TestCreateFailRemoveFail(t *testing.T) {
 
 	err := driver.Create()
 	assert.EqualError(t, err, "error during Create: 'ExecuteScript unsuccessful'; followed by error during Remove: 'Remove after failed inner Create failed as well'")
-}
-
-func TestCheckOnboardNicsConfig_BondingEnabled_BaremetalPortSet_LogsWarning(t *testing.T) {
-	var buf bytes.Buffer
-	restore := fsaslog.SetLogger(&buf)
-	defer restore()
-
-	driver := &Driver{
-		BaseDriver:             &drivers.BaseDriver{},
-		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   3,
-		NetworkBaremetalUUID:   "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-		NetworkProvisionPort:   3,
-	}
-
-	err := driver.checkOnboardNicsConfig()
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "NetworkBaremetalPort is set but will be ignored")
-}
-
-func TestCheckOnboardNicsConfig_BondingEnabled_BaremetalPortNotSet_NoWarning(t *testing.T) {
-	var buf bytes.Buffer
-	restore := fsaslog.SetLogger(&buf)
-	defer restore()
-
-	driver := &Driver{
-		BaseDriver:             &drivers.BaseDriver{},
-		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   -1,
-		NetworkBaremetalUUID:   "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-		NetworkProvisionPort:   3,
-	}
-
-	err := driver.checkOnboardNicsConfig()
-	assert.NoError(t, err)
-	assert.NotContains(t, buf.String(), "NetworkBaremetalPort is set but will be ignored")
 }
 
 func TestKill_success(t *testing.T) {
@@ -2657,166 +2525,6 @@ func Test_applyCloudInit_bonding_fail_write_network_config(t *testing.T) {
 	assert.EqualError(t, err, "WriteFileOnRemoteMachine failed")
 }
 
-func TestCheckOnboardNicsConfig(t *testing.T) {
-	testCases := []struct {
-		name           string
-		bonding        bool
-		baremetalUUID  string
-		baremetalPort  int
-		provisionPort  int
-		expectedErrMsg string
-	}{
-		// Bonding disabled
-		{
-			name:           "bonding disabled, no baremetal UUID - skips all baremetal checks",
-			bonding:        false,
-			baremetalUUID:  "",
-			baremetalPort:  -1,
-			provisionPort:  1,
-			expectedErrMsg: "",
-		},
-		{
-			name:           "bonding disabled, baremetal UUID set, baremetal port not set (-1)",
-			bonding:        false,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  -1,
-			provisionPort:  1,
-			expectedErrMsg: "--fsas-network-baremetal-port",
-		},
-		{
-			name:           "bonding disabled, baremetal and provisioning on the same port",
-			bonding:        false,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  3,
-			provisionPort:  3,
-			expectedErrMsg: "baremetal and provisioning lanport idx must not be the same",
-		},
-		{
-			name:           "bonding disabled, baremetal port 1 and provisioning port 2 - both onboard NICs",
-			bonding:        false,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  1,
-			provisionPort:  2,
-			expectedErrMsg: "baremetal and provisioning subnets cannot both use onboard NICs",
-		},
-		{
-			name:           "bonding disabled, baremetal port 2 and provisioning port 1 - both onboard NICs",
-			bonding:        false,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  2,
-			provisionPort:  1,
-			expectedErrMsg: "baremetal and provisioning subnets cannot both use onboard NICs",
-		},
-		{
-			name:           "bonding disabled, valid - baremetal port 3, provisioning port 1",
-			bonding:        false,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  3,
-			provisionPort:  1,
-			expectedErrMsg: "",
-		},
-		{
-			name:           "bonding disabled, valid - baremetal port 3, provisioning port 2",
-			bonding:        false,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  3,
-			provisionPort:  2,
-			expectedErrMsg: "",
-		},
-		{
-			name:           "bonding disabled, valid - baremetal port 1, provisioning port 3",
-			bonding:        false,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  1,
-			provisionPort:  3,
-			expectedErrMsg: "",
-		},
-		{
-			name:           "bonding disabled, no baremetal UUID, but baremetal port set",
-			bonding:        false,
-			baremetalUUID:  "",
-			baremetalPort:  3,
-			provisionPort:  1,
-			expectedErrMsg: "--fsas-network-baremetal-uuid",
-		},
-		{
-			name:           "bonding disabled, no baremetal UUID, but both port and default GW set",
-			bonding:        false,
-			baremetalUUID:  "",
-			baremetalPort:  3,
-			provisionPort:  1,
-			expectedErrMsg: "--fsas-network-baremetal-uuid",
-		},
-		// Bonding enabled
-		{
-			name:           "bonding enabled, provisioning port 1 - reserved for bonding",
-			bonding:        true,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  -1,
-			provisionPort:  1,
-			expectedErrMsg: "provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled",
-		},
-		{
-			name:           "bonding enabled, provisioning port 2 - reserved for bonding",
-			bonding:        true,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  -1,
-			provisionPort:  2,
-			expectedErrMsg: "provisioning lanport idx must not be 1 or 2 when baremetal bonding is enabled",
-		},
-		{
-			name:           "bonding enabled, provisioning port 3 - valid",
-			bonding:        true,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  -1,
-			provisionPort:  3,
-			expectedErrMsg: "",
-		},
-		{
-			name:           "bonding enabled, no baremetal UUID - missing required UUID",
-			bonding:        true,
-			baremetalUUID:  "",
-			baremetalPort:  -1,
-			provisionPort:  3,
-			expectedErrMsg: "Baremetal subnet UUID must be specified",
-		},
-		{
-			name:           "bonding enabled, baremetal port not set - ignored, provisioning port 3 valid",
-			bonding:        true,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  -1,
-			provisionPort:  3,
-			expectedErrMsg: "",
-		},
-		{
-			name:           "bonding enabled, baremetal port set - ignored with warning, provisioning port 3 valid",
-			bonding:        true,
-			baremetalUUID:  "7e8ba727-ea79-4951-a49d-feb866d5ca21",
-			baremetalPort:  3,
-			provisionPort:  3,
-			expectedErrMsg: "",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			driver := &Driver{
-				BaseDriver:             &drivers.BaseDriver{},
-				EnableBaremetalBonding: tc.bonding,
-				NetworkBaremetalUUID:   tc.baremetalUUID,
-				NetworkBaremetalPort:   tc.baremetalPort,
-				NetworkProvisionPort:   tc.provisionPort,
-			}
-			err := driver.checkOnboardNicsConfig()
-			if tc.expectedErrMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.ErrorContains(t, err, tc.expectedErrMsg)
-			}
-		})
-	}
-}
-
 func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 	mockClock := timeutilsmock.NewMockClock(t)
 	statusClock = mockClock
@@ -2842,9 +2550,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 		ComputeConditionsJson:  "testJsnn",
 		DevicesSpecJson:        "testJson",
 		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   -1,
 		NetworkBaremetalUUID:   testBaremetalUUID,
-		NetworkProvisionPort:   3,
 		NetworkProvisionUUID:   testProvisionUUID,
 		NtpUrl:                 "test",
 		DnsIp:                  "test",
@@ -2861,9 +2567,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 		ComputeConditionsJson:  driver.ComputeConditionsJson,
 		DevicesSpecJson:        driver.DevicesSpecJson,
 		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   driver.NetworkBaremetalPort,
 		NetworkBaremetalUUID:   driver.NetworkBaremetalUUID,
-		NetworkProvisionPort:   driver.NetworkProvisionPort,
 		NetworkProvisionUUID:   driver.NetworkProvisionUUID,
 		NtpServer:              driver.NtpUrl,
 		DnsServer:              driver.DnsIp,
@@ -2937,9 +2641,7 @@ func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
 		ComputeConditionsJson:  "testJsnn",
 		DevicesSpecJson:        "testJson",
 		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   -1,
 		NetworkBaremetalUUID:   testBaremetalUUID,
-		NetworkProvisionPort:   3,
 		NetworkProvisionUUID:   testProvisionUUID,
 		NtpUrl:                 "test",
 		DnsIp:                  "test",
@@ -2956,9 +2658,7 @@ func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
 		ComputeConditionsJson:  driver.ComputeConditionsJson,
 		DevicesSpecJson:        driver.DevicesSpecJson,
 		EnableBaremetalBonding: true,
-		NetworkBaremetalPort:   driver.NetworkBaremetalPort,
 		NetworkBaremetalUUID:   driver.NetworkBaremetalUUID,
-		NetworkProvisionPort:   driver.NetworkProvisionPort,
 		NetworkProvisionUUID:   driver.NetworkProvisionUUID,
 		NtpServer:              driver.NtpUrl,
 		DnsServer:              driver.DnsIp,
