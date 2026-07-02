@@ -1,121 +1,195 @@
-categories:
-  - Cluster
-
 questions:
 
-#
+# --------------------------------------------------------------------
 # Cluster
-#
+# --------------------------------------------------------------------
 
 - variable: cluster.name
   label: Cluster Name
   type: string
   required: true
-  default: fsas-cluster
+  default: fc00
+  group: Cluster
+
+- variable: cluster.namespace
+  label: Namespace
+  type: string
+  required: true
+  default: fleet-default
+  group: Cluster
+
+- variable: cluster.cloudCredentialSecretName
+  label: Cloud Credential
+  type: cloudcredential
+  required: true
+  group: Cluster
 
 - variable: cluster.kubernetesVersion
   label: Kubernetes Version
   type: string
   required: true
   default: v1.35.6+rke2r1
+  group: Cluster
 
-- variable: cluster.cloudCredentialSecretName
-  label: Cloud Credential
-  type: cloudcredential
-  required: true
+# --------------------------------------------------------------------
+# Control Plane
+# --------------------------------------------------------------------
 
-#
-# Pool
-#
-
-- variable: machinePools.name
-  label: Node name
-  type: string
-  required: true
-
-- variable: machinePools.quantity
-  label: Number of machines
+- variable: controlPlane.quantity
+  label: Number of Control Plane Nodes
   type: int
-  required: true
   default: 1
-
-#
-# OS
-#
-
-- variable: fsas.pool.osImageName
-  label: OS Image
-  type: string
+  min: 1
   required: true
-  default: sles16
+  group: Control Plane
 
-- variable: fsas.pool.imageOsSshHostPubKey
-  label: SSH Host Public Key
-  required: true
+- variable: controlPlane.workerRole
+  label: Control Plane also acts as Worker
+  type: boolean
+  default: false
+  group: Control Plane
+
+# --------------------------------------------------------------------
+# Worker
+# --------------------------------------------------------------------
+
+- variable: worker.enabled
+  label: Create Worker Pool
+  type: boolean
+  default: true
+  group: Worker
+
+- variable: worker.quantity
+  label: Number of Worker Nodes
+  type: int
+  default: 1
+  min: 1
+  show_if: worker.enabled=true
+  group: Worker
+
+
+# --------------------------------------------------------------------
+# FSAS Control Plane
+# --------------------------------------------------------------------
+
+- variable: fsas.controlPlane.computeConditionsJson
+  label: Control Plane Compute Conditions (JSON)
   type: multiline
+  group: FSAS Control Plane
 
-#
-# Compute
-#
-
-- variable: fsas.pool.computeConditionsJson
-  label: Compute Conditions
+- variable: fsas.controlPlane.devicesSpecJson
+  label: Control Plane Device Specification (JSON)
   type: multiline
-  required: true
+  group: FSAS Control Plane
 
-#
-# Device specification (storage, network, etc.)
-#
-
-- variable: fsas.pool.devicesSpecJson
-  label: Device Specification
-  type: multiline
-  required: true
-
-#
-# Networking
-#
-
-- variable: fsas.pool.networkBaremetalUuid
-  label: Baremetal Network UUID
-  type: string
-  required: true
-
-- variable: fsas.pool.networkProvisionUuid
-  label: Provisioning Network UUID
-  type: string
-  required: true
-
-- variable: fsas.pool.networkProvisionDefaultGw
-  label: Provisioning Gateway
-  type: string
-  required: true
-
-- variable: fsas.pool.enableBaremetalBonding
+- variable: fsas.controlPlane.enableBaremetalBonding
   label: Enable Baremetal Bonding
   type: boolean
   default: false
+  group: FSAS Control Plane
 
-#
-# SSH
-#
+- variable: fsas.controlPlane.networkBaremetalUuid
+  label: Baremetal Network UUID
+  type: string
+  group: FSAS Control Plane
 
-- variable: fsas.pool.sshUser
+- variable: fsas.controlPlane.networkProvisionUuid
+  label: Provisioning Network UUID
+  type: string
+  group: FSAS Control Plane
+
+- variable: fsas.controlPlane.networkProvisionDefaultGw
+  label: Provisioning Gateway
+  type: string
+  group: FSAS Control Plane
+
+- variable: fsas.controlPlane.osImageName
+  label: Control Plane OS Image
+  type: string
+  default: sles16
+  group: FSAS Control Plane
+
+- variable: fsas.controlPlane.imageOsSshHostPubKey
+  label: SSH Host Public Key
+  type: multiline
+  group: FSAS Control Plane
+
+- variable: fsas.controlPlane.sshUser
   label: SSH User
   type: string
-  required: true
   default: rancher
+  group: FSAS Control Plane
 
-- variable: fsas.pool.sshPassword
+- variable: fsas.controlPlane.sshPassword
   label: SSH Password
   type: password
-  required: true
   default: rancher
+  group: FSAS Control Plane
 
-#
-# Cloud-init
-#
-
-- variable: fsas.pool.userdata
-  label: User Data
+- variable: fsas.controlPlane.userdata
+  label: Userdata
   type: multiline
+  group: FSAS Control Plane
+
+# --------------------------------------------------------------------
+# FSAS Worker
+# --------------------------------------------------------------------
+
+- variable: fsas.worker.computeConditionsJson
+  label: Worker Compute Conditions (JSON)
+  type: multiline
+  group: FSAS Worker
+
+- variable: fsas.worker.devicesSpecJson
+  label: Worker Device Specification (JSON)
+  type: multiline
+  group: FSAS Worker
+
+- variable: fsas.worker.enableBaremetalBonding
+  label: Enable Baremetal Bonding
+  type: boolean
+  default: false
+  group: FSAS Worker
+
+- variable: fsas.worker.networkBaremetalUuid
+  label: Baremetal Network UUID
+  type: string
+  group: FSAS Worker
+
+- variable: fsas.worker.networkProvisionUuid
+  label: Provisioning Network UUID
+  type: string
+  group: FSAS Worker
+
+- variable: fsas.worker.networkProvisionDefaultGw
+  label: Provisioning Gateway
+  type: string
+  group: FSAS Worker
+
+- variable: fsas.worker.osImageName
+  label: Worker OS Image
+  type: string
+  default: sles16
+  group: FSAS Worker
+
+- variable: fsas.worker.imageOsSshHostPubKey
+  label: SSH Host Public Key
+  type: multiline
+  group: FSAS Worker
+
+- variable: fsas.worker.sshUser
+  label: SSH User
+  type: string
+  default: rancher
+  group: FSAS Worker
+
+- variable: fsas.worker.sshPassword
+  label: SSH Password
+  type: password
+  default: rancher
+  group: FSAS Worker
+
+- variable: fsas.worker.userdata
+  label: Userdata
+  type: multiline
+  group: FSAS Worker

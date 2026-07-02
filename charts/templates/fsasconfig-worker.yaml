@@ -1,0 +1,31 @@
+{{- if .Values.worker.enabled }}
+apiVersion: rke-machine-config.cattle.io/v1
+kind: FsasConfig
+
+metadata:
+  name: {{ include "fsas-cluster-template.workerConfigName" . }}
+  namespace: {{ .Values.cluster.namespace }}
+  labels:
+    {{- include "fsas-cluster-template.labels" . | nindent 4 }}
+
+apiUrl: ""
+tenantUuid: ""
+credentialsUsername: ""
+credentialsPassword: ""
+dnsIp: ""
+ntpUrl: ""
+slesRegistrationCode: ""
+slesRegistrationEmail: ""
+
+osImageName: {{ .Values.fsas.worker.osImageName | quote }}
+computeConditionsJson: {{ .Values.fsas.worker.computeConditionsJson | toJson }}
+devicesSpecJson: {{ .Values.fsas.worker.devicesSpecJson | toJson }}
+networkBaremetalUuid: {{ .Values.fsas.worker.networkBaremetalUuid | quote }}
+networkProvisionUuid: {{ .Values.fsas.worker.networkProvisionUuid | quote }}
+networkProvisionDefaultGw: {{ .Values.fsas.worker.networkProvisionDefaultGw | quote }}
+enableBaremetalBonding: {{ .Values.fsas.worker.enableBaremetalBonding }}
+sshUser: {{ .Values.fsas.worker.sshUser | quote }}
+sshPassword: {{ .Values.fsas.worker.sshPassword | quote }}
+imageOsSshHostPubKey: {{ .Values.fsas.worker.imageOsSshHostPubKey | quote }}
+userdata: {{ .Values.fsas.worker.userdata | quote }}
+{{- end }}

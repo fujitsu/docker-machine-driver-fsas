@@ -1,0 +1,31 @@
+{{- if .Values.controlPlane.enabled }}
+apiVersion: rke-machine-config.cattle.io/v1
+kind: FsasConfig
+
+metadata:
+  name: {{ include "fsas-cluster-template.cpConfigName" . }}
+  namespace: {{ .Values.cluster.namespace }}
+  labels:
+    {{- include "fsas-cluster-template.labels" . | nindent 4 }}
+
+apiUrl: ""
+tenantUuid: ""
+credentialsUsername: ""
+credentialsPassword: ""
+dnsIp: ""
+ntpUrl: ""
+slesRegistrationCode: ""
+slesRegistrationEmail: ""
+
+osImageName: {{ .Values.fsas.controlPlane.osImageName | quote }}
+computeConditionsJson: {{ .Values.fsas.controlPlane.computeConditionsJson | toJson }}
+devicesSpecJson: {{ .Values.fsas.controlPlane.devicesSpecJson | toJson }}
+networkBaremetalUuid: {{ .Values.fsas.controlPlane.networkBaremetalUuid | quote }}
+networkProvisionUuid: {{ .Values.fsas.controlPlane.networkProvisionUuid | quote }}
+networkProvisionDefaultGw: {{ .Values.fsas.controlPlane.networkProvisionDefaultGw | quote }}
+enableBaremetalBonding: {{ .Values.fsas.controlPlane.enableBaremetalBonding }}
+sshUser: {{ .Values.fsas.controlPlane.sshUser | quote }}
+sshPassword: {{ .Values.fsas.controlPlane.sshPassword | quote }}
+imageOsSshHostPubKey: {{ .Values.fsas.controlPlane.imageOsSshHostPubKey | quote }}
+userdata: {{ .Values.fsas.controlPlane.userdata | quote }}
+{{- end }}
