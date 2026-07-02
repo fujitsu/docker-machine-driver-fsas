@@ -15,6 +15,13 @@ rkeConfig:
     snapshotRetention: 5
     snapshotScheduleCron: "0 */5 * * *"
 
+  machineGlobalConfig:
+    etcdArgs: []
+    ### when autoscaler is enabled uncomment 3 rows below and add proper arguments
+    # kube-apiserver-arg: []
+    # kube-controller-manager-arg: []
+    # kube-scheduler-arg: []
+
 controlPlane:
   enabled: true
   quantity: 1
@@ -22,8 +29,13 @@ controlPlane:
   workerRole: false
 
 worker:
+  # Set to false for a single-node cluster
   enabled: true
   quantity: 1
+
+  autoscalingEnabled: false
+  autoscalingMinSize: 1
+  autoscalingMaxSize: 3
 
 fsas:
   controlPlane:

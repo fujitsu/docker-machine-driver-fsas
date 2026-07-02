@@ -61,6 +61,11 @@ spec:
         etcdRole: false
         workerRole: true
 
+{{- if .Values.worker.autoscalingEnabled }}
+        autoscalingMaxSize: {{ .Values.worker.autoscalingMaxSize }}
+        autoscalingMinSize: {{ .Values.worker.autoscalingMinSize }}
+{{- end }}
+
         drainBeforeDelete: true
         unhealthyNodeTimeout: 0s
 

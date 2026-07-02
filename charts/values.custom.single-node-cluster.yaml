@@ -1,0 +1,71 @@
+cluster:
+  name: lp28
+  namespace: fleet-default
+
+  cloudCredentialSecretName: cattle-global-data:cc-7t9c5
+  kubernetesVersion: v1.35.6+rke2r1
+
+  localClusterAuthEndpoint: {}
+
+rkeConfig:
+  cni: calico
+  ingressController: traefik
+  disableKubeProxy: false
+  etcdExposeMetrics: false
+
+  etcd:
+    snapshotRetention: 5
+    snapshotScheduleCron: "0 */5 * * *"
+
+  ### comment whole section 'machineGlobalConfig' when autoscaler is disabled
+  machineGlobalConfig:
+    etcdArgs: []
+
+controlPlane:
+  enabled: true
+  quantity: 1
+  # Set to true for a single-node cluster
+  workerRole: true
+
+worker:
+  enabled: false
+  quantity: 1
+
+  autoscalingEnabled: false
+  autoscalingMinSize: 1
+  autoscalingMaxSize: 3
+
+fsas:
+  controlPlane:
+    networkBaremetalUuid: 7e8ba727-ea79-4951-a49d-feb866d5c123
+    networkProvisionUuid: 7e8ba727-ea79-4951-a49d-feb866d5c122
+    networkProvisionDefaultGw: 192.168.122.1
+    enableBaremetalBonding: false
+    osImageName: sles16
+    sshUser: rancher
+    sshPassword: rancher-password
+    imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
+    userdata:
+
+    computeConditionsJson: >
+      [{"column":"model","operator":"eq","value":"PRIMERGYRX2540M6"}]
+
+    devicesSpecJson: >
+      [{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]},"tags":{"is_bootstorage":true}}]
+
+  worker:
+    networkBaremetalUuid: 7e8ba727-ea79-4951-a49d-feb866d5c123
+    networkProvisionUuid: 7e8ba727-ea79-4951-a49d-feb866d5c122
+    networkProvisionDefaultGw: 192.168.122.1
+    enableBaremetalBonding: false
+    osImageName: sles16
+    imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
+    sshUser: rancher
+    sshPassword: rancher-password
+    userdata:
+
+    computeConditionsJson: >
+      [{"column":"model","operator":"eq","value":"PRIMERGYRX2540M6"}]
+
+    devicesSpecJson: >
+      [{"res_type":"storage","res_num":1,"res_spec":{"condition":[{"column":"vendor","operator":"eq","value":"samsung"}]},"tags":{"is_bootstorage":true}}]
