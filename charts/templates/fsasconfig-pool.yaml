@@ -1,0 +1,28 @@
+apiVersion: rke-machine-config.cattle.io/v1
+kind: FsasConfig
+metadata:
+  name: {{ printf "%s-all" .Values.cluster.name }}
+  namespace: fleet-default
+
+apiUrl: ""
+tenantUuid: ""
+credentialsUsername: ""
+credentialsPassword: ""
+dnsIp: ""
+ntpUrl: ""
+slesRegistrationCode: ""
+slesRegistrationEmail: ""
+
+networkBaremetalUuid: {{ .Values.fsas.pool.networkBaremetalUuid | quote }}
+networkProvisionUuid: {{ .Values.fsas.pool.networkProvisionUuid | quote }}
+networkProvisionDefaultGw: {{ .Values.fsas.pool.networkProvisionDefaultGw | quote }}
+enableBaremetalBonding: {{ .Values.fsas.pool.enableBaremetalBonding }}
+sshUser: {{ .Values.fsas.pool.sshUser | quote }}
+sshPassword: {{ .Values.fsas.pool.sshPassword | quote }}
+osImageName: {{ .Values.fsas.pool.osImageName | quote }}
+imageOsSshHostPubKey: {{ .Values.fsas.pool.imageOsSshHostPubKey | quote }}
+userdata: {{ .Values.fsas.pool.userdata | quote }}
+computeConditionsJson: {{ .Values.fsas.pool.computeConditionsJson | trim | squote }}
+devicesSpecJson: {{ .Values.fsas.pool.devicesSpecJson | quote }}
+
+
