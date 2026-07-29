@@ -598,11 +598,6 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	slog.Info("Waiting for the installation of the operating system", "status", OS_INSTALLING)
-	if err := d.waitForStatus(OS_INSTALLING, WAIT_FOR_STATUS_STEP_FOR_INSTALLATION, WAIT_FOR_STATUS_TIMEOUT); err != nil {
-		return err
-	}
-
 	slog.Info("Installing operating system", "OS", d.OsImageName)
 
 	slog.Info("Waiting for operating system installation to complete", "status", ACTIVE_POFF)
