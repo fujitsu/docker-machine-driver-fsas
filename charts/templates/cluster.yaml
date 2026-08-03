@@ -33,6 +33,7 @@ spec:
       disable-kube-proxy: {{ .Values.rkeConfig.disableKubeProxy }}
       etcd-expose-metrics: {{ .Values.rkeConfig.etcdExposeMetrics }}
       ingress-controller: {{ .Values.rkeConfig.ingressController }}
+      {{- toYaml .Values.rkeConfig.machineGlobalConfig | nindent 6 }}
 
     machinePoolDefaults: {}
 
