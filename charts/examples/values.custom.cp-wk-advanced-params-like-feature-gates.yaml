@@ -36,7 +36,7 @@ worker:
   enabled: true
   quantity: 1
 
-  autoscalingEnabled: true
+  autoscalingEnabled: false
   autoscalingMinSize: 1
   autoscalingMaxSize: 3
 
@@ -47,7 +47,7 @@ fsas:
     networkProvisionDefaultGw: 192.168.122.1
     enableBaremetalBonding: false
     osImageName: sles16
-    sshUser: rancher
+    sshUser: rancher-username
     sshPassword: rancher-password
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
     userdata:
@@ -65,7 +65,7 @@ fsas:
     enableBaremetalBonding: false
     osImageName: sles16
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
-    sshUser: rancher
+    sshUser: rancher-username
     sshPassword: rancher-password
     userdata:
 

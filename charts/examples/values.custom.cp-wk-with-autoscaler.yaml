@@ -1,5 +1,5 @@
 cluster:
-  name: lp28
+  name: lp23
   namespace: fleet-default
 
   cloudCredentialSecretName: cattle-global-data:cc-7t9c5
@@ -17,7 +17,6 @@ rkeConfig:
     snapshotRetention: 5
     snapshotScheduleCron: "0 */5 * * *"
 
-  ### comment whole section 'machineGlobalConfig' when autoscaler is disabled
   machineGlobalConfig:
     etcdArgs: []
 
@@ -25,13 +24,13 @@ controlPlane:
   enabled: true
   quantity: 1
   # Set to true for a single-node cluster
-  workerRole: true
+  workerRole: false
 
 worker:
-  enabled: false
+  enabled: true
   quantity: 1
 
-  autoscalingEnabled: false
+  autoscalingEnabled: true
   autoscalingMinSize: 1
   autoscalingMaxSize: 3
 
@@ -42,7 +41,7 @@ fsas:
     networkProvisionDefaultGw: 192.168.122.1
     enableBaremetalBonding: false
     osImageName: sles16
-    sshUser: rancher
+    sshUser: rancher-username
     sshPassword: rancher-password
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
     userdata:
@@ -60,7 +59,7 @@ fsas:
     enableBaremetalBonding: false
     osImageName: sles16
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
-    sshUser: rancher
+    sshUser: rancher-username
     sshPassword: rancher-password
     userdata:
 

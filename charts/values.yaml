@@ -17,7 +17,7 @@ rkeConfig:
 
   machineGlobalConfig:
     etcdArgs: []
-    ### when autoscaler is enabled uncomment 3 rows below and add proper arguments
+    ### when feature-gates are needed uncomment 3 rows below and add proper arguments
     # kube-apiserver-arg: []
     # kube-controller-manager-arg: []
     # kube-scheduler-arg: []
@@ -33,6 +33,7 @@ worker:
   enabled: true
   quantity: 1
 
+  # Set to true for enabling autoscaling for the worker nodes
   autoscalingEnabled: false
   autoscalingMinSize: 1
   autoscalingMaxSize: 3
