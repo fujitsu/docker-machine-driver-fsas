@@ -5,7 +5,6 @@ type: application
 
 version: 0.1.2
 appVersion: "2.14.2"
-icon: https://raw.githubusercontent.com/fujitsu/docker-machine-driver-fsas/task/3983-create-cluster-via-helm-chart/charts/icon.png
 
 kubeVersion: ">=1.29.0-0"
 

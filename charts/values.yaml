@@ -5,7 +5,7 @@ cluster:
 
 machinePools:
   pool:
-    name: pool1
+    name: <node-name>
     quantity: 1
     controlPlaneRole: true
     etcdRole: true
@@ -30,16 +30,16 @@ machineSelectorConfig:
 
 fsas:
   pool:
-    networkBaremetalUuid: ""
-    networkProvisionUuid: ""
-    networkProvisionDefaultGw: ""
-    enableBaremetalBonding: false
-    sshUser:
-    sshPassword:
-    osImageName:
-    imageOsSshHostPubKey: ""
+    networkBaremetalUuid: <network-baremetal-uuid>
+    networkProvisionUuid: <network-provision-uuid>
+    networkProvisionDefaultGw: <network-provision-default-gw>
+    enableBaremetalBonding: <true-or-false>
+    sshUser: <ssh-user-name>
+    sshPassword: <ssh-user-password>
+    osImageName: <os-image-name>
+    imageOsSshHostPubKey: <ssh-public-key>
     userdata: ""
     computeConditionsJson: |
-      []
+      <compute-conditions-json>
     devicesSpecJson: |
-      []
+      <devices-spec-json>
