@@ -2,14 +2,14 @@ apiVersion: provisioning.cattle.io/v1
 kind: Cluster
 
 metadata:
-  name: {{ .Values.cluster.name }}
-  namespace: {{ .Values.cluster.namespace }}
+  name: {{ required "cluster.name is required" .Values.cluster.name }}
+  namespace: fleet-default
   labels:
     {{- include "fsas-cluster-template.labels" . | nindent 4 }}
 
 spec:
 
-  cloudCredentialSecretName: {{ required "cluster.cloudCredentialSecretNameID is required" .Values.cluster.cloudCredentialSecretName }}
+  cloudCredentialSecretName: {{ required "cluster.cloudCredentialSecretName is required" .Values.cluster.cloudCredentialSecretName }}
   kubernetesVersion: {{ .Values.cluster.kubernetesVersion }}
 
   localClusterAuthEndpoint:
@@ -55,7 +55,7 @@ spec:
 {{- if .Values.worker.enabled }}
 
       - name: wk
-        quantity: {{ .Values.worker.quantity }}
+        quantity: {{ required "worker.quantity is required" .Values.worker.quantity }}
 
         controlPlaneRole: false
         etcdRole: false
