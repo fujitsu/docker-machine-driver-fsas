@@ -1,10 +1,10 @@
 apiVersion: provisioning.cattle.io/v1
 kind: Cluster
 metadata:
-  name: {{ .Values.cluster.name }}
+  name: {{ required "cluster.name is required" .Values.cluster.name }}
   namespace: fleet-default
 spec:
-  cloudCredentialSecretName: {{ .Values.cluster.cloudCredentialSecretName }}
+  cloudCredentialSecretName: {{ required "cluster.cloudCredentialSecretNameID is required" .Values.cluster.cloudCredentialSecretName }}
   kubernetesVersion: {{ .Values.cluster.kubernetesVersion }}
 
   localClusterAuthEndpoint: {}
@@ -32,8 +32,8 @@ spec:
 
     machinePools:
 
-      - name: {{ .Values.machinePools.pool.name }}
-        quantity: {{ .Values.machinePools.pool.quantity }}
+      - name: {{ required "machinePools.pool.name is required" .Values.machinePools.pool.name }}
+        quantity: {{ required "machinePools.pool.quantity is required" .Values.machinePools.pool.quantity }}
 
         controlPlaneRole: {{ .Values.machinePools.pool.controlPlaneRole }}
         etcdRole: {{ .Values.machinePools.pool.etcdRole }}

@@ -1,11 +1,12 @@
 cluster:
-  name: <cluster-name>
-  cloudCredentialSecretName: cattle-global-data:<cloud-credentials-ID>
+  name: ""
+  # cloudCredentialSecretName refers to ID of the cloud credential
+  cloudCredentialSecretName: cattle-global-data:""
   kubernetesVersion: v1.35.6+rke2r1
 
 machinePools:
   pool:
-    name: <node-name>
+    name: ""
     quantity: 1
     controlPlaneRole: true
     etcdRole: true
@@ -30,16 +31,16 @@ machineSelectorConfig:
 
 fsas:
   pool:
-    networkBaremetalUuid: <network-baremetal-uuid>
-    networkProvisionUuid: <network-provision-uuid>
-    networkProvisionDefaultGw: <network-provision-default-gw>
-    enableBaremetalBonding: <true-or-false>
-    sshUser: <ssh-user-name>
-    sshPassword: <ssh-user-password>
-    osImageName: <os-image-name>
-    imageOsSshHostPubKey: <ssh-public-key>
+    networkBaremetalUuid: ""
+    networkProvisionUuid: ""
+    networkProvisionDefaultGw: ""
+    enableBaremetalBonding: false
+    sshUser: ""
+    sshPassword: ""
+    osImageName: ""
+    imageOsSshHostPubKey: ""
     userdata: ""
     computeConditionsJson: |
-      <compute-conditions-json>
+      []
     devicesSpecJson: |
-      <devices-spec-json>
+      []

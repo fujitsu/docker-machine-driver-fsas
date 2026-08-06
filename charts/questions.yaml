@@ -28,8 +28,13 @@ questions:
 # Pool
 #
 
-- variable: machinePools.pool.quantity
-  label: Pool Nodes
+- variable: machinePools.name
+  label: Node name
+  type: string
+  required: true
+
+- variable: machinePools.quantity
+  label: Number of machines
   type: int
   required: true
   default: 1
@@ -41,10 +46,12 @@ questions:
 - variable: fsas.pool.osImageName
   label: OS Image
   type: string
+  required: true
   default: sles16
 
 - variable: fsas.pool.imageOsSshHostPubKey
   label: SSH Host Public Key
+  required: true
   type: multiline
 
 #
@@ -72,19 +79,22 @@ questions:
 - variable: fsas.pool.networkBaremetalUuid
   label: Baremetal Network UUID
   type: string
+  required: true
 
 - variable: fsas.pool.networkProvisionUuid
   label: Provisioning Network UUID
   type: string
+  required: true
 
 - variable: fsas.pool.networkProvisionDefaultGw
   label: Provisioning Gateway
   type: string
+  required: true
 
 - variable: fsas.pool.enableBaremetalBonding
   label: Enable Baremetal Bonding
   type: boolean
-  default: true
+  default: false
 
 #
 # SSH
@@ -93,11 +103,13 @@ questions:
 - variable: fsas.pool.sshUser
   label: SSH User
   type: string
+  required: true
   default: rancher
 
 - variable: fsas.pool.sshPassword
   label: SSH Password
   type: password
+  required: true
   default: rancher
 
 #
