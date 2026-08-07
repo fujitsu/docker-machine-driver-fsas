@@ -1,0 +1,121 @@
+categories:
+  - Cluster
+
+questions:
+
+#
+# Cluster
+#
+
+- variable: cluster.name
+  label: Cluster Name
+  type: string
+  required: true
+  default: fsas-cluster
+
+- variable: cluster.kubernetesVersion
+  label: Kubernetes Version
+  type: string
+  required: true
+  default: v1.35.6+rke2r1
+
+- variable: cluster.cloudCredentialSecretName
+  label: Cloud Credential
+  type: cloudcredential
+  required: true
+
+#
+# Pool
+#
+
+- variable: machinePools.name
+  label: Node name
+  type: string
+  required: true
+
+- variable: machinePools.quantity
+  label: Number of machines
+  type: int
+  required: true
+  default: 1
+
+#
+# OS
+#
+
+- variable: fsas.pool.osImageName
+  label: OS Image
+  type: string
+  required: true
+  default: sles16
+
+- variable: fsas.pool.imageOsSshHostPubKey
+  label: SSH Host Public Key
+  required: true
+  type: multiline
+
+#
+# Compute
+#
+
+- variable: fsas.pool.computeConditionsJson
+  label: Compute Conditions
+  type: multiline
+  required: true
+
+#
+# Device specification (storage, network, etc.)
+#
+
+- variable: fsas.pool.devicesSpecJson
+  label: Device Specification
+  type: multiline
+  required: true
+
+#
+# Networking
+#
+
+- variable: fsas.pool.networkBaremetalUuid
+  label: Baremetal Network UUID
+  type: string
+  required: true
+
+- variable: fsas.pool.networkProvisionUuid
+  label: Provisioning Network UUID
+  type: string
+  required: true
+
+- variable: fsas.pool.networkProvisionDefaultGw
+  label: Provisioning Gateway
+  type: string
+  required: true
+
+- variable: fsas.pool.enableBaremetalBonding
+  label: Enable Baremetal Bonding
+  type: boolean
+  default: false
+
+#
+# SSH
+#
+
+- variable: fsas.pool.sshUser
+  label: SSH User
+  type: string
+  required: true
+  default: rancher
+
+- variable: fsas.pool.sshPassword
+  label: SSH Password
+  type: password
+  required: true
+  default: rancher
+
+#
+# Cloud-init
+#
+
+- variable: fsas.pool.userdata
+  label: User Data
+  type: multiline

@@ -1,0 +1,46 @@
+cluster:
+  name: ""
+  # cloudCredentialSecretName refers to ID of the cloud credential
+  cloudCredentialSecretName: cattle-global-data:""
+  kubernetesVersion: v1.35.6+rke2r1
+
+machinePools:
+  pool:
+    name: ""
+    quantity: 1
+    controlPlaneRole: true
+    etcdRole: true
+    workerRole: true
+
+rkeConfig:
+  cni: calico
+  ingressController: traefik
+  disableKubeProxy: false
+  etcdExposeMetrics: false
+
+  etcd:
+    snapshotRetention: 5
+    snapshotScheduleCron: "0 */5 * * *"
+
+  upgradeStrategy:
+    controlPlaneConcurrency: "1"
+    workerConcurrency: "1"
+
+machineSelectorConfig:
+  protectKernelDefaults: false
+
+fsas:
+  pool:
+    networkBaremetalUuid: ""
+    networkProvisionUuid: ""
+    networkProvisionDefaultGw: ""
+    enableBaremetalBonding: false
+    sshUser: ""
+    sshPassword: ""
+    osImageName: ""
+    imageOsSshHostPubKey: ""
+    userdata: ""
+    computeConditionsJson: |
+      []
+    devicesSpecJson: |
+      []
