@@ -1,0 +1,82 @@
+apiVersion: provisioning.cattle.io/v1
+kind: Cluster
+metadata:
+  name: {{ required "cluster.name is required" .Values.cluster.name }}
+  namespace: fleet-default
+spec:
+  cloudCredentialSecretName: {{ required "cluster.cloudCredentialSecretNameID is required" .Values.cluster.cloudCredentialSecretName }}
+  kubernetesVersion: {{ .Values.cluster.kubernetesVersion }}
+
+  localClusterAuthEndpoint: {}
+
+  rkeConfig:
+
+    chartValues:
+      rke2-calico: {}
+      rke2-ingress-nginx: {}
+      rke2-traefik: {}
+
+    dataDirectories: {}
+
+    etcd:
+      snapshotRetention: {{ .Values.rkeConfig.etcd.snapshotRetention }}
+      snapshotScheduleCron: {{ .Values.rkeConfig.etcd.snapshotScheduleCron | quote }}
+
+    machineGlobalConfig:
+      cni: {{ .Values.rkeConfig.cni }}
+      disable-kube-proxy: {{ .Values.rkeConfig.disableKubeProxy }}
+      etcd-expose-metrics: {{ .Values.rkeConfig.etcdExposeMetrics }}
+      ingress-controller: {{ .Values.rkeConfig.ingressController }}
+
+    machinePoolDefaults: {}
+
+    machinePools:
+
+      - name: {{ required "machinePools.pool.name is required" .Values.machinePools.pool.name }}
+        quantity: {{ required "machinePools.pool.quantity is required" .Values.machinePools.pool.quantity }}
+
+        controlPlaneRole: {{ .Values.machinePools.pool.controlPlaneRole }}
+        etcdRole: {{ .Values.machinePools.pool.etcdRole }}
+        workerRole: {{ .Values.machinePools.pool.workerRole }}
+
+        drainBeforeDelete: true
+        unhealthyNodeTimeout: 0s
+
+        machineConfigRef:
+          apiVersion: rke-machine-config.cattle.io/v1
+          kind: FsasConfig
+          name: {{ printf "%s-all" .Values.cluster.name }}
+
+    machineSelectorConfig:
+      - config:
+          protect-kernel-defaults: {{ .Values.machineSelectorConfig.protectKernelDefaults }}
+
+    networking: {}
+
+    registries: {}
+
+    upgradeStrategy:
+
+      controlPlaneConcurrency: {{ .Values.rkeConfig.upgradeStrategy.controlPlaneConcurrency | quote }}
+
+      controlPlaneDrainOptions:
+        deleteEmptyDirData: true
+        disableEviction: false
+        enabled: false
+        force: false
+        gracePeriod: -1
+        ignoreDaemonSets: true
+        skipWaitForDeleteTimeoutSeconds: 0
+        timeout: 120
+
+      workerConcurrency: {{ .Values.rkeConfig.upgradeStrategy.workerConcurrency | quote }}
+
+      workerDrainOptions:
+        deleteEmptyDirData: true
+        disableEviction: false
+        enabled: false
+        force: false
+        gracePeriod: -1
+        ignoreDaemonSets: true
+        skipWaitForDeleteTimeoutSeconds: 0
+        timeout: 120

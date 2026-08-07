@@ -1,0 +1,25 @@
+apiVersion: v2
+name: fsas-cluster-template
+description: Rancher Cluster Template for Fujitsu FSAS node driver
+type: application
+
+version: 0.1.2
+appVersion: "2.14.2"
+
+kubeVersion: ">=1.29.0-0"
+
+keywords:
+  - rancher
+  - rke2
+  - fsas
+  - cluster-template
+
+home: https://github.com/fujitsu/docker-machine-driver-fsas
+
+maintainers:
+  - name: Fujitsu
+
+annotations:
+  catalog.cattle.io/type: cluster-template
+  catalog.cattle.io/display-name: Fujitsu FSAS Cluster
+  catalog.cattle.io/namespace: fleet-default
