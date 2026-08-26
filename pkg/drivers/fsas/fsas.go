@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/mail"
+	"strconv"
 
 	"os"
 	"path/filepath"
@@ -106,11 +107,13 @@ const (
 	defaultKeycloakEndpoint      = "/id_manager"
 	errorMandatoryOption         = "%s must be specified using the CLI option %s"
 	cloudInitDirPath             = "/etc/cdi/cloud-init-discovery/"
+	envVarSSHMaxAttempts         = "FSAS_SSH_MAX_ATTEMPTS"
 )
 
 const (
-	INNER_CREATE_SSH_MAX_ATTEMPTS = 5
-	REMOVE_SSH_MAX_ATTEMPTS       = 1
+	DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS = 30
+	ERROR_SSH_MAX_ATTEMPTS                = 100
+	REMOVE_SSH_MAX_ATTEMPTS               = 1
 )
 
 func (d *Driver) String() string {
@@ -436,6 +439,24 @@ func (d *Driver) initFabricManager() error {
 	return nil
 }
 
+// getSSHMaxAttempts returns the SSH connection max attempts read from the
+// FSAS_SSH_MAX_ATTEMPTS env var, falling back to the default when unset or invalid.
+// Declared as a var so it can be overridden in tests.
+var getSSHMaxAttempts = func() int {
+	envVal := os.Getenv(envVarSSHMaxAttempts)
+	if envVal == "" {
+		slog.Info("FSAS_SSH_MAX_ATTEMPTS env var is not set, using default", "default", DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS)
+		return DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS
+	}
+	val, err := strconv.Atoi(envVal)
+	if err != nil || val <= 0 || val > ERROR_SSH_MAX_ATTEMPTS {
+		slog.Info("Invalid FSAS_SSH_MAX_ATTEMPTS or out of range, using default", "value", envVal, "default", DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS, "minValue", 1, "maxValue", ERROR_SSH_MAX_ATTEMPTS)
+		return DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS
+	}
+	slog.Debug("FSAS_SSH_MAX_ATTEMPTS set correctly", "value", val)
+	return val
+}
+
 // initSshManager Initialize SSH Manager client
 func (d *Driver) initSshManager(maxAttempts int) error {
 	if !d.SshManager.IsReady() {
@@ -656,7 +677,7 @@ func (d *Driver) innerCreate() error {
 		}
 	}
 
-	if err := d.initSshManager(INNER_CREATE_SSH_MAX_ATTEMPTS); err != nil {
+	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
 	}
