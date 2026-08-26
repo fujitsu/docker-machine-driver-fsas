@@ -450,7 +450,7 @@ var getSSHMaxAttempts = func() int {
 	}
 	val, err := strconv.Atoi(envVal)
 	if err != nil || val <= 0 || val > ERROR_SSH_MAX_ATTEMPTS {
-		slog.Info("Invalid FSAS_SSH_MAX_ATTEMPTS, using default", "value", envVal, "default", DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS)
+		slog.Info("Invalid FSAS_SSH_MAX_ATTEMPTS or out of range, using default", "value", envVal, "default", DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS, "minValue", 1, "maxValue", ERROR_SSH_MAX_ATTEMPTS)
 		return DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS
 	}
 	slog.Debug("FSAS_SSH_MAX_ATTEMPTS set correctly", "value", val)
