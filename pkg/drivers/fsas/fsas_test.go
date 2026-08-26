@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"os"
+	"strconv"
 	"strings"
 
 	"testing"
@@ -2684,4 +2685,27 @@ func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
 
 	err := driver.Create()
 	assert.EqualError(t, err, bootCmdErr.Error())
+}
+
+func TestGetSSHMaxAttempts(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected int
+	}{
+		{name: "unset uses default", envValue: "", expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
+		{name: "valid positive int is used", envValue: "10", expected: 10},
+		{name: "non-numeric uses default", envValue: "abc", expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
+		{name: "zero uses default", envValue: "0", expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
+		{name: "negative uses default", envValue: "-5", expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
+		{name: "upper bound is used", envValue: strconv.Itoa(ERROR_SSH_MAX_ATTEMPTS), expected: ERROR_SSH_MAX_ATTEMPTS},
+		{name: "above upper bound uses default", envValue: strconv.Itoa(ERROR_SSH_MAX_ATTEMPTS + 1), expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(envVarSSHMaxAttempts, tt.envValue)
+			assert.Equal(t, tt.expected, getSSHMaxAttempts())
+		})
+	}
 }
