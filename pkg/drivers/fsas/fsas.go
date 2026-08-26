@@ -112,6 +112,7 @@ const (
 
 const (
 	DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS = 30
+	ERROR_SSH_MAX_ATTEMPTS                = 100
 	REMOVE_SSH_MAX_ATTEMPTS               = 1
 )
 
@@ -448,7 +449,7 @@ var getSSHMaxAttempts = func() int {
 		return DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS
 	}
 	val, err := strconv.Atoi(envVal)
-	if err != nil || val <= 0 {
+	if err != nil || val <= 0 || val > ERROR_SSH_MAX_ATTEMPTS {
 		slog.Info("Invalid FSAS_SSH_MAX_ATTEMPTS, using default", "value", envVal, "default", DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS)
 		return DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS
 	}

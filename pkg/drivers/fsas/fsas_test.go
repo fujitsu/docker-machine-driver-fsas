@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"os"
+	"strconv"
 	"strings"
 
 	"testing"
@@ -2697,6 +2698,8 @@ func TestGetSSHMaxAttempts(t *testing.T) {
 		{name: "non-numeric uses default", envValue: "abc", expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
 		{name: "zero uses default", envValue: "0", expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
 		{name: "negative uses default", envValue: "-5", expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
+		{name: "upper bound is used", envValue: strconv.Itoa(ERROR_SSH_MAX_ATTEMPTS), expected: ERROR_SSH_MAX_ATTEMPTS},
+		{name: "above upper bound uses default", envValue: strconv.Itoa(ERROR_SSH_MAX_ATTEMPTS + 1), expected: DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS},
 	}
 
 	for _, tt := range tests {
