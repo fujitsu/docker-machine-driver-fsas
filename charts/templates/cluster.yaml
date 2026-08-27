@@ -33,6 +33,7 @@ spec:
       disable-kube-proxy: {{ .Values.rkeConfig.disableKubeProxy }}
       etcd-expose-metrics: {{ .Values.rkeConfig.etcdExposeMetrics }}
       ingress-controller: {{ .Values.rkeConfig.ingressController }}
+      {{- toYaml .Values.rkeConfig.machineGlobalConfig | nindent 6 }}
 
     machinePoolDefaults: {}
 
@@ -60,6 +61,11 @@ spec:
         controlPlaneRole: false
         etcdRole: false
         workerRole: true
+
+{{- if .Values.worker.autoscalingEnabled }}
+        autoscalingMaxSize: {{ .Values.worker.autoscalingMaxSize }}
+        autoscalingMinSize: {{ .Values.worker.autoscalingMinSize }}
+{{- end }}
 
         drainBeforeDelete: true
         unhealthyNodeTimeout: 0s
