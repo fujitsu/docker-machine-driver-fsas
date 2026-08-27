@@ -1,0 +1,31 @@
+{{- if .Values.worker.enabled }}
+apiVersion: rke-machine-config.cattle.io/v1
+kind: FsasConfig
+
+metadata:
+  name: {{ include "fsas-cluster-template.workerConfigName" . }}
+  namespace: fleet-default
+  labels:
+    {{- include "fsas-cluster-template.labels" . | nindent 4 }}
+
+apiUrl: ""
+tenantUuid: ""
+credentialsUsername: ""
+credentialsPassword: ""
+dnsIp: ""
+ntpUrl: ""
+slesRegistrationCode: ""
+slesRegistrationEmail: ""
+
+osImageName: {{ required "fsas.worker.osImageName is required" .Values.fsas.worker.osImageName | quote }}
+computeConditionsJson: {{ required "fsas.worker.computeConditionsJson is required" .Values.fsas.worker.computeConditionsJson | toJson }}
+devicesSpecJson: {{ required "fsas.worker.devicesSpecJson is required" .Values.fsas.worker.devicesSpecJson | toJson }}
+networkBaremetalUuid: {{ required "fsas.worker.networkBaremetalUuid is required" .Values.fsas.worker.networkBaremetalUuid | quote }}
+networkProvisionUuid: {{ required "fsas.worker.networkProvisionUuid is required" .Values.fsas.worker.networkProvisionUuid | quote }}
+networkProvisionDefaultGw: {{ required "fsas.worker.networkProvisionDefaultGw is required" .Values.fsas.worker.networkProvisionDefaultGw | quote }}
+enableBaremetalBonding: {{ .Values.fsas.worker.enableBaremetalBonding }}
+sshUser: {{ required "fsas.worker.sshUser is required" .Values.fsas.worker.sshUser | quote }}
+sshPassword: {{ required "fsas.worker.sshPassword is required" .Values.fsas.worker.sshPassword | quote }}
+imageOsSshHostPubKey: {{ required "fsas.worker.imageOsSshHostPubKey is required" .Values.fsas.worker.imageOsSshHostPubKey | quote }}
+userdata: {{ .Values.fsas.worker.userdata | quote }}
+{{- end }}
