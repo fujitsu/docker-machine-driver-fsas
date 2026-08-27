@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
@@ -12,6 +14,8 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/httputils"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 )
+
+const envVarProvisioningLanportIdx = "FSAS_PROVISIONING_LANPORT_IDX"
 
 const ErrMissingParams = "baseURI and port cannot be empty"
 
@@ -226,6 +230,24 @@ const (
 	PROVISIONING_LANPORT_IDX = 3
 )
 
+// getProvisioningLanportIdx returns the provisioning lanport index read from the
+// FSAS_PROVISIONING_LANPORT_IDX env var, falling back to the default when unset or invalid.
+// Declared as a var so it can be overridden in tests.
+var getProvisioningLanportIdx = func() int {
+	envVal := os.Getenv(envVarProvisioningLanportIdx)
+	if envVal == "" {
+		slog.Info("FSAS_PROVISIONING_LANPORT_IDX env var is not set, using default", "default", PROVISIONING_LANPORT_IDX)
+		return PROVISIONING_LANPORT_IDX
+	}
+	val, err := strconv.Atoi(envVal)
+	if err != nil || val < 0 {
+		slog.Info("Invalid FSAS_PROVISIONING_LANPORT_IDX, using default", "value", envVal, "default", PROVISIONING_LANPORT_IDX, "minValue", 0)
+		return PROVISIONING_LANPORT_IDX
+	}
+	slog.Debug("FSAS_PROVISIONING_LANPORT_IDX set correctly", "value", val)
+	return val
+}
+
 // composableNicContainsBaremetalSubnet checks if the subnet used for baremetal provisioning is also included
 // in any composable NICs defined in the device spec.
 func composableNicContainsBaremetalSubnet(baremetalSubnet string, deviceSpec []models.Resource) bool {
@@ -269,7 +291,7 @@ func (fmc *FabricManagerClient) populateCreateMachineRequest(machineName, tenant
 	subnets := []models.Subnet{
 		{
 			SubnetUUID: machineSpecs.NetworkProvisionUUID,
-			LanportIdx: PROVISIONING_LANPORT_IDX,
+			LanportIdx: getProvisioningLanportIdx(),
 			Ntp:        machineSpecs.NtpServer,
 			Dns:        machineSpecs.DnsServer,
 			DefaultGW:  machineSpecs.NetworkProvisionDefaultGW,
