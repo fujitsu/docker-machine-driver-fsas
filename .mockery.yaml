@@ -20,6 +20,9 @@ packages:
   github.com/fujitsu/docker-machine-driver-fsas/cfgutils:
     interfaces:
       CfgManager:
+  github.com/fujitsu/docker-machine-driver-fsas/seedutils:
+    interfaces:
+      SeedManager:
   github.com/fujitsu/docker-machine-driver-fsas/timeutils:
     interfaces:
       Clock:

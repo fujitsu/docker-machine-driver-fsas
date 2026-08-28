@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/keycloak"
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
+	"github.com/fujitsu/docker-machine-driver-fsas/seedutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	"github.com/rancher/machine/libmachine/drivers"
@@ -64,10 +64,11 @@ type Driver struct {
 	UserDataFile              string
 	SlesRegistrationCode      string
 	SlesRegistrationEmail     string
-	FabricManager             fm.FabricManager    `json:"-"`
-	Keycloak                  keycloak.Keycloak   `json:"-"`
-	SshManager                sshutils.SshManager `json:"-"`
-	CfgManager                cfgutils.CfgManager `json:"-"`
+	FabricManager             fm.FabricManager      `json:"-"`
+	Keycloak                  keycloak.Keycloak     `json:"-"`
+	SshManager                sshutils.SshManager   `json:"-"`
+	CfgManager                cfgutils.CfgManager   `json:"-"`
+	SeedManager               seedutils.SeedManager `json:"-"`
 }
 
 // NewDriver creates and returns a new instance of the FSAS CDI driver
@@ -97,6 +98,7 @@ func NewDriver() *Driver {
 		Keycloak:                  &keycloak.KeycloakClient{},
 		SshManager:                &sshutils.StandardSshManager{},
 		CfgManager:                &cfgutils.StandardCfgManager{},
+		SeedManager:               &seedutils.StandardSeedManager{},
 	}
 }
 
@@ -108,6 +110,8 @@ const (
 	errorMandatoryOption         = "%s must be specified using the CLI option %s"
 	cloudInitDirPath             = "/etc/cdi/cloud-init-discovery/"
 	envVarSSHMaxAttempts         = "FSAS_SSH_MAX_ATTEMPTS"
+	// TODO: temporary hardcoded seed server URL until it is exposed as a configurable option
+	seedServerUrl = "http://192.168.122.1:8500"
 )
 
 const (
@@ -495,6 +499,21 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 	return nil
 }
 
+// initSeedManager Initialize Seed Manager client used to publish cloud-init config to the seed server
+func (d *Driver) initSeedManager() error {
+	if !d.SeedManager.IsInit() {
+		slog.Warn("Seed Manager is NOT initialized then start init procedure")
+		seedManager, err := seedutils.NewStandardSeedManager(seedServerUrl)
+		if err != nil {
+			slog.Error("Could not create Seed Manager because of an error", "err", err)
+			return err
+		}
+		d.SeedManager = seedManager
+	}
+
+	return nil
+}
+
 // checkConfig Verify if mandatory flags are set
 func (d *Driver) checkConfig() error {
 	slog.Debug("check config from mandatory flags")
@@ -695,11 +714,13 @@ func (d *Driver) innerCreate() error {
 
 var osReadFile = os.ReadFile
 
-// applyCloudInit Save user-data and meta-data files on remote machine
+// applyCloudInit Publishes user-data, meta-data and network-config to the seed server so
+// the node can fetch them over HTTP via its NoCloud datasource.
 func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
-	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
-	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
-	networkConfigPath := filepath.Join(cloudInitDirPath, "network-config")
+	if err := d.initSeedManager(); err != nil {
+		slog.Error("Error while initializing Seed Manager", "err", err)
+		return err
+	}
 
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
@@ -707,13 +728,14 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			return err
 		}
 
-		if err := d.SshManager.WriteFileOnRemoteMachine(userdataPath, string(userDataFileContent), 0700); err != nil {
+		if err := d.SeedManager.PublishUserData(string(userDataFileContent)); err != nil {
 			return err
 		}
 	}
+
 	metadataContent := d.CfgManager.PrepareMetadata(d.MachineUUID, sshHostName)
 
-	if err := d.SshManager.WriteFileOnRemoteMachine(metadataPath, metadataContent, 0700); err != nil {
+	if err := d.SeedManager.PublishMetadata(metadataContent); err != nil {
 		return err
 	}
 
@@ -727,11 +749,11 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			slog.Error("Failed to prepare network config", "err", err)
 			return err
 		}
-		if err := d.SshManager.WriteFileOnRemoteMachine(networkConfigPath, networkConfigContent, 0700); err != nil {
-			slog.Error("Failed to write network config to remote machine", "err", err)
+		if err := d.SeedManager.PublishNetworkConfig(networkConfigContent); err != nil {
+			slog.Error("Failed to publish network config to seed server", "err", err)
 			return err
 		}
-		slog.Info("Successfully wrote network config to remote machine", "path", networkConfigPath)
+		slog.Info("Successfully published network config to seed server")
 	} else {
 		slog.Info("Skipping network-config generation: baremetal bonding is disabled")
 	}
