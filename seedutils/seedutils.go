@@ -1,8 +1,12 @@
 package seedutils
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"mime/multipart"
+	"net/http"
+	"os"
 	"strings"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/httputils"
@@ -80,4 +84,60 @@ func (s *StandardSeedManager) PublishMetadata(content string) error {
 
 func (s *StandardSeedManager) PublishNetworkConfig(content string) error {
 	return s.publish(networkConfigName, content)
+}
+
+func SendFormAndFile() {
+	fmt.Println("send file to remote server")
+	file, err := os.Open("example.txt")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	// Text field
+	err = writer.WriteField("mach_uuid", "1234-mach-uuid-5678")
+	if err != nil {
+		panic(err)
+	}
+
+	// File field
+	part, err := writer.CreateFormFile("file", "example.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = file.WriteTo(part)
+	if err != nil {
+		panic(err)
+	}
+
+	// IMPORTANT: finish the multipart body
+	err = writer.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		"http://localhost:8501/upload",
+		&body,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// Contains the boundary, so don't manually set this to just
+	// "multipart/form-data".
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	fmt.Println(resp.Status)
 }
