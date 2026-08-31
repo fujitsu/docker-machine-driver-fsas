@@ -643,10 +643,6 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.Start(); err != nil {
-		return err
-	}
-
 	lanports, err := d.assignIpAddresses()
 	if err != nil {
 		return err
@@ -696,11 +692,6 @@ func (d *Driver) innerCreate() error {
 		}
 	}
 
-	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
-		slog.Error("Error while initializing SSH Manager", "err", err)
-		return err
-	}
-
 	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
 		slog.Error("Error while applying cloud init", "err", err)
 		return err
@@ -708,6 +699,27 @@ func (d *Driver) innerCreate() error {
 
 	slog.Info("Logging content of cloud config file at the end of method innerCreate")
 	logContentOfCloudConfigFile(d.UserDataFile)
+
+	// config files must be read before starting machine because when the machine reboots cloud-init is applied from the remote server
+
+	if err := d.Start(); err != nil {
+		return err
+	}
+
+	// ==================
+	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
+		slog.Error("Error while initializing SSH Manager", "err", err)
+		return err
+	}
+
+	if err := d.SshManager.RebootCloudInit(); err != nil {
+		slog.Error("Potential error while rebooting cloud init", "err", err)
+		return err
+	}
+
+	delay := WAIT_FOR_START_AFTER_REBOOT
+	slog.Info("Waiting for the machine reebot", "delay", delay)
+	statusClock.Sleep(delay)
 
 	return nil
 }
@@ -728,14 +740,16 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			return err
 		}
 
-		if err := d.SeedManager.PublishUserData(string(userDataFileContent)); err != nil {
+		if err = d.SeedManager.PublishFile(d.MachineUUID, seedutils.UserDataFileName, userDataFileContent); err != nil {
+			slog.Error("Error while publishing file", "file", seedutils.UserDataFileName, "err", err)
 			return err
 		}
 	}
 
 	metadataContent := d.CfgManager.PrepareMetadata(d.MachineUUID, sshHostName)
 
-	if err := d.SeedManager.PublishMetadata(metadataContent); err != nil {
+	if err := d.SeedManager.PublishFile(d.MachineUUID, seedutils.MetaDataFileName, []byte(metadataContent)); err != nil {
+		slog.Error("Error while publishing file", "file", seedutils.MetaDataFileName, "err", err)
 		return err
 	}
 
@@ -749,8 +763,9 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			slog.Error("Failed to prepare network config", "err", err)
 			return err
 		}
-		if err := d.SeedManager.PublishNetworkConfig(networkConfigContent); err != nil {
-			slog.Error("Failed to publish network config to seed server", "err", err)
+
+		if err = d.SeedManager.PublishFile(d.MachineUUID, seedutils.NetworkConfigFileName, []byte(networkConfigContent)); err != nil {
+			slog.Error("Error while publishing file", "file", seedutils.NetworkConfigFileName, "err", err)
 			return err
 		}
 		slog.Info("Successfully published network config to seed server")
@@ -758,14 +773,6 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 		slog.Info("Skipping network-config generation: baremetal bonding is disabled")
 	}
 
-	if err := d.SshManager.RebootCloudInit(); err != nil {
-		slog.Error("Potential error while rebooting cloud init", "err", err)
-		return err
-	}
-
-	// Wait for the machine to reach the Running state
-	slog.Info("Waiting for the machine to reach the Running state")
-	statusClock.Sleep(WAIT_FOR_START_AFTER_REBOOT)
 	return nil
 }
 

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	seedEndpointPrefix = "/seed"
+	seedEndpointPrefix = "/upload"
 	userDataName       = "user-data"
 	metadataName       = "meta-data"
 	networkConfigName  = "network-config"
@@ -28,9 +28,7 @@ var (
 // SeedManager interface defines the methods for publishing cloud-init artifacts to the seed server.
 type SeedManager interface {
 	IsInit() bool
-	PublishUserData(content string) error
-	PublishMetadata(content string) error
-	PublishNetworkConfig(content string) error
+	PublishFile(machineUUID string, filename ConfigFiles, content []byte) error
 }
 
 // StandardSeedManager struct holds configuration for seed server interaction.
@@ -59,36 +57,68 @@ func (s *StandardSeedManager) IsInit() bool {
 	return isInit
 }
 
-// publish uploads a single cloud-init artifact to the seed server via HTTP PUT.
-func (s *StandardSeedManager) publish(name, content string) error {
-	endpoint := fmt.Sprintf("%s/%s", seedEndpointPrefix, name)
-	headers := map[string]string{"Content-Type": "text/plain"}
+type ConfigFiles string
 
-	statusCode, err := s.cdiClient.Put([]byte(content), endpoint, nil, nil, headers)
-	if err != nil {
-		slog.Error("Failed to publish cloud-init artifact to seed server", "name", name, "err", err)
-		return err
+const (
+	UserDataFileName      ConfigFiles = "user-data"
+	MetaDataFileName      ConfigFiles = "meta-data"
+	NetworkConfigFileName ConfigFiles = "network-config"
+)
+
+func (c ConfigFiles) String() string {
+	return string(c)
+}
+
+func (s *StandardSeedManager) PublishFile(machineUUID string, filename ConfigFiles, content []byte) error {
+	if machineUUID == "" {
+		return errors.New("machine UUID cannot be empty")
 	}
 
-	slog.Info("Successfully published cloud-init artifact to seed server", "name", name, "status_code", statusCode)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	// Text field with machine UUID
+	err := writer.WriteField("mach_uuid", machineUUID)
+	if err != nil {
+		return fmt.Errorf("error while writing machine UUID: %w", err)
+	}
+
+	// File field
+	part, err := writer.CreateFormFile("file", filename.String())
+	if err != nil {
+		return fmt.Errorf("error while creating form file: %w", err)
+	}
+
+	_, err = part.Write(content)
+	if err != nil {
+		return fmt.Errorf("error while writing file content: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("error while closing multipart writer: %w", err)
+	}
+
+	headers := map[string]string{
+		"Content-Type": writer.FormDataContentType(),
+	}
+
+	statusCode, err := s.cdiClient.Post(body.Bytes(), seedEndpointPrefix, nil, nil, headers)
+	if err != nil {
+		return fmt.Errorf("error while posting file: %w", err)
+	}
+	if statusCode != http.StatusOK {
+		return fmt.Errorf("Error from server: Status code: %d", statusCode)
+	}
+
+	slog.Info("upload succeeded", "file", filename, "status_code", statusCode)
 	return nil
 }
 
-func (s *StandardSeedManager) PublishUserData(content string) error {
-	return s.publish(userDataName, content)
-}
-
-func (s *StandardSeedManager) PublishMetadata(content string) error {
-	return s.publish(metadataName, content)
-}
-
-func (s *StandardSeedManager) PublishNetworkConfig(content string) error {
-	return s.publish(networkConfigName, content)
-}
-
-func SendFormAndFile() {
+func SendFormAndFile(machineUUID, filename string) {
 	fmt.Println("send file to remote server")
-	file, err := os.Open("example.txt")
+	// TODO: validate machineUUID
+
+	file, err := os.Open(filename)
 	if err != nil {
 		panic(err)
 	}
@@ -97,14 +127,14 @@ func SendFormAndFile() {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
-	// Text field
-	err = writer.WriteField("mach_uuid", "1234-mach-uuid-5678")
+	// Text field with machine UUID
+	err = writer.WriteField("mach_uuid", machineUUID)
 	if err != nil {
 		panic(err)
 	}
 
 	// File field
-	part, err := writer.CreateFormFile("file", "example.txt")
+	part, err := writer.CreateFormFile("file", filename)
 	if err != nil {
 		panic(err)
 	}
@@ -135,9 +165,12 @@ func SendFormAndFile() {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error while sending request:", "error:", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Error from server:", "Status code:", resp.StatusCode, "Status:", resp.Status)
 	}
 	defer resp.Body.Close()
 
-	fmt.Println(resp.Status)
+	fmt.Println("response status=", resp.Status)
 }
