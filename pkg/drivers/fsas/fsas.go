@@ -111,7 +111,7 @@ const (
 	cloudInitDirPath             = "/etc/cdi/cloud-init-discovery/"
 	envVarSSHMaxAttempts         = "FSAS_SSH_MAX_ATTEMPTS"
 	// TODO: temporary hardcoded seed server URL until it is exposed as a configurable option
-	seedServerUrl = "http://192.168.122.1:8500"
+	seedServerUrl = "http://192.168.122.1:8501"
 )
 
 const (
