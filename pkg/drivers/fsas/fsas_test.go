@@ -2709,3 +2709,77 @@ func TestGetSSHMaxAttempts(t *testing.T) {
 		})
 	}
 }
+
+func TestCloudInitWebServerUrlIsInvalid(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "valid IPv4 with trailing slash",
+			input:   "http://192.168.122.1:8500/",
+			wantErr: false,
+		},
+		{
+			name:    "valid IPv4 without trailing slash",
+			input:   "http://192.168.122.1:8500",
+			wantErr: false,
+		},
+		{
+			name:    "valid hostname",
+			input:   "https://example.com:443",
+			wantErr: false,
+		},
+		{
+			name:    "missing port",
+			input:   "http://192.168.122.1",
+			wantErr: true,
+		},
+		{
+			name:    "invalid scheme",
+			input:   "ftp://192.168.122.1:8500",
+			wantErr: true,
+		},
+		{
+			name:    "port out of range",
+			input:   "http://192.168.122.1:70000",
+			wantErr: true,
+		},
+		{
+			name:    "non numeric port",
+			input:   "http://192.168.122.1:abcd",
+			wantErr: true,
+		},
+		{
+			name:    "missing host",
+			input:   "http://:8500",
+			wantErr: true,
+		},
+		{
+			name:    "not a URL",
+			input:   "192.168.122.1:8500",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			input:   "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cloudInitWebServerUrlIsValid(tt.input)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf(
+					"cloudInitWebServerUrlIsInvalid(%q) error = %v, wantErr = %v",
+					tt.input,
+					err,
+					tt.wantErr,
+				)
+			}
+		})
+	}
+}
