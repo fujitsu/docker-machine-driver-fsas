@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/httputils"
@@ -15,9 +14,6 @@ import (
 
 const (
 	seedEndpointPrefix = "/upload"
-	userDataName       = "user-data"
-	metadataName       = "meta-data"
-	networkConfigName  = "network-config"
 )
 
 var (
@@ -112,65 +108,4 @@ func (s *StandardSeedManager) PublishFile(machineUUID string, filename ConfigFil
 
 	slog.Info("upload succeeded", "file", filename, "status_code", statusCode)
 	return nil
-}
-
-func SendFormAndFile(machineUUID, filename string) {
-	fmt.Println("send file to remote server")
-	// TODO: validate machineUUID
-
-	file, err := os.Open(filename)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-
-	// Text field with machine UUID
-	err = writer.WriteField("mach_uuid", machineUUID)
-	if err != nil {
-		panic(err)
-	}
-
-	// File field
-	part, err := writer.CreateFormFile("file", filename)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = file.WriteTo(part)
-	if err != nil {
-		panic(err)
-	}
-
-	// IMPORTANT: finish the multipart body
-	err = writer.Close()
-	if err != nil {
-		panic(err)
-	}
-
-	req, err := http.NewRequest(
-		http.MethodPost,
-		"http://localhost:8501/upload",
-		&body,
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	// Contains the boundary, so don't manually set this to just
-	// "multipart/form-data".
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		fmt.Println("Error while sending request:", "error:", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Error from server:", "Status code:", resp.StatusCode, "Status:", resp.Status)
-	}
-	defer resp.Body.Close()
-
-	fmt.Println("response status=", resp.Status)
 }

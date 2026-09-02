@@ -3,7 +3,9 @@ package fsas
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/mail"
+	"net/url"
 	"strconv"
 
 	"os"
@@ -64,6 +66,7 @@ type Driver struct {
 	UserDataFile              string
 	SlesRegistrationCode      string
 	SlesRegistrationEmail     string
+	CloudInitWebServerUrl     string
 	FabricManager             fm.FabricManager      `json:"-"`
 	Keycloak                  keycloak.Keycloak     `json:"-"`
 	SshManager                sshutils.SshManager   `json:"-"`
@@ -94,6 +97,7 @@ func NewDriver() *Driver {
 		UserDataFile:              "",
 		SlesRegistrationCode:      "",
 		SlesRegistrationEmail:     "",
+		CloudInitWebServerUrl:     "",
 		FabricManager:             &fm.FabricManagerClient{},
 		Keycloak:                  &keycloak.KeycloakClient{},
 		SshManager:                &sshutils.StandardSshManager{},
@@ -110,11 +114,7 @@ const (
 	errorMandatoryOption         = "%s must be specified using the CLI option %s"
 	cloudInitDirPath             = "/etc/cdi/cloud-init-discovery/"
 	envVarSSHMaxAttempts         = "FSAS_SSH_MAX_ATTEMPTS"
-	// TODO: temporary hardcoded seed server URL until it is exposed as a configurable option
-	seedServerUrl = "http://192.168.122.1:8501"
-)
 
-const (
 	DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS = 30
 	ERROR_SSH_MAX_ATTEMPTS                = 100
 	REMOVE_SSH_MAX_ATTEMPTS               = 1
@@ -139,6 +139,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("MachineUUID: %s, ", d.MachineUUID) +
 		fmt.Sprintf("UserDataFile: %s, ", d.UserDataFile) +
 		fmt.Sprintf("SlesRegistrationEmail: %s", d.SlesRegistrationEmail) +
+		fmt.Sprintf("CloudInitWebServerUrl: %s", d.CloudInitWebServerUrl) +
 		"}"
 }
 
@@ -238,6 +239,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "fsas-sles-registration-email",
 			Usage:  "SLES registration email",
 			EnvVar: "FSAS_SLES_REGISTRATION_EMAIL",
+		},
+		mcnflag.StringFlag{
+			Name:   "fsas-cloud-init-web-server-url",
+			Usage:  "URL of the cloud-init web server with port e.g. 'http://192.168.122.1:8500'",
+			EnvVar: "FSAS_CLOUD_INIT_WEB_SERVER_URL",
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-userdata",
@@ -387,6 +393,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SlesRegistrationEmail = strings.TrimSpace(flags.String("fsas-sles-registration-email"))
 	slog.Debug("Driver", "FSAS SLES registration email", d.SlesRegistrationEmail)
 
+	d.CloudInitWebServerUrl = strings.TrimSpace(flags.String("fsas-cloud-init-web-server-url"))
+	slog.Debug("Driver", "FSAS cloud-init web server URL", d.CloudInitWebServerUrl)
+
 	return d.checkConfig()
 }
 
@@ -503,7 +512,7 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 func (d *Driver) initSeedManager() error {
 	if !d.SeedManager.IsInit() {
 		slog.Warn("Seed Manager is NOT initialized then start init procedure")
-		seedManager, err := seedutils.NewStandardSeedManager(seedServerUrl)
+		seedManager, err := seedutils.NewStandardSeedManager(d.CloudInitWebServerUrl)
 		if err != nil {
 			slog.Error("Could not create Seed Manager because of an error", "err", err)
 			return err
@@ -557,6 +566,13 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image ssh host public key", "--fsas-image-os-ssh-host-pub-key")
 	}
 
+	if d.CloudInitWebServerUrl == "" {
+		return fmt.Errorf(errorMandatoryOption, "Cloud-init web server URL", "--fsas-cloud-init-web-server-url")
+	}
+	if err := cloudInitWebServerUrlIsValid(d.CloudInitWebServerUrl); err != nil {
+		return err
+	}
+
 	parsedKey, err := sshutils.ParseSSHPublicKey(d.OsImageSshHostPubKey)
 	if err != nil {
 		return fmt.Errorf("invalid SSH host public key format: %w", err)
@@ -574,6 +590,43 @@ func (d *Driver) checkConfig() error {
 		}
 	}
 	return nil
+}
+
+// cloudInitWebServerUrlIsValid Validates the cloud-init web server URL format, scheme, host, and port.
+func cloudInitWebServerUrlIsValid(s string) error {
+	u, err := url.Parse(s)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+
+	// Only HTTP/HTTPS
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("invalid URL scheme; only http or https are allowed; actual scheme: %s", u.Scheme)
+	}
+
+	// Must have a host
+	if u.Host == "" {
+		return fmt.Errorf("missing host in URL: %s", s)
+	}
+
+	// Require explicit port
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return fmt.Errorf("invalid host format: %w", err)
+	}
+
+	if host == "" || port == "" {
+		return fmt.Errorf("invalid host or port in URL: %s", s)
+	}
+
+	// Port must be numeric and in valid range
+	p, err := strconv.Atoi(port)
+	if err != nil || p < 1 || p > 65535 {
+		return fmt.Errorf("invalid port in URL: %s", s)
+	}
+
+	return nil
+
 }
 
 // Create a host using the driver's config
@@ -701,12 +754,10 @@ func (d *Driver) innerCreate() error {
 	logContentOfCloudConfigFile(d.UserDataFile)
 
 	// config files must be read before starting machine because when the machine reboots cloud-init is applied from the remote server
-
 	if err := d.Start(); err != nil {
 		return err
 	}
 
-	// ==================
 	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
