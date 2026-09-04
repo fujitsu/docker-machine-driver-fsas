@@ -791,7 +791,7 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			return err
 		}
 
-		if err = d.SeedManager.PublishFile(d.MachineUUID, seedutils.UserDataFileName, userDataFileContent); err != nil {
+		if err = d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.UserDataFileName, userDataFileContent); err != nil {
 			slog.Error("Error while publishing file", "file", seedutils.UserDataFileName, "err", err)
 			return err
 		}
@@ -799,7 +799,7 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 
 	metadataContent := d.CfgManager.PrepareMetadata(d.MachineUUID, sshHostName)
 
-	if err := d.SeedManager.PublishFile(d.MachineUUID, seedutils.MetaDataFileName, []byte(metadataContent)); err != nil {
+	if err := d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.MetaDataFileName, []byte(metadataContent)); err != nil {
 		slog.Error("Error while publishing file", "file", seedutils.MetaDataFileName, "err", err)
 		return err
 	}
@@ -815,7 +815,7 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			return err
 		}
 
-		if err = d.SeedManager.PublishFile(d.MachineUUID, seedutils.NetworkConfigFileName, []byte(networkConfigContent)); err != nil {
+		if err = d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.NetworkConfigFileName, []byte(networkConfigContent)); err != nil {
 			slog.Error("Error while publishing file", "file", seedutils.NetworkConfigFileName, "err", err)
 			return err
 		}
