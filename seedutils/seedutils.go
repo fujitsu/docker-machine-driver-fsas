@@ -24,7 +24,7 @@ var (
 // SeedManager interface defines the methods for publishing cloud-init artifacts to the seed server.
 type SeedManager interface {
 	IsInit() bool
-	PublishFile(machineUUID string, filename ConfigFiles, content []byte) error
+	PublishFile(dmiSystemUUID string, filename ConfigFiles, content []byte) error
 }
 
 // StandardSeedManager struct holds configuration for seed server interaction.
@@ -65,18 +65,18 @@ func (c ConfigFiles) String() string {
 	return string(c)
 }
 
-func (s *StandardSeedManager) PublishFile(machineUUID string, filename ConfigFiles, content []byte) error {
-	if machineUUID == "" {
-		return errors.New("machine UUID cannot be empty")
+func (s *StandardSeedManager) PublishFile(dmiSystemUUID string, filename ConfigFiles, content []byte) error {
+	if dmiSystemUUID == "" {
+		return errors.New("DMI.system-uuid cannot be empty")
 	}
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
-	// Text field with machine UUID
-	err := writer.WriteField("mach_uuid", machineUUID)
+	// Text field with DMI.system-uuid
+	err := writer.WriteField("dmi-system-uuid", dmiSystemUUID)
 	if err != nil {
-		return fmt.Errorf("error while writing machine UUID: %w", err)
+		return fmt.Errorf("error while writing DMI.system-uuid: %w", err)
 	}
 
 	// File field
