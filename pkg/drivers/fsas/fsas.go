@@ -764,9 +764,25 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	// TODO: remove this sleep after testing, it is only for dev env purposes
-	slog.Info("wait for rebooting machine - only for dev env purposes")
-	time.Sleep(30 * time.Second)
+	/*
+		In our dev environment the machine is created and started at once. Thus, during booting, cloud-init
+		fails to load config from web-server (it's to early and config files are not ready yet).
+		To run original cloud-init settings again, there must be cloud-init reboot
+		procedure executed e.g. 'sudo cloud-init clean --logs --reboot'
+	*/
+	if err := developmentEnvironmenDetected(); err != nil {
+		slog.Warn("Dev env detected, sending cloud-init reboot command to the machine")
+
+		if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
+			slog.Error("Error while initializing SSH Manager", "err", err)
+			return err
+		}
+
+		if err := d.SshManager.RebootCloudInit(); err != nil {
+			slog.Error("Potential error while rebooting cloud init", "err", err)
+			return err
+		}
+	}
 
 	// config files must be read before starting machine because when the machine reboots cloud-init is applied from the remote server
 	if err := d.Start(); err != nil {
@@ -781,16 +797,39 @@ func (d *Driver) innerCreate() error {
 	return nil
 }
 
+// developmentEnvironmenDetected checks if current environment is development one.
+func developmentEnvironmenDetected() error {
+	// TODO: find some cleaner/cleaver solution for detecting dev environment
+	devEnvPrefix := "192.168.122"
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		msg := "Error while getting IP addresses from current machine"
+		slog.Error(msg, "err", err)
+		return fmt.Errorf("%s: %w", msg, err)
+	}
+
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if !ok {
+			continue
+		}
+
+		if ipNet.IP.To4() != nil {
+			slog.Info("current machine IP address", "adr", ipNet.IP)
+			if strings.HasPrefix(ipNet.IP.String(), devEnvPrefix) {
+				slog.Warn("dev environment detected", "IP", ipNet.IP)
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("dev environment is not active")
+}
+
 var osReadFile = os.ReadFile
 
 // applyCloudInit Publishes user-data, meta-data and network-config to the seed server so
 // the node can fetch them over HTTP via its NoCloud datasource.
 func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
-
-	// if err := d.initSeedManager(); err != nil {
-	// 	slog.Error("Error while initializing Seed Manager", "err", err)
-	// 	return err
-	// }
 
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
@@ -1200,6 +1239,7 @@ func logContentOfCloudConfigFile(cloudConfigFilePath string) {
 	slog.Debug(string(content))
 }
 
+// waitUntilMachineIsActive Waits until the machine's port 22 is reachable. In case of timeout return error.
 func waitUntilMachineIsActive(ipAddress string, timeout time.Duration) error {
 	slog.Info("Checking if machine is active (port 22)", "ip", ipAddress, "timeout", timeout)
 	start := time.Now()
