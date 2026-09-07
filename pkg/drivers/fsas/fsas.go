@@ -745,6 +745,10 @@ func (d *Driver) innerCreate() error {
 		}
 	}
 
+	if err := d.initSeedManager(); err != nil {
+		slog.Error("Error while initializing Seed Manager", "err", err)
+		return err
+	}
 	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
 		slog.Error("Error while applying cloud init", "err", err)
 		return err
@@ -753,24 +757,34 @@ func (d *Driver) innerCreate() error {
 	slog.Info("Logging content of cloud config file at the end of method innerCreate")
 	logContentOfCloudConfigFile(d.UserDataFile)
 
+	// Check if Seed Manager is active and reachable, otherwise ther is no point to start the machine
+	if err := d.SeedManager.IsActive(); err != nil {
+		slog.Error("Seed server is not active", "err", err)
+		return err
+	}
+
+	// TODO: remove this sleep after testing, it is only for dev env purposes
+	slog.Info("wait for rebooting machine - only for dev env purposes")
+	time.Sleep(30 * time.Second)
+
 	// config files must be read before starting machine because when the machine reboots cloud-init is applied from the remote server
 	if err := d.Start(); err != nil {
 		return err
 	}
 
-	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
-		slog.Error("Error while initializing SSH Manager", "err", err)
-		return err
-	}
+	// if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
+	// 	slog.Error("Error while initializing SSH Manager", "err", err)
+	// 	return err
+	// }
 
-	if err := d.SshManager.RebootCloudInit(); err != nil {
-		slog.Error("Potential error while rebooting cloud init", "err", err)
-		return err
-	}
+	// if err := d.SshManager.RebootCloudInit(); err != nil {
+	// 	slog.Error("Potential error while rebooting cloud init", "err", err)
+	// 	return err
+	// }
 
-	delay := WAIT_FOR_START_AFTER_REBOOT
-	slog.Info("Waiting for the machine reebot", "delay", delay)
-	statusClock.Sleep(delay)
+	// delay := WAIT_FOR_START_AFTER_REBOOT
+	// slog.Info("Waiting for the machine reebot", "delay", delay)
+	// statusClock.Sleep(delay)
 
 	return nil
 }
@@ -780,10 +794,11 @@ var osReadFile = os.ReadFile
 // applyCloudInit Publishes user-data, meta-data and network-config to the seed server so
 // the node can fetch them over HTTP via its NoCloud datasource.
 func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
-	if err := d.initSeedManager(); err != nil {
-		slog.Error("Error while initializing Seed Manager", "err", err)
-		return err
-	}
+
+	// if err := d.initSeedManager(); err != nil {
+	// 	slog.Error("Error while initializing Seed Manager", "err", err)
+	// 	return err
+	// }
 
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)

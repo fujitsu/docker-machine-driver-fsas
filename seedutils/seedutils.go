@@ -14,6 +14,7 @@ import (
 
 const (
 	seedEndpointPrefix = "/upload"
+	seedEndpointHealth = "/health"
 )
 
 var (
@@ -24,6 +25,7 @@ var (
 // SeedManager interface defines the methods for publishing cloud-init artifacts to the seed server.
 type SeedManager interface {
 	IsInit() bool
+	IsActive() error
 	PublishFile(dmiSystemUUID, ip string, filename ConfigFiles, content []byte) error
 }
 
@@ -51,6 +53,27 @@ func NewStandardSeedManager(seedServerUrl string) (*StandardSeedManager, error) 
 // IsInit Returns true if constructor succeeded else false
 func (s *StandardSeedManager) IsInit() bool {
 	return isInit
+}
+
+// IsActive checks if the seed manager is active
+func (s *StandardSeedManager) IsActive() error {
+	if !isInit {
+		return errors.New("seed manager is not initialized")
+	}
+
+	queryParams := map[string]string{}
+	headers := map[string]string{}
+	statusCode, err := s.cdiClient.Get(seedEndpointHealth, queryParams, nil, headers)
+	if err != nil {
+		return fmt.Errorf("error while getting health check: %w", err)
+	}
+	if statusCode != http.StatusOK {
+		return fmt.Errorf("Error from server: Status code: %d", statusCode)
+	}
+
+	slog.Info("seed server is active", "status_code", statusCode)
+
+	return nil
 }
 
 type ConfigFiles string
