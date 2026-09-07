@@ -40,6 +40,7 @@ const (
 	WAIT_FOR_STATUS_STOPPED_TIMEOUT       time.Duration = 15 * time.Second
 	WAIT_FOR_STATUS_NOT_FOUND_TIMEOUT     time.Duration = 15 * time.Second
 	WAIT_FOR_START_AFTER_REBOOT           time.Duration = 60 * time.Second
+	WAIT_FOR_START_AFTER_CLOUD_INIT       time.Duration = time.Hour
 )
 
 // Driver is the implementation of BaseDriver interface
@@ -772,19 +773,10 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	// if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
-	// 	slog.Error("Error while initializing SSH Manager", "err", err)
-	// 	return err
-	// }
-
-	// if err := d.SshManager.RebootCloudInit(); err != nil {
-	// 	slog.Error("Potential error while rebooting cloud init", "err", err)
-	// 	return err
-	// }
-
-	// delay := WAIT_FOR_START_AFTER_REBOOT
-	// slog.Info("Waiting for the machine reebot", "delay", delay)
-	// statusClock.Sleep(delay)
+	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_CLOUD_INIT); err != nil {
+		slog.Error("Error while waiting for machine to be active", "err", err)
+		return err
+	}
 
 	return nil
 }
@@ -1206,4 +1198,37 @@ func logContentOfCloudConfigFile(cloudConfigFilePath string) {
 	}
 	slog.Debug("Cloud config file content")
 	slog.Debug(string(content))
+}
+
+func waitUntilMachineIsActive(ipAddress string, timeout time.Duration) error {
+	slog.Info("Checking if machine is active (port 22)", "ip", ipAddress, "timeout", timeout)
+	start := time.Now()
+
+	formatDuration := func(d time.Duration) string {
+		hours := int(d.Hours())
+		minutes := int(d.Minutes()) % 60
+		seconds := int(d.Seconds()) % 60
+
+		return fmt.Sprintf("%dh:%02dm:%02ds", hours, minutes, seconds)
+	}
+
+	for time.Since(start) < timeout {
+		conn, err := net.DialTimeout(
+			"tcp",
+			ipAddress+":22", // SSH port that should be opened on the machine
+			10*time.Second,  // timeout for ONE connection attempt
+		)
+
+		if err != nil {
+			slog.Info("Machine is not active", "machine-IP", ipAddress,
+				"duration-since", formatDuration(time.Since(start)), "err", err)
+			time.Sleep(10 * time.Second)
+		} else {
+			slog.Info("Machine is active", "machine-IP", ipAddress)
+			conn.Close()
+			return nil
+		}
+
+	}
+	return fmt.Errorf("machine '%s' was not active within timeout: %v", ipAddress, timeout)
 }
