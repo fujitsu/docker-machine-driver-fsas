@@ -731,19 +731,13 @@ func (d *Driver) innerCreate() error {
 	/*
 		In our dev environment the machine is created and started at once. Thus, during booting, cloud-init
 		fails to load config from web-server (it's to early and config files are not ready yet).
-		To run original cloud-init settings again, there must be cloud-init reboot
-		procedure executed e.g. 'sudo cloud-init clean --logs --reboot'
+		To run original cloud-init settings again, the machine must be rebooted.
 	*/
 	if err := developmentEnvironmenDetected(); err != nil {
 		slog.Warn("Dev env detected, sending cloud-init reboot command to the machine")
 
-		if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
-			slog.Error("Error while initializing SSH Manager", "err", err)
-			return err
-		}
-
-		if err := d.SshManager.RebootCloudInit(); err != nil {
-			slog.Error("Potential error while rebooting cloud init", "err", err)
+		if err := d.Restart(); err != nil {
+			slog.Error("error while restarting machine;", "err", err)
 			return err
 		}
 	}
