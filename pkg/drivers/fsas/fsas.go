@@ -713,6 +713,13 @@ func (d *Driver) innerCreate() error {
 		slog.Error("Error while initializing Seed Manager", "err", err)
 		return err
 	}
+
+	// Check if Seed Manager is active and reachable, otherwise there is no point in dowloading config params
+	if err := d.SeedManager.IsActive(); err != nil {
+		slog.Error("Seed server is not active", "err", err)
+		return err
+	}
+
 	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
 		slog.Error("Error while applying cloud init", "err", err)
 		return err
@@ -720,12 +727,6 @@ func (d *Driver) innerCreate() error {
 
 	slog.Info("Logging content of cloud config file at the end of method innerCreate")
 	logContentOfCloudConfigFile(d.UserDataFile)
-
-	// Check if Seed Manager is active and reachable, otherwise there is no point to start the machine
-	if err := d.SeedManager.IsActive(); err != nil {
-		slog.Error("Seed server is not active", "err", err)
-		return err
-	}
 
 	/*
 		In our dev environment the machine is created and started at once. Thus, during booting, cloud-init
