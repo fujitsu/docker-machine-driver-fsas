@@ -709,43 +709,6 @@ func (d *Driver) innerCreate() error {
 	}
 	slog.Info("Acquired ssh hostname", "hostname", hostName)
 
-	if !d.CfgManager.IsInit() {
-		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
-		d.CfgManager = cfgManager
-	}
-
-	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
-		return err
-	}
-
-	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {
-		return err
-	}
-
-	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
-		slog.Error("Failed to implant RKE2 config via userdata", "err", err)
-		return err
-	}
-
-	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
-		slog.Error("Failed to inject OS registration data into config file", "err", err)
-		return err
-	}
-
-	if err := d.CfgManager.DisableSSHLogin(); err != nil {
-		slog.Error("Failed to disable SSH login via cloud config", "err", err)
-		return err
-	}
-
-	if d.EnableBaremetalBonding {
-		if err := d.CfgManager.ExtendUserdataBootCmd([]string{
-			`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
-		}); err != nil {
-			slog.Error("Failed to inject bootcmd for baremetal bonding", "err", err)
-			return err
-		}
-	}
-
 	if err := d.initSeedManager(); err != nil {
 		slog.Error("Error while initializing Seed Manager", "err", err)
 		return err
@@ -837,6 +800,39 @@ var osReadFile = os.ReadFile
 // applyCloudInit Publishes user-data, meta-data and network-config to the seed server so
 // the node can fetch them over HTTP via its NoCloud datasource.
 func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
+
+	if !d.CfgManager.IsInit() {
+		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
+		d.CfgManager = cfgManager
+	}
+
+	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
+		return err
+	}
+
+	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
+		slog.Error("Failed to implant RKE2 config via userdata", "err", err)
+		return err
+	}
+
+	if err := d.CfgManager.InjectOSRegistration(d.SlesRegistrationCode, d.SlesRegistrationEmail); err != nil {
+		slog.Error("Failed to inject OS registration data into config file", "err", err)
+		return err
+	}
+
+	if err := d.CfgManager.DisableSSHLogin(); err != nil {
+		slog.Error("Failed to disable SSH login via cloud config", "err", err)
+		return err
+	}
+
+	if d.EnableBaremetalBonding {
+		if err := d.CfgManager.ExtendUserdataBootCmd([]string{
+			`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
+		}); err != nil {
+			slog.Error("Failed to inject bootcmd for baremetal bonding", "err", err)
+			return err
+		}
+	}
 
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
