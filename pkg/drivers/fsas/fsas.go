@@ -758,7 +758,7 @@ func (d *Driver) innerCreate() error {
 	slog.Info("Logging content of cloud config file at the end of method innerCreate")
 	logContentOfCloudConfigFile(d.UserDataFile)
 
-	// Check if Seed Manager is active and reachable, otherwise ther is no point to start the machine
+	// Check if Seed Manager is active and reachable, otherwise there is no point to start the machine
 	if err := d.SeedManager.IsActive(); err != nil {
 		slog.Error("Seed server is not active", "err", err)
 		return err
@@ -791,6 +791,13 @@ func (d *Driver) innerCreate() error {
 
 	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_CLOUD_INIT); err != nil {
 		slog.Error("Error while waiting for machine to be active", "err", err)
+		return err
+	}
+
+	// Machine started successfully so there is no point for storing config files (meta-data, user-data) on web-server
+	// Clean up content for web-server's folder containing config files for current machine
+	if err := d.SeedManager.CleanupFolderWithConfigFiles(d.MachineUUID, d.IPAddress); err != nil {
+		slog.Error("error while cleaning up folder with config;", "err", err)
 		return err
 	}
 
