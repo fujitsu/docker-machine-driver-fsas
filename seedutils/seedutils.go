@@ -27,6 +27,7 @@ type SeedManager interface {
 	IsInit() bool
 	IsActive() error
 	PublishFile(dmiSystemUUID, ip string, filename ConfigFiles, content []byte) error
+	CleanupFolderWithConfigFiles(dmiSystemUUID, ip string) error
 }
 
 // StandardSeedManager struct holds configuration for seed server interaction.
@@ -129,12 +130,28 @@ func (s *StandardSeedManager) PublishFile(dmiSystemUUID, ip string, filename Con
 
 	statusCode, err := s.cdiClient.Post(body.Bytes(), seedEndpointPrefix, nil, nil, headers)
 	if err != nil {
-		return fmt.Errorf("error while posting file: %w", err)
+		return fmt.Errorf("error while sending POST request to endpoint: %s; error: %w", seedEndpointPrefix, err)
 	}
 	if statusCode != http.StatusOK {
-		return fmt.Errorf("Error from server: Status code: %d", statusCode)
+		return fmt.Errorf("error while sending POST request to endpoint: %s; status code: %d", seedEndpointPrefix, statusCode)
 	}
 
 	slog.Info("upload succeeded", "file", filename, "status_code", statusCode)
+	return nil
+}
+
+func (s *StandardSeedManager) CleanupFolderWithConfigFiles(dmiSystemUUID, ip string) error {
+	endpoint := fmt.Sprintf("/%s", dmiSystemUUID)
+	headers := map[string]string{}
+
+	statusCode, err := s.cdiClient.Delete(endpoint, nil, nil, headers)
+	if err != nil {
+		return fmt.Errorf("error while sending DELETE request to endpoint: %s; error: %w", endpoint, err)
+	}
+	if statusCode != http.StatusNoContent {
+		return fmt.Errorf("error while sending DELETE request to endpoint: %s; Status code: %d", endpoint, statusCode)
+	}
+
+	slog.Info("Folder with config files successfully cleaned up", "folder", dmiSystemUUID, "status_code", statusCode)
 	return nil
 }
