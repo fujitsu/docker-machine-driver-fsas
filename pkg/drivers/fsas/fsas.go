@@ -805,6 +805,9 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
 		return err
 	}
+	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {
+		return err
+	}
 
 	if err := d.CfgManager.ImplantRKE2Config("100-fsas-providerid.yaml", d.MachineUUID); err != nil {
 		slog.Error("Failed to implant RKE2 config via userdata", "err", err)
