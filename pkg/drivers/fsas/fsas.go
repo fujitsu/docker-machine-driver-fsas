@@ -729,20 +729,6 @@ func (d *Driver) innerCreate() error {
 	slog.Info("Logging content of cloud config file at the end of method innerCreate")
 	logContentOfCloudConfigFile(d.UserDataFile)
 
-	/*
-		In our dev environment the machine is created and started at once. Thus, during booting, cloud-init
-		fails to load config from web-server (it's to early and config files are not ready yet).
-		To run original cloud-init settings again, the machine must be rebooted.
-	*/
-	// if err := developmentEnvironmenDetected(); err != nil {
-	// 	slog.Warn("Dev env detected, sending cloud-init reboot command to the machine")
-
-	// 	if err := d.Restart(); err != nil {
-	// 		slog.Error("error while restarting machine;", "err", err)
-	// 		return err
-	// 	}
-	// }
-
 	if err := d.Start(); err != nil {
 		return err
 	}
@@ -771,34 +757,6 @@ func (d *Driver) innerCreate() error {
 	}
 
 	return nil
-}
-
-// developmentEnvironmenDetected checks if current environment is development one.
-func developmentEnvironmenDetected() error {
-	// TODO: find some cleaner/cleaver solution for detecting dev environment
-	devEnvPrefix := "192.168.122"
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		msg := "Error while getting IP addresses from current machine"
-		slog.Error(msg, "err", err)
-		return fmt.Errorf("%s: %w", msg, err)
-	}
-
-	for _, addr := range addrs {
-		ipNet, ok := addr.(*net.IPNet)
-		if !ok {
-			continue
-		}
-
-		if ipNet.IP.To4() != nil {
-			slog.Info("current machine IP address", "adr", ipNet.IP)
-			if strings.HasPrefix(ipNet.IP.String(), devEnvPrefix) {
-				slog.Warn("dev environment detected", "IP", ipNet.IP)
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("dev environment is not active")
 }
 
 var osReadFile = os.ReadFile
