@@ -734,17 +734,27 @@ func (d *Driver) innerCreate() error {
 		fails to load config from web-server (it's to early and config files are not ready yet).
 		To run original cloud-init settings again, the machine must be rebooted.
 	*/
-	if err := developmentEnvironmenDetected(); err != nil {
-		slog.Warn("Dev env detected, sending cloud-init reboot command to the machine")
+	// if err := developmentEnvironmenDetected(); err != nil {
+	// 	slog.Warn("Dev env detected, sending cloud-init reboot command to the machine")
 
-		if err := d.Restart(); err != nil {
-			slog.Error("error while restarting machine;", "err", err)
-			return err
-		}
+	// 	if err := d.Restart(); err != nil {
+	// 		slog.Error("error while restarting machine;", "err", err)
+	// 		return err
+	// 	}
+	// }
+
+	if err := d.Start(); err != nil {
+		return err
 	}
 
-	// config files must be read before starting machine because when the machine reboots cloud-init is applied from the remote server
-	if err := d.Start(); err != nil {
+	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_CLOUD_INIT); err != nil {
+		slog.Error("Error while waiting for machine to be active", "err", err)
+		return err
+	}
+
+	// restart is needed because on new the machine network interfaces are not ready before cloud-init service
+	if err := d.Restart(); err != nil {
+		slog.Error("error while restarting machine;", "err", err)
 		return err
 	}
 
