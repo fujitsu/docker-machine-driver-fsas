@@ -236,8 +236,9 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "FSAS_SLES_REGISTRATION_EMAIL",
 		},
 		mcnflag.StringFlag{
+			// Usage is intentionally omitted: Rancher overwrites the description for
+			// fields listed in nodedriver.cattle.io/file-to-field-aliases.
 			Name:   "fsas-userdata",
-			Usage:  "Warning: this field should remain empty as custom userdata are not supported!",
 			EnvVar: "FSAS_USERDATA",
 		},
 	}
