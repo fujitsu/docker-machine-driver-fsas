@@ -1338,3 +1338,24 @@ func Test_populateLanportNicTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestGetProvisioningLanportIdx(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected int
+	}{
+		{name: "unset uses default", envValue: "", expected: PROVISIONING_LANPORT_IDX},
+		{name: "valid positive int is used", envValue: "5", expected: 5},
+		{name: "zero is used", envValue: "0", expected: 0},
+		{name: "non-numeric uses default", envValue: "abc", expected: PROVISIONING_LANPORT_IDX},
+		{name: "negative uses default", envValue: "-1", expected: PROVISIONING_LANPORT_IDX},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(envVarProvisioningLanportIdx, tt.envValue)
+			assert.Equal(t, tt.expected, getProvisioningLanportIdx())
+		})
+	}
+}
