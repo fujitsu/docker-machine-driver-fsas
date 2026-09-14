@@ -50,7 +50,7 @@ If you render from CLI, make sure your override file uses the same paths used by
 cp values.yaml values.custom.yaml
 ```
 
-2. Edit `values.custom.yaml` with your environment:
+2. Edit `values.custom.yaml` with your environment and fill in fields:
 
 - `cluster.name`
 - `cluster.cloudCredentialSecretName` (Rancher cloud credential secret reference)
@@ -58,7 +58,48 @@ cp values.yaml values.custom.yaml
 - Control Plane fields under `fsas.controlPlane.*`
 - worker fields under `fsas.worker.*`
 
-Example below prepare 1 Control Plane + 2 workers:
+**Examples below show how to prepare customized clusters.**
+
+Example 1: Control Plane combined with Worker (all in one):
+
+```yaml
+cluster:
+  name: lp25
+
+controlPlane:
+  enabled: true
+  quantity: 1
+  workerRole: true
+
+worker:
+  enabled: false
+  quantity:
+
+fsas:
+
+  controlPlane:
+    networkBaremetalUuid: 7e8ba727-ea79-4951-a49d-feb866d5c123
+    networkProvisionUuid: 7e8ba727-ea79-4951-a49d-feb866d5c122
+    networkProvisionDefaultGw: 192.168.122.1
+    enableBaremetalBonding: false
+    osImageName: sles16
+    sshUser: rancher
+    sshPassword: rancher
+    imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
+    userdata: ""
+    computeConditionsJson: >
+      [{"resource":"M6"}]
+    devicesSpecJson: >
+      [{"spec":"s1"}]
+
+  worker:
+    networkBaremetalUuid:
+    networkProvisionUuid:
+    networkProvisionDefaultGw:
+```
+
+
+Example 2: prepare 1 Control Plane + 2 workers:
 
 ```yaml
 cluster:
@@ -105,6 +146,68 @@ fsas:
     devicesSpecJson: >
       [{"spec":"s2"}]
 ```
+
+Example 3: prepare 1 Control Plane + 1 Worker with auto-scaling:
+(below feature-gates value is mandatory for auto-scaling for Kubernetes version v1.35)
+```yaml
+cluster:
+  name: lp27
+
+rkeConfig:
+  machineGlobalConfig:
+    kube-apiserver-arg:
+      - feature-gates=DRADeviceBindingConditions=true
+    kube-controller-manager-arg:
+      - feature-gates=DRADeviceBindingConditions=true
+    kube-scheduler-arg:
+      - feature-gates=DRADeviceBindingConditions=true
+
+controlPlane:
+  enabled: true
+  quantity: 1
+  workerRole: false
+
+worker:
+  enabled: true
+  quantity: 1
+
+  autoscalingEnabled: true
+  autoscalingMinSize: 1
+  autoscalingMaxSize: 3
+
+fsas:
+
+  controlPlane:
+    networkBaremetalUuid: 7e8ba727-ea79-4951-a49d-feb866d5c123
+    networkProvisionUuid: 7e8ba727-ea79-4951-a49d-feb866d5c122
+    networkProvisionDefaultGw: 192.168.122.1
+    enableBaremetalBonding: false
+    osImageName: sles16
+    sshUser: rancher
+    sshPassword: rancher
+    imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
+    userdata: ""
+    computeConditionsJson: >
+      [{"resource":"M6"}]
+    devicesSpecJson: >
+      [{"spec":"s1"}]
+
+  worker:
+    networkBaremetalUuid: 7e8ba727-ea79-4951-a49d-feb866d5c123
+    networkProvisionUuid: 7e8ba727-ea79-4951-a49d-feb866d5c122
+    networkProvisionDefaultGw: 192.168.122.1
+	enableBaremetalBonding: true
+    osImageName: sles16
+    sshUser: rancher
+    sshPassword: rancher
+    imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
+    userdata: ""
+    computeConditionsJson: >
+      [{"resource":"M5"}]
+    devicesSpecJson: >
+      [{"spec":"s2"}]
+```
+
 
 ## Render Kubernetes manifests
 
@@ -163,4 +266,3 @@ If this chart is published as a Rancher catalog `cluster-template`:
 - Namespace is currently fixed to `fleet-default` in templates.
 - Pool machine config name is rendered as `<cluster.name>-cp` for Control Plane and `<cluster.name>-wk` for worker.
 - Treat files containing credentials as sensitive; do not commit secrets.
-#
