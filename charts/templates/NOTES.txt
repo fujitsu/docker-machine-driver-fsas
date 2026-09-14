@@ -1,0 +1,45 @@
+FSAS Cluster Template installed successfully.
+
+Cluster Name:
+  {{ .Values.cluster.name }}
+
+Namespace:
+  {{ .Values.cluster.namespace }}
+
+Kubernetes Version:
+  {{ .Values.cluster.kubernetesVersion }}
+
+Cloud Credential:
+  {{ .Values.cluster.cloudCredentialSecretName }}
+
+Control Plane:
+  Nodes: {{ .Values.controlPlane.quantity }}
+  Worker Role: {{ .Values.controlPlane.workerRole }}
+
+{{- if .Values.worker.enabled }}
+Worker Pool:
+  Enabled: true
+  Nodes: {{ .Values.worker.quantity }}
+{{- else }}
+Worker Pool:
+  Disabled
+{{- end }}
+
+Machine Configs:
+  - {{ include "fsas-cluster-template.cpConfigName" . }}
+{{- if .Values.worker.enabled }}
+  - {{ include "fsas-cluster-template.workerConfigName" . }}
+{{- end }}
+
+The following resources were created:
+
+  ✓ Cluster
+{{- if .Values.controlPlane.enabled }}
+  ✓ FsasConfig (Control Plane)
+{{- end }}
+{{- if .Values.worker.enabled }}
+  ✓ FsasConfig (Worker)
+{{- end }}
+
+If this chart is used as a Rancher Cluster Template,
+the cluster should now appear in the Rancher provisioning interface.

@@ -1,13 +1,19 @@
 apiVersion: provisioning.cattle.io/v1
 kind: Cluster
+
 metadata:
   name: {{ required "cluster.name is required" .Values.cluster.name }}
   namespace: fleet-default
+  labels:
+    {{- include "fsas-cluster-template.labels" . | nindent 4 }}
+
 spec:
-  cloudCredentialSecretName: {{ required "cluster.cloudCredentialSecretNameID is required" .Values.cluster.cloudCredentialSecretName }}
+
+  cloudCredentialSecretName: {{ required "cluster.cloudCredentialSecretName is required" .Values.cluster.cloudCredentialSecretName }}
   kubernetesVersion: {{ .Values.cluster.kubernetesVersion }}
 
-  localClusterAuthEndpoint: {}
+  localClusterAuthEndpoint:
+{{ toYaml .Values.cluster.localClusterAuthEndpoint | indent 4 }}
 
   rkeConfig:
 
@@ -32,12 +38,11 @@ spec:
 
     machinePools:
 
-      - name: {{ required "machinePools.pool.name is required" .Values.machinePools.pool.name }}
-        quantity: {{ required "machinePools.pool.quantity is required" .Values.machinePools.pool.quantity }}
-
-        controlPlaneRole: {{ .Values.machinePools.pool.controlPlaneRole }}
-        etcdRole: {{ .Values.machinePools.pool.etcdRole }}
-        workerRole: {{ .Values.machinePools.pool.workerRole }}
+      - name: cp
+        quantity: {{ required "controlPlane.quantity is required" .Values.controlPlane.quantity }}
+        controlPlaneRole: true
+        etcdRole: true
+        workerRole: {{ .Values.controlPlane.workerRole }}
 
         drainBeforeDelete: true
         unhealthyNodeTimeout: 0s
@@ -45,11 +50,30 @@ spec:
         machineConfigRef:
           apiVersion: rke-machine-config.cattle.io/v1
           kind: FsasConfig
-          name: {{ printf "%s-all" .Values.cluster.name }}
+          name: {{ include "fsas-cluster-template.cpConfigName" . }}
+
+{{- if .Values.worker.enabled }}
+
+      - name: wk
+        quantity: {{ required "worker.quantity is required" .Values.worker.quantity }}
+
+        controlPlaneRole: false
+        etcdRole: false
+        workerRole: true
+
+        drainBeforeDelete: true
+        unhealthyNodeTimeout: 0s
+
+        machineConfigRef:
+          apiVersion: rke-machine-config.cattle.io/v1
+          kind: FsasConfig
+          name: {{ include "fsas-cluster-template.workerConfigName" . }}
+
+{{- end }}
 
     machineSelectorConfig:
       - config:
-          protect-kernel-defaults: {{ .Values.machineSelectorConfig.protectKernelDefaults }}
+          protect-kernel-defaults: false
 
     networking: {}
 
@@ -57,7 +81,7 @@ spec:
 
     upgradeStrategy:
 
-      controlPlaneConcurrency: {{ .Values.rkeConfig.upgradeStrategy.controlPlaneConcurrency | quote }}
+      controlPlaneConcurrency: "1"
 
       controlPlaneDrainOptions:
         deleteEmptyDirData: true
@@ -69,7 +93,7 @@ spec:
         skipWaitForDeleteTimeoutSeconds: 0
         timeout: 120
 
-      workerConcurrency: {{ .Values.rkeConfig.upgradeStrategy.workerConcurrency | quote }}
+      workerConcurrency: "1"
 
       workerDrainOptions:
         deleteEmptyDirData: true

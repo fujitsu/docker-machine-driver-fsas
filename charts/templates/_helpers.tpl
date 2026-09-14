@@ -1,24 +1,41 @@
 {{/*
 Expand the chart name.
 */}}
-{{- define "fsas-cluster.name" -}}
-{{- default .Chart.Name .Values.cluster.name | trunc 63 | trimSuffix "-" -}}
+{{- define "fsas-cluster-template.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
-Create a full name.
+Create a fullname.
 */}}
-{{- define "fsas-cluster.fullname" -}}
-{{- if .Values.cluster.name }}
-{{- .Values.cluster.name | trunc 63 | trimSuffix "-" }}
+{{- define "fsas-cluster-template.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" }}
+{{- .Values.cluster.name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
 
 {{/*
-Pool FsasConfig name.
+Common labels.
 */}}
-{{- define "fsas-cluster.pool1ConfigName" -}}
-{{ include "fsas-cluster.fullname" . }}-worker
+{{- define "fsas-cluster-template.labels" -}}
+app.kubernetes.io/name: {{ include "fsas-cluster-template.name" . }}
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Control-plane FsasConfig name.
+*/}}
+{{- define "fsas-cluster-template.cpConfigName" -}}
+{{ printf "%s-cp" .Values.cluster.name }}
+{{- end }}
+
+{{/*
+Worker FsasConfig name.
+*/}}
+{{- define "fsas-cluster-template.workerConfigName" -}}
+{{ printf "%s-wk" .Values.cluster.name }}
 {{- end }}
