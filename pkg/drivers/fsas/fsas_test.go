@@ -62,6 +62,14 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+func useMockStatusClock(t *testing.T) *timeutilsmock.MockClock {
+	t.Helper()
+	mockClock := timeutilsmock.NewMockClock(t)
+	statusClock = mockClock
+	t.Cleanup(func() { statusClock = timeutils.RealClock{} })
+	return mockClock
+}
+
 func TestDriverName(t *testing.T) {
 	driver := NewDriver()
 
@@ -587,8 +595,7 @@ func TestStartGetStateError(t *testing.T) {
 		987,
 		nil)
 
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mockClock.On("Now").Return(mock_now_time)
 	mockClock.On("Since", mock_now_time).Return(WAIT_FOR_STATUS_TIMEOUT + time.Microsecond*100)
@@ -1045,8 +1052,7 @@ func TestInitSshManagerFailNewStandardSshManager(t *testing.T) {
 }
 
 func TestWaitForStatusCorrectStatus(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
@@ -1076,8 +1082,7 @@ func TestWaitForStatusCorrectStatus(t *testing.T) {
 }
 
 func TestWaitForStatusCorrectSecondCallStatus(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
@@ -1110,8 +1115,7 @@ func TestWaitForStatusCorrectSecondCallStatus(t *testing.T) {
 }
 
 func TestWaitForStatusTimeout(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	driver := &Driver{
@@ -1142,8 +1146,7 @@ func TestWaitForStatusTimeout(t *testing.T) {
 }
 
 func TestWaitForStatusError(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
@@ -1171,8 +1174,7 @@ func TestWaitForStatusError(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockSSH := sshMock.NewMockSshManager(t)
@@ -1256,24 +1258,23 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateCloudInitFail(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockSSH := sshMock.NewMockSshManager(t)
 	mockCfg := cfgMock.NewMockCfgManager(t)
-	mockSeed := seedMock.NewMockSeedManager(t)
+	// mockSeed := seedMock.NewMockSeedManager(t)
 
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
 	driver := &Driver{
-		BaseDriver:            &drivers.BaseDriver{},
-		FabricManager:         mockFM,
-		Keycloak:              mockKeycloak,
-		SshManager:            mockSSH,
-		CfgManager:            mockCfg,
-		SeedManager:           mockSeed,
+		BaseDriver:    &drivers.BaseDriver{},
+		FabricManager: mockFM,
+		Keycloak:      mockKeycloak,
+		SshManager:    mockSSH,
+		CfgManager:    mockCfg,
+		// SeedManager:           mockSeed,
 		MachineUUID:           testMachineUUID,
 		UserDataFile:          "custom-user-data.yaml",
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
@@ -1288,6 +1289,8 @@ func TestCreateCloudInitFail(t *testing.T) {
 		CloudInitWebServerUrl: "http://192.168.122.1:8501/",
 	}
 	driver.MachineName = "machineNameTest"
+	mockSeed := seedMock.NewMockSeedManager(t)
+	driver.SeedManager = mockSeed
 
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
@@ -1392,8 +1395,7 @@ func TestCreateMachineFail(t *testing.T) {
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, "", int(UNBUILDED), nil)
 
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
 	mockClock.On("Now").Return(mock_now_time)
 
@@ -1403,8 +1405,7 @@ func TestCreateMachineFail(t *testing.T) {
 }
 
 func TestCreateWaitForStatusFail(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
@@ -1501,7 +1502,7 @@ func TestCreateGetMachineDetailsFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
 
 	err := driver.Create()
-	assert.EqualError(t, err, testError.Error())
+	assert.EqualError(t, err, "GetMachineDetails unsucessfull")
 }
 
 func TestCreateImageInstallFail(t *testing.T) {
@@ -1550,7 +1551,7 @@ func TestCreateImageInstallFail(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
 
 	err := driver.Create()
-	assert.EqualError(t, err, testError.Error())
+	assert.EqualError(t, err, "ImageInstall unsucessfull")
 }
 
 func TestCreateStartFail(t *testing.T) {
@@ -1558,16 +1559,18 @@ func TestCreateStartFail(t *testing.T) {
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockSSH := sshMock.NewMockSshManager(t)
 	mockCfg := cfgMock.NewMockCfgManager(t)
-	mockSeed := seedMock.NewMockSeedManager(t)
+	mockClock := useMockStatusClock(t)
+	t.Cleanup(func() { statusClock = timeutils.RealClock{} })
+	// mockSeed := seedMock.NewMockSeedManager(t)
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
 	driver := &Driver{
-		BaseDriver:            &drivers.BaseDriver{},
-		FabricManager:         mockFM,
-		Keycloak:              mockKeycloak,
-		SshManager:            mockSSH,
-		CfgManager:            mockCfg,
-		SeedManager:           mockSeed,
+		BaseDriver:    &drivers.BaseDriver{},
+		FabricManager: mockFM,
+		Keycloak:      mockKeycloak,
+		SshManager:    mockSSH,
+		CfgManager:    mockCfg,
+		// SeedManager:           mockSeed,
 		MachineUUID:           testMachineUUID,
 		TenantUuid:            "4a9587f0-e7da-4824-8127-d5ca5ddf8c34",
 		ComputeConditionsJson: "testJsnn",
@@ -1579,6 +1582,8 @@ func TestCreateStartFail(t *testing.T) {
 		CloudInitWebServerUrl: "http://192.168.122.1:8501/",
 	}
 	driver.MachineName = "machineNameTest"
+	mockSeed := seedMock.NewMockSeedManager(t)
+	driver.SeedManager = mockSeed
 
 	mockKeycloak.On("IsInit").Return(true)
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
@@ -1615,9 +1620,12 @@ func TestCreateStartFail(t *testing.T) {
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// last waitForStatus in Remove
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
+	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
+	mockClock.On("Now").Return(mock_now_time)
+	mockClock.On("Since", mock_now_time).Return(WAIT_FOR_STATUS_TIMEOUT + time.Microsecond*100).Once()
 
 	err := driver.Create()
-	assert.EqualError(t, err, testError.Error())
+	assert.EqualError(t, err, "error during Create: 'PowerOn unsucessfull'; followed by error during Remove: 'error: required status was not achieved within the specified time'")
 
 }
 
@@ -1696,6 +1704,8 @@ func TestCreateImplantSSHKeyFail(t *testing.T) {
 	mockSSH := sshMock.NewMockSshManager(t)
 	mockCfg := cfgMock.NewMockCfgManager(t)
 	mockSeed := seedMock.NewMockSeedManager(t)
+	mockClock := useMockStatusClock(t)
+	t.Cleanup(func() { statusClock = timeutils.RealClock{} })
 	testMachineUUID := "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f"
 	bootSsdUUID := "3129cbdf-345c-43a9-b4dc-34880ceed63d"
 	driver := &Driver{
@@ -1746,9 +1756,12 @@ func TestCreateImplantSSHKeyFail(t *testing.T) {
 	mockFM.On("RemoveMachine", driver.MachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	// waitForStatus in Remove call
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return([]models.Lanport{}, "", 17, nil)
+	mock_now_time := time.Date(2025, time.January, 1, 12, 0, 0, 0, time.UTC)
+	mockClock.On("Now").Return(mock_now_time)
+	mockClock.On("Since", mock_now_time).Return(WAIT_FOR_STATUS_TIMEOUT + time.Microsecond*100).Once()
 
 	err := driver.Create()
-	assert.EqualError(t, err, testError.Error())
+	assert.EqualError(t, err, "error during Create: 'ImplantSSHKey unsuccessful'; followed by error during Remove: 'error: required status was not achieved within the specified time'")
 }
 
 func TestCreateOSRegistrationFail(t *testing.T) {
@@ -2306,8 +2319,7 @@ func TestAssignIpAddresses_NicTypeMismatch_Fails(t *testing.T) {
 }
 
 func Test_applyCloudInit_success(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	useMockStatusClock(t)
 
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
@@ -2472,8 +2484,7 @@ func Test_applyCloudInit_bonding_fail_write_network_config(t *testing.T) {
 }
 
 func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockCfg := cfgMock.NewMockCfgManager(t)
@@ -2562,8 +2573,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 }
 
 func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
-	mockClock := timeutilsmock.NewMockClock(t)
-	statusClock = mockClock
+	mockClock := useMockStatusClock(t)
 	mockFM := fmmock.NewMockFabricManager(t)
 	mockKeycloak := keycloakMock.NewMockKeycloak(t)
 	mockSSH := sshMock.NewMockSshManager(t)
