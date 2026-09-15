@@ -35,17 +35,17 @@ func TestPrepareMetadata(t *testing.T) {
 		expected   string
 	}{
 		{instanceId: "12345678-1234-1234-1234-123456789012", hostname: "host1",
-			expected: `dsmode: local
+			expected: `dsmode: net
 instance-id: 12345678-1234-1234-1234-123456789012
 hostname: host1`,
 		},
 		{instanceId: "12345678-1234-1234-1234-123456789012", hostname: "",
-			expected: `dsmode: local
+			expected: `dsmode: net
 instance-id: 12345678-1234-1234-1234-123456789012
 hostname: `,
 		},
-		{instanceId: "", hostname: "host1", expected: "dsmode: local\ninstance-id: \nhostname: host1"},
-		{instanceId: "", hostname: "", expected: "dsmode: local\ninstance-id: \nhostname: "},
+		{instanceId: "", hostname: "host1", expected: "dsmode: net\ninstance-id: \nhostname: host1"},
+		{instanceId: "", hostname: "", expected: "dsmode: net\ninstance-id: \nhostname: "},
 	}
 
 	for _, tc := range testCases {
