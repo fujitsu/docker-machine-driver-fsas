@@ -42,17 +42,22 @@ func TestMain(m *testing.M) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	// Replace with mock function
-	original := generateSSHKey
+	originalGenerateSSHKey := generateSSHKey
 	generateSSHKey = func(path string) error { return nil }
 
 	originalIsPublicKeyIsValid := sshutils.IsPublicKeyValid
+
+	// Mock implementation of waitUntilMachineIsActive
+	originalWaitUntilMachineIsActive := waitUntilMachineIsActive
+	waitUntilMachineIsActive = func(ipAddress string, timeout time.Duration) error { return nil }
 
 	exitCode := m.Run() // run tests
 
 	/* tear-down code here */
 	statusClock = timeutils.RealClock{}
 
-	generateSSHKey = original
+	generateSSHKey = originalGenerateSSHKey
+	waitUntilMachineIsActive = originalWaitUntilMachineIsActive
 
 	// Restore original logger
 	slog.SetDefault(originalLogger)
@@ -1249,14 +1254,6 @@ func TestCreate(t *testing.T) {
 	osReadFile = func(path string) ([]byte, error) {
 		return []byte("script-content-rke2"), nil
 	}
-
-	// Mock implementation of waitUntilMachineIsActiveWrap
-	original := waitUntilMachineIsActive
-	defer func() { waitUntilMachineIsActive = original }()
-	waitUntilMachineIsActiveMock := func(ipAddress string, timeout time.Duration) error {
-		return nil
-	}
-	waitUntilMachineIsActive = waitUntilMachineIsActiveMock
 
 	err := driver.Create()
 	assert.NoError(t, err)
@@ -2524,8 +2521,6 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
 	mockCfg.On("IsInit").Return(true)
-	mockSeed.On("IsInit").Return(true)
-	mockSeed.On("IsActive").Return(nil)
 
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson:  driver.ComputeConditionsJson,
@@ -2567,10 +2562,14 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 
 	mockCfg.On("PrepareMetadata", testMachineUUID, driver.MachineName).Return("")
 	mockCfg.On("PrepareNetworkConfig", models.ExpectedLanportsBonding, expectedSubnets).Return(networkConfigContent, nil)
+	mockSeed.On("IsInit").Return(true)
+	mockSeed.On("IsActive").Return(nil)
 	mockSeed.On("PublishFile", testMachineUUID, mock.Anything, seedutils.MetaDataFileName, mock.Anything).Return(nil)
+	// publish network config file
 	mockSeed.On("PublishFile", testMachineUUID, mock.Anything, seedutils.NetworkConfigFileName, mock.Anything).Return(nil)
-	mockSeed.On("CleanupFolderWithConfigFiles", testMachineUUID, mock.Anything).Return(nil)
+
 	mockFM.On("Reboot", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
+	mockSeed.On("CleanupFolderWithConfigFiles", testMachineUUID, mock.Anything).Return(nil)
 
 	err := driver.Create()
 	assert.NoError(t, err)
