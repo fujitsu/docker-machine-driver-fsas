@@ -1209,8 +1209,10 @@ func logContentOfCloudConfigFile(cloudConfigFilePath string) {
 	slog.Debug(string(content))
 }
 
-// waitUntilMachineIsActive Waits until the machine's port 22 is reachable. In case of timeout return error.
-func waitUntilMachineIsActive(ipAddress string, timeout time.Duration) error {
+var waitUntilMachineIsActive func(ipAddress string, timeout time.Duration) error = waitUntilMachineIsActiveFunc
+
+// waitUntilMachineIsActiveFunc Waits until the machine's port 22 is reachable. In case of timeout return error.
+func waitUntilMachineIsActiveFunc(ipAddress string, timeout time.Duration) error {
 	slog.Info("Checking if machine is active (port 22)", "ip", ipAddress, "timeout", timeout)
 	start := time.Now()
 

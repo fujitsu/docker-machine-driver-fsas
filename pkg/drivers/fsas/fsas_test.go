@@ -1209,8 +1209,6 @@ func TestCreate(t *testing.T) {
 	mockKeycloak.On("GetToken").Return(models.AccessTokenExample)
 	mockFM.On("IsInit").Return(true)
 	mockCfg.On("IsInit").Return(true)
-	mockSeed.On("IsInit").Return(true)
-	mockSeed.On("IsActive").Return(nil)
 
 	machineSpecArgs := models.MachineSpecsArgs{
 		ComputeConditionsJson: driver.ComputeConditionsJson,
@@ -1228,8 +1226,10 @@ func TestCreate(t *testing.T) {
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Twice()
 	mockFM.On("ImageInstall", driver.TenantUuid, bootSsdUUID, driver.OsImageName, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 15, nil).Once()
+
+	mockSeed.On("IsInit").Return(true)
+	mockSeed.On("IsActive").Return(nil)
 	mockSeed.On("PublishFile", testMachineUUID, mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
-	mockSeed.On("CleanupFolderWithConfigFiles", testMachineUUID, mock.Anything).Return(nil)
 
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
@@ -1240,11 +1240,8 @@ func TestCreate(t *testing.T) {
 	mockFM.On("PowerOn", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
 	mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
 
-	// ----------------------------------------
 	mockFM.On("Reboot", testMachineUUID, driver.TenantUuid, models.AccessTokenExample).Return(nil)
-	// mockFM.On("GetMachineDetails", driver.TenantUuid, driver.MachineUUID, models.AccessTokenExample).Return(models.ExpectedLanportsWithType, bootSsdUUID, 13, nil).Twice()
-
-	// ----------------------------------------
+	mockSeed.On("CleanupFolderWithConfigFiles", driver.MachineUUID, "192.168.2.100").Return(nil)
 
 	// Mock implementation of os.ReadFile
 	originalOsReadFile := osReadFile
@@ -1252,6 +1249,14 @@ func TestCreate(t *testing.T) {
 	osReadFile = func(path string) ([]byte, error) {
 		return []byte("script-content-rke2"), nil
 	}
+
+	// Mock implementation of waitUntilMachineIsActiveWrap
+	original := waitUntilMachineIsActive
+	defer func() { waitUntilMachineIsActive = original }()
+	waitUntilMachineIsActiveMock := func(ipAddress string, timeout time.Duration) error {
+		return nil
+	}
+	waitUntilMachineIsActive = waitUntilMachineIsActiveMock
 
 	err := driver.Create()
 	assert.NoError(t, err)
