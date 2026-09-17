@@ -4,7 +4,7 @@ metadata:
   annotations:
     passwordFields: credentialsPassword,slesRegistrationCode
     privateCredentialFields: credentialsPassword,slesRegistrationCode
-    publicCredentialFields: credentialsUsername,tenantUuid,apiUrl,ntpUrl,dnsIp,slesRegistrationEmail
+    publicCredentialFields: credentialsUsername,tenantUuid,apiUrl,ntpUrl,dnsIp,slesRegistrationEmail,cloudInitWebServerUrl
     nodedriver.cattle.io/file-to-field-aliases: userdata:userdata
   name: fsas
 spec:

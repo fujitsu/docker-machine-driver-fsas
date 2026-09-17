@@ -3,11 +3,12 @@ package fsas
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/mail"
+	"net/url"
 	"strconv"
 
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/keycloak"
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
+	"github.com/fujitsu/docker-machine-driver-fsas/seedutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/sshutils"
 	"github.com/fujitsu/docker-machine-driver-fsas/timeutils"
 	"github.com/rancher/machine/libmachine/drivers"
@@ -38,6 +40,7 @@ const (
 	WAIT_FOR_STATUS_STOPPED_TIMEOUT       time.Duration = 15 * time.Second
 	WAIT_FOR_STATUS_NOT_FOUND_TIMEOUT     time.Duration = 15 * time.Second
 	WAIT_FOR_START_AFTER_REBOOT           time.Duration = 60 * time.Second
+	WAIT_FOR_START_AFTER_CLOUD_INIT       time.Duration = time.Hour
 )
 
 // Driver is the implementation of BaseDriver interface
@@ -64,10 +67,12 @@ type Driver struct {
 	UserDataFile              string
 	SlesRegistrationCode      string
 	SlesRegistrationEmail     string
-	FabricManager             fm.FabricManager    `json:"-"`
-	Keycloak                  keycloak.Keycloak   `json:"-"`
-	SshManager                sshutils.SshManager `json:"-"`
-	CfgManager                cfgutils.CfgManager `json:"-"`
+	CloudInitWebServerUrl     string
+	FabricManager             fm.FabricManager      `json:"-"`
+	Keycloak                  keycloak.Keycloak     `json:"-"`
+	SshManager                sshutils.SshManager   `json:"-"`
+	CfgManager                cfgutils.CfgManager   `json:"-"`
+	SeedManager               seedutils.SeedManager `json:"-"`
 }
 
 // NewDriver creates and returns a new instance of the FSAS CDI driver
@@ -93,10 +98,12 @@ func NewDriver() *Driver {
 		UserDataFile:              "",
 		SlesRegistrationCode:      "",
 		SlesRegistrationEmail:     "",
+		CloudInitWebServerUrl:     "",
 		FabricManager:             &fm.FabricManagerClient{},
 		Keycloak:                  &keycloak.KeycloakClient{},
 		SshManager:                &sshutils.StandardSshManager{},
 		CfgManager:                &cfgutils.StandardCfgManager{},
+		SeedManager:               &seedutils.StandardSeedManager{},
 	}
 }
 
@@ -108,9 +115,7 @@ const (
 	errorMandatoryOption         = "%s must be specified using the CLI option %s"
 	cloudInitDirPath             = "/etc/cdi/cloud-init-discovery/"
 	envVarSSHMaxAttempts         = "FSAS_SSH_MAX_ATTEMPTS"
-)
 
-const (
 	DEFAULT_INNER_CREATE_SSH_MAX_ATTEMPTS = 30
 	ERROR_SSH_MAX_ATTEMPTS                = 100
 	REMOVE_SSH_MAX_ATTEMPTS               = 1
@@ -135,6 +140,7 @@ func (d *Driver) String() string {
 		fmt.Sprintf("MachineUUID: %s, ", d.MachineUUID) +
 		fmt.Sprintf("UserDataFile: %s, ", d.UserDataFile) +
 		fmt.Sprintf("SlesRegistrationEmail: %s", d.SlesRegistrationEmail) +
+		fmt.Sprintf("CloudInitWebServerUrl: %s", d.CloudInitWebServerUrl) +
 		"}"
 }
 
@@ -234,6 +240,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "fsas-sles-registration-email",
 			Usage:  "SLES registration email",
 			EnvVar: "FSAS_SLES_REGISTRATION_EMAIL",
+		},
+		mcnflag.StringFlag{
+			Name:   "fsas-cloud-init-web-server-url",
+			Usage:  "URL of the cloud-init web server with port e.g. 'http://192.168.122.1:8500'",
+			EnvVar: "FSAS_CLOUD_INIT_WEB_SERVER_URL",
 		},
 		mcnflag.StringFlag{
 			// Usage is intentionally omitted: Rancher overwrites the description for
@@ -384,6 +395,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SlesRegistrationEmail = strings.TrimSpace(flags.String("fsas-sles-registration-email"))
 	slog.Debug("Driver", "FSAS SLES registration email", d.SlesRegistrationEmail)
 
+	d.CloudInitWebServerUrl = strings.TrimSpace(flags.String("fsas-cloud-init-web-server-url"))
+	slog.Debug("Driver", "FSAS cloud-init web server URL", d.CloudInitWebServerUrl)
+
 	return d.checkConfig()
 }
 
@@ -496,6 +510,21 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 	return nil
 }
 
+// initSeedManager Initialize Seed Manager client used to publish cloud-init config to the seed server
+func (d *Driver) initSeedManager() error {
+	if !d.SeedManager.IsInit() {
+		slog.Warn("Seed Manager is NOT initialized then start init procedure")
+		seedManager, err := seedutils.NewStandardSeedManager(d.CloudInitWebServerUrl)
+		if err != nil {
+			slog.Error("Could not create Seed Manager because of an error", "err", err)
+			return err
+		}
+		d.SeedManager = seedManager
+	}
+
+	return nil
+}
+
 // checkConfig Verify if mandatory flags are set
 func (d *Driver) checkConfig() error {
 	slog.Debug("check config from mandatory flags")
@@ -539,6 +568,13 @@ func (d *Driver) checkConfig() error {
 		return fmt.Errorf(errorMandatoryOption, "OS image ssh host public key", "--fsas-image-os-ssh-host-pub-key")
 	}
 
+	if d.CloudInitWebServerUrl == "" {
+		return fmt.Errorf(errorMandatoryOption, "Cloud-init web server URL", "--fsas-cloud-init-web-server-url")
+	}
+	if err := cloudInitWebServerUrlIsValid(d.CloudInitWebServerUrl); err != nil {
+		return err
+	}
+
 	parsedKey, err := sshutils.ParseSSHPublicKey(d.OsImageSshHostPubKey)
 	if err != nil {
 		return fmt.Errorf("invalid SSH host public key format: %w", err)
@@ -556,6 +592,43 @@ func (d *Driver) checkConfig() error {
 		}
 	}
 	return nil
+}
+
+// cloudInitWebServerUrlIsValid Validates the cloud-init web server URL format, scheme, host, and port.
+func cloudInitWebServerUrlIsValid(s string) error {
+	u, err := url.Parse(s)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+
+	// Only HTTP/HTTPS
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("invalid URL scheme; only http or https are allowed; actual scheme: %s", u.Scheme)
+	}
+
+	// Must have a host
+	if u.Host == "" {
+		return fmt.Errorf("missing host in URL: %s", s)
+	}
+
+	// Require explicit port
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return fmt.Errorf("invalid host format: %w", err)
+	}
+
+	if host == "" || port == "" {
+		return fmt.Errorf("invalid host or port in URL: %s", s)
+	}
+
+	// Port must be numeric and in valid range
+	p, err := strconv.Atoi(port)
+	if err != nil || p < 1 || p > 65535 {
+		return fmt.Errorf("invalid port in URL: %s", s)
+	}
+
+	return nil
+
 }
 
 // Create a host using the driver's config
@@ -625,10 +698,6 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.Start(); err != nil {
-		return err
-	}
-
 	lanports, err := d.assignIpAddresses()
 	if err != nil {
 		return err
@@ -641,6 +710,61 @@ func (d *Driver) innerCreate() error {
 	}
 	slog.Info("Acquired ssh hostname", "hostname", hostName)
 
+	if err := d.initSeedManager(); err != nil {
+		slog.Error("Error while initializing Seed Manager", "err", err)
+		return err
+	}
+
+	// Check if Seed Manager is active and reachable, otherwise there is no point in dowloading config params
+	if err := d.SeedManager.IsActive(); err != nil {
+		slog.Error("Seed server is not active", "err", err)
+		return err
+	}
+
+	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
+		slog.Error("Error while applying cloud init", "err", err)
+		return err
+	}
+
+	slog.Info("Logging content of cloud config file at the end of method innerCreate")
+	logContentOfCloudConfigFile(d.UserDataFile)
+
+	if err := d.Start(); err != nil {
+		return err
+	}
+
+	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_CLOUD_INIT); err != nil {
+		slog.Error("Error while waiting for machine to be active", "err", err)
+		return err
+	}
+
+	// restart is needed because on new the machine network interfaces are not ready before cloud-init service
+	if err := d.Restart(); err != nil {
+		slog.Error("error while restarting machine;", "err", err)
+		return err
+	}
+
+	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_CLOUD_INIT); err != nil {
+		slog.Error("Error while waiting for machine to be active", "err", err)
+		return err
+	}
+
+	// Machine started successfully so there is no point for storing config files (meta-data, user-data) on web-server
+	// Clean up content for web-server's folder containing config files for current machine
+	if err := d.SeedManager.CleanupFolderWithConfigFiles(d.MachineUUID, d.IPAddress); err != nil {
+		slog.Error("error while cleaning up folder with config;", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+var osReadFile = os.ReadFile
+
+// applyCloudInit Publishes user-data, meta-data and network-config to the seed server so
+// the node can fetch them over HTTP via its NoCloud datasource.
+func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
+
 	if !d.CfgManager.IsInit() {
 		cfgManager := cfgutils.NewStandardCfgManager(d.DevicesSpecJson, d.UserDataFile)
 		d.CfgManager = cfgManager
@@ -649,7 +773,6 @@ func (d *Driver) innerCreate() error {
 	if err := generateSSHKey(d.GetSSHKeyPath()); err != nil {
 		return err
 	}
-
 	if err := d.CfgManager.ImplantSSHKey(d.GetSSHKeyPath(), d.SSHUser); err != nil {
 		return err
 	}
@@ -678,43 +801,22 @@ func (d *Driver) innerCreate() error {
 		}
 	}
 
-	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
-		slog.Error("Error while initializing SSH Manager", "err", err)
-		return err
-	}
-
-	if err := d.applyCloudInit(d.GetMachineName(), lanports); err != nil {
-		slog.Error("Error while applying cloud init", "err", err)
-		return err
-	}
-
-	slog.Info("Logging content of cloud config file at the end of method innerCreate")
-	logContentOfCloudConfigFile(d.UserDataFile)
-
-	return nil
-}
-
-var osReadFile = os.ReadFile
-
-// applyCloudInit Save user-data and meta-data files on remote machine
-func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) error {
-	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
-	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
-	networkConfigPath := filepath.Join(cloudInitDirPath, "network-config")
-
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
 		if err != nil {
 			return err
 		}
 
-		if err := d.SshManager.WriteFileOnRemoteMachine(userdataPath, string(userDataFileContent), 0700); err != nil {
+		if err = d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.UserDataFileName, userDataFileContent); err != nil {
+			slog.Error("Error while publishing file", "file", seedutils.UserDataFileName, "err", err)
 			return err
 		}
 	}
+
 	metadataContent := d.CfgManager.PrepareMetadata(d.MachineUUID, sshHostName)
 
-	if err := d.SshManager.WriteFileOnRemoteMachine(metadataPath, metadataContent, 0700); err != nil {
+	if err := d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.MetaDataFileName, []byte(metadataContent)); err != nil {
+		slog.Error("Error while publishing file", "file", seedutils.MetaDataFileName, "err", err)
 		return err
 	}
 
@@ -728,23 +830,16 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			slog.Error("Failed to prepare network config", "err", err)
 			return err
 		}
-		if err := d.SshManager.WriteFileOnRemoteMachine(networkConfigPath, networkConfigContent, 0700); err != nil {
-			slog.Error("Failed to write network config to remote machine", "err", err)
+
+		if err = d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.NetworkConfigFileName, []byte(networkConfigContent)); err != nil {
+			slog.Error("Error while publishing file", "file", seedutils.NetworkConfigFileName, "err", err)
 			return err
 		}
-		slog.Info("Successfully wrote network config to remote machine", "path", networkConfigPath)
+		slog.Info("Successfully published network config to seed server")
 	} else {
 		slog.Info("Skipping network-config generation: baremetal bonding is disabled")
 	}
 
-	if err := d.SshManager.RebootCloudInit(); err != nil {
-		slog.Error("Potential error while rebooting cloud init", "err", err)
-		return err
-	}
-
-	// Wait for the machine to reach the Running state
-	slog.Info("Waiting for the machine to reach the Running state")
-	statusClock.Sleep(WAIT_FOR_START_AFTER_REBOOT)
 	return nil
 }
 
@@ -1112,4 +1207,40 @@ func logContentOfCloudConfigFile(cloudConfigFilePath string) {
 	}
 	slog.Debug("Cloud config file content")
 	slog.Debug(string(content))
+}
+
+var waitUntilMachineIsActive func(ipAddress string, timeout time.Duration) error = waitUntilMachineIsActiveFunc
+
+// waitUntilMachineIsActiveFunc Waits until the machine's port 22 is reachable. In case of timeout return error.
+func waitUntilMachineIsActiveFunc(ipAddress string, timeout time.Duration) error {
+	slog.Info("Checking if machine is active (port 22)", "ip", ipAddress, "timeout", timeout)
+	start := time.Now()
+
+	formatDuration := func(d time.Duration) string {
+		hours := int(d.Hours())
+		minutes := int(d.Minutes()) % 60
+		seconds := int(d.Seconds()) % 60
+
+		return fmt.Sprintf("%dh:%02dm:%02ds", hours, minutes, seconds)
+	}
+
+	for time.Since(start) < timeout {
+		conn, err := net.DialTimeout(
+			"tcp",
+			ipAddress+":22", // SSH port that should be opened on the machine
+			10*time.Second,  // timeout for ONE connection attempt
+		)
+
+		if err != nil {
+			slog.Info("Machine is not active", "machine-IP", ipAddress,
+				"duration-since", formatDuration(time.Since(start)), "err", err)
+			time.Sleep(10 * time.Second)
+		} else {
+			slog.Info("Machine is active", "machine-IP", ipAddress)
+			conn.Close()
+			return nil
+		}
+
+	}
+	return fmt.Errorf("machine '%s' was not active within timeout: %v", ipAddress, timeout)
 }
