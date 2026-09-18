@@ -40,7 +40,7 @@ const (
 	WAIT_FOR_STATUS_STOPPED_TIMEOUT       time.Duration = 15 * time.Second
 	WAIT_FOR_STATUS_NOT_FOUND_TIMEOUT     time.Duration = 15 * time.Second
 	WAIT_FOR_START_AFTER_REBOOT           time.Duration = 60 * time.Second
-	WAIT_FOR_START_AFTER_CLOUD_INIT       time.Duration = time.Hour
+	WAIT_FOR_START_AFTER_BOOT             time.Duration = 20 * time.Minute
 )
 
 // Driver is the implementation of BaseDriver interface
@@ -733,20 +733,28 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_CLOUD_INIT); err != nil {
+	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_BOOT); err != nil {
 		slog.Error("Error while waiting for machine to be active", "err", err)
 		return err
 	}
 
-	// restart is needed because on new the machine network interfaces are not ready before cloud-init service
-	if err := d.Restart(); err != nil {
-		slog.Error("error while restarting machine;", "err", err)
-		return err
-	}
+	/*
+		In our dev environment the machine is created and started at once. Thus, during the first boot, the cloud-init
+		fails to load config from web-server (it's to early and config files are not ready yet).
+		To run cloud-init settings again, the machine must be rebooted.
+	*/
+	if developmentEnvironmenDetected(d.IPAddress) {
+		slog.Warn("Dev env detected, sending reboot command to the machine", "ip", d.IPAddress)
 
-	if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_CLOUD_INIT); err != nil {
-		slog.Error("Error while waiting for machine to be active", "err", err)
-		return err
+		if err := d.Restart(); err != nil {
+			slog.Error("error while restarting machine;", "err", err)
+			return err
+		}
+
+		if err := waitUntilMachineIsActive(d.IPAddress, WAIT_FOR_START_AFTER_BOOT); err != nil {
+			slog.Error("Error while waiting for machine to be active", "err", err)
+			return err
+		}
 	}
 
 	// Machine started successfully so there is no point for storing config files (meta-data, user-data) on web-server
@@ -1219,6 +1227,13 @@ func logContentOfCloudConfigFile(cloudConfigFilePath string) {
 	}
 	slog.Debug("Cloud config file content")
 	slog.Debug(string(content))
+}
+
+// developmentEnvironmenDetected checks if current environment is development one.
+func developmentEnvironmenDetected(provisioningIp string) bool {
+	// TODO: find some cleaner/smarter solution for detecting dev environment then the IP prefix
+	devEnvPrefix := "192.168.122."
+	return strings.HasPrefix(provisioningIp, devEnvPrefix)
 }
 
 var waitUntilMachineIsActive func(ipAddress string, timeout time.Duration) error = waitUntilMachineIsActiveFunc
