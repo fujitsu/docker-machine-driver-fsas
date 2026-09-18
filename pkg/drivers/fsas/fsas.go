@@ -800,14 +800,14 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			return err
 		}
 	}
-
+	ips := getIpsFromLanports(lanports)
 	if d.UserDataFile != "" {
 		userDataFileContent, err := osReadFile(d.UserDataFile)
 		if err != nil {
 			return err
 		}
 
-		if err = d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.UserDataFileName, userDataFileContent); err != nil {
+		if err = d.SeedManager.PublishFile(d.MachineUUID, ips, seedutils.UserDataFileName, userDataFileContent); err != nil {
 			slog.Error("Error while publishing file", "file", seedutils.UserDataFileName, "err", err)
 			return err
 		}
@@ -815,7 +815,7 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 
 	metadataContent := d.CfgManager.PrepareMetadata(d.MachineUUID, sshHostName)
 
-	if err := d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.MetaDataFileName, []byte(metadataContent)); err != nil {
+	if err := d.SeedManager.PublishFile(d.MachineUUID, ips, seedutils.MetaDataFileName, []byte(metadataContent)); err != nil {
 		slog.Error("Error while publishing file", "file", seedutils.MetaDataFileName, "err", err)
 		return err
 	}
@@ -831,7 +831,7 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 			return err
 		}
 
-		if err = d.SeedManager.PublishFile(d.MachineUUID, d.IPAddress, seedutils.NetworkConfigFileName, []byte(networkConfigContent)); err != nil {
+		if err = d.SeedManager.PublishFile(d.MachineUUID, ips, seedutils.NetworkConfigFileName, []byte(networkConfigContent)); err != nil {
 			slog.Error("Error while publishing file", "file", seedutils.NetworkConfigFileName, "err", err)
 			return err
 		}
@@ -841,6 +841,18 @@ func (d *Driver) applyCloudInit(sshHostName string, lanports []models.Lanport) e
 	}
 
 	return nil
+}
+
+func getIpsFromLanports(lanports []models.Lanport) []string {
+	ips := []string{}
+	for _, lanport := range lanports {
+		ip := net.ParseIP(lanport.IPAddress)
+		if ip != nil && ip.To4() != nil {
+			ips = append(ips, ip.String())
+		}
+	}
+	return ips
+
 }
 
 // GetSSHHostname returns hostname for use with ssh

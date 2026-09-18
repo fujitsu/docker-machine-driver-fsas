@@ -26,7 +26,7 @@ var (
 type SeedManager interface {
 	IsInit() bool
 	IsActive() error
-	PublishFile(dmiSystemUUID, ip string, filename ConfigFiles, content []byte) error
+	PublishFile(dmiSystemUUID string, ips []string, filename ConfigFiles, content []byte) error
 	CleanupFolderWithConfigFiles(dmiSystemUUID, ip string) error
 }
 
@@ -89,54 +89,56 @@ func (c ConfigFiles) String() string {
 	return string(c)
 }
 
-func (s *StandardSeedManager) PublishFile(dmiSystemUUID, ip string, filename ConfigFiles, content []byte) error {
+func (s *StandardSeedManager) PublishFile(dmiSystemUUID string, ips []string, filename ConfigFiles, content []byte) error {
 	if dmiSystemUUID == "" {
 		return errors.New("DMI.system-uuid cannot be empty")
 	}
 
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
+	for _, ip := range ips {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
 
-	// Text field with DMI.system-uuid
-	err := writer.WriteField("dmi-system-uuid", dmiSystemUUID)
-	if err != nil {
-		return fmt.Errorf("error while writing DMI.system-uuid: %w", err)
-	}
+		// Text field with DMI.system-uuid
+		err := writer.WriteField("dmi-system-uuid", dmiSystemUUID)
+		if err != nil {
+			return fmt.Errorf("error while writing DMI.system-uuid: %w", err)
+		}
 
-	// Text field with IP address
-	err = writer.WriteField("ip", ip)
-	if err != nil {
-		return fmt.Errorf("error while writing IP: %w", err)
-	}
+		// Text field with IP address
+		err = writer.WriteField("ip", ip)
+		if err != nil {
+			return fmt.Errorf("error while writing IP: %w", err)
+		}
 
-	// File field
-	part, err := writer.CreateFormFile("file", filename.String())
-	if err != nil {
-		return fmt.Errorf("error while creating form file: %w", err)
-	}
+		// File field
+		part, err := writer.CreateFormFile("file", filename.String())
+		if err != nil {
+			return fmt.Errorf("error while creating form file: %w", err)
+		}
 
-	_, err = part.Write(content)
-	if err != nil {
-		return fmt.Errorf("error while writing file content: %w", err)
-	}
+		_, err = part.Write(content)
+		if err != nil {
+			return fmt.Errorf("error while writing file content: %w", err)
+		}
 
-	if err := writer.Close(); err != nil {
-		return fmt.Errorf("error while closing multipart writer: %w", err)
-	}
+		if err := writer.Close(); err != nil {
+			return fmt.Errorf("error while closing multipart writer: %w", err)
+		}
 
-	headers := map[string]string{
-		"Content-Type": writer.FormDataContentType(),
-	}
+		headers := map[string]string{
+			"Content-Type": writer.FormDataContentType(),
+		}
 
-	statusCode, err := s.cdiClient.Post(body.Bytes(), seedEndpointPrefix, nil, nil, headers)
-	if err != nil {
-		return fmt.Errorf("error while sending POST request to endpoint: %s; error: %w", seedEndpointPrefix, err)
-	}
-	if statusCode != http.StatusOK {
-		return fmt.Errorf("error while sending POST request to endpoint: %s; status code: %d", seedEndpointPrefix, statusCode)
-	}
+		statusCode, err := s.cdiClient.Post(body.Bytes(), seedEndpointPrefix, nil, nil, headers)
+		if err != nil {
+			return fmt.Errorf("error while sending POST request to endpoint: %s; error: %w", seedEndpointPrefix, err)
+		}
+		if statusCode != http.StatusOK {
+			return fmt.Errorf("error while sending POST request to endpoint: %s; status code: %d", seedEndpointPrefix, statusCode)
+		}
 
-	slog.Info("upload succeeded", "file", filename, "status_code", statusCode)
+		slog.Info("upload succeeded", "file", filename, "ip", ip, "status_code", statusCode)
+	}
 	return nil
 }
 
