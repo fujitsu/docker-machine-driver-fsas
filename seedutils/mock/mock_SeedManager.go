@@ -157,17 +157,17 @@ func (_c *MockSeedManager_IsInit_Call) RunAndReturn(run func() bool) *MockSeedMa
 	return _c
 }
 
-// PublishFile provides a mock function with given fields: dmiSystemUUID, ip, filename, content
-func (_m *MockSeedManager) PublishFile(dmiSystemUUID string, ip string, filename seedutils.ConfigFiles, content []byte) error {
-	ret := _m.Called(dmiSystemUUID, ip, filename, content)
+// PublishFile provides a mock function with given fields: dmiSystemUUID, ips, filename, content
+func (_m *MockSeedManager) PublishFile(dmiSystemUUID string, ips []string, filename seedutils.ConfigFiles, content []byte) error {
+	ret := _m.Called(dmiSystemUUID, ips, filename, content)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PublishFile")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, seedutils.ConfigFiles, []byte) error); ok {
-		r0 = rf(dmiSystemUUID, ip, filename, content)
+	if rf, ok := ret.Get(0).(func(string, []string, seedutils.ConfigFiles, []byte) error); ok {
+		r0 = rf(dmiSystemUUID, ips, filename, content)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -182,16 +182,16 @@ type MockSeedManager_PublishFile_Call struct {
 
 // PublishFile is a helper method to define mock.On call
 //   - dmiSystemUUID string
-//   - ip string
+//   - ips []string
 //   - filename seedutils.ConfigFiles
 //   - content []byte
-func (_e *MockSeedManager_Expecter) PublishFile(dmiSystemUUID interface{}, ip interface{}, filename interface{}, content interface{}) *MockSeedManager_PublishFile_Call {
-	return &MockSeedManager_PublishFile_Call{Call: _e.mock.On("PublishFile", dmiSystemUUID, ip, filename, content)}
+func (_e *MockSeedManager_Expecter) PublishFile(dmiSystemUUID interface{}, ips interface{}, filename interface{}, content interface{}) *MockSeedManager_PublishFile_Call {
+	return &MockSeedManager_PublishFile_Call{Call: _e.mock.On("PublishFile", dmiSystemUUID, ips, filename, content)}
 }
 
-func (_c *MockSeedManager_PublishFile_Call) Run(run func(dmiSystemUUID string, ip string, filename seedutils.ConfigFiles, content []byte)) *MockSeedManager_PublishFile_Call {
+func (_c *MockSeedManager_PublishFile_Call) Run(run func(dmiSystemUUID string, ips []string, filename seedutils.ConfigFiles, content []byte)) *MockSeedManager_PublishFile_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(seedutils.ConfigFiles), args[3].([]byte))
+		run(args[0].(string), args[1].([]string), args[2].(seedutils.ConfigFiles), args[3].([]byte))
 	})
 	return _c
 }
@@ -201,7 +201,7 @@ func (_c *MockSeedManager_PublishFile_Call) Return(_a0 error) *MockSeedManager_P
 	return _c
 }
 
-func (_c *MockSeedManager_PublishFile_Call) RunAndReturn(run func(string, string, seedutils.ConfigFiles, []byte) error) *MockSeedManager_PublishFile_Call {
+func (_c *MockSeedManager_PublishFile_Call) RunAndReturn(run func(string, []string, seedutils.ConfigFiles, []byte) error) *MockSeedManager_PublishFile_Call {
 	_c.Call.Return(run)
 	return _c
 }
