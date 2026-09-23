@@ -125,7 +125,7 @@ func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport, su
 	return string(rawYaml), nil
 }
 
-const metadataContent = `dsmode: local
+const metadataContent = `dsmode: net
 instance-id: %s
 hostname: %s`
 
