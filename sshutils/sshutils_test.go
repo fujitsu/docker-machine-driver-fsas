@@ -117,7 +117,7 @@ func TestParseSSHPublicKeyTypeMismatch(t *testing.T) {
 	key, err := ParseSSHPublicKey("test AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHMl5neMPoM8XtWmsrSI1TxGe+iWUwfeA62gW0y7a5SM+vJ7WafERtBZJlWBgfOv+zVEPdUjkO0fnWoVbELLjSI=")
 	assert.Error(t, err)
 	assert.Nil(t, key)
-	assert.ErrorContains(t, err, "SSH public key type mismatch")
+	assert.ErrorContains(t, err, "authorized keys key type mismatch")
 }
 
 func TestParseSSHPublicKeyMissingTypePrefix(t *testing.T) {
