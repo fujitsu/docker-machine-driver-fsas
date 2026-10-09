@@ -13,7 +13,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
-	github.com/pkg/sftp v1.13.7
+	github.com/pkg/sftp v1.13.11
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	golang.org/x/crypto v0.56.0
@@ -23,4 +23,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-go 1.26.5
+go 1.26.0
+
+toolchain go1.26.6
