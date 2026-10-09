@@ -1,0 +1,70 @@
+cluster:
+  name: ""
+  # cloudCredentialSecretName refers to ID of the cloud credential
+  cloudCredentialSecretName: cattle-global-data:""
+  kubernetesVersion: v1.35.6+rke2r1
+  localClusterAuthEndpoint: {}
+
+rkeConfig:
+  cni: calico
+  ingressController: traefik
+  disableKubeProxy: false
+  etcdExposeMetrics: false
+
+  etcd:
+    snapshotRetention: 5
+    snapshotScheduleCron: "0 */5 * * *"
+
+  machineGlobalConfig:
+    etcdArgs: []
+    ### when feature-gates are needed uncomment 3 rows below and add proper arguments
+    # kube-apiserver-arg: []
+    # kube-controller-manager-arg: []
+    # kube-scheduler-arg: []
+
+controlPlane:
+  enabled: true
+  quantity: 1
+  # Set to true for a single-node cluster
+  workerRole: false
+
+worker:
+  # Set to false for a single-node cluster
+  enabled: true
+  quantity: 1
+
+  # Set to true for enabling autoscaling for the worker nodes
+  autoscalingEnabled: false
+  autoscalingMinSize: 1
+  autoscalingMaxSize: 3
+
+fsas:
+  controlPlane:
+    networkBaremetalUuid: ""
+    networkProvisionUuid: ""
+    networkProvisionDefaultGw: ""
+    enableBaremetalBonding: false
+    osImageName: ""
+    sshUser: ""
+    sshPassword: ""
+    imageOsSshHostPubKey: ""
+    userdata: ""
+    computeConditionsJson: >
+      []
+    devicesSpecJson: >
+      []
+
+  worker:
+    networkBaremetalUuid: ""
+    networkProvisionUuid: ""
+    networkProvisionDefaultGw: ""
+    enableBaremetalBonding: false
+    osImageName: ""
+    imageOsSshHostPubKey: ""
+    sshUser: ""
+    sshPassword: ""
+    userdata: ""
+    computeConditionsJson: >
+      []
+    devicesSpecJson: >
+      []

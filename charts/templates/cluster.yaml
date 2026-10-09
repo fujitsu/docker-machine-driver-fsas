@@ -1,0 +1,112 @@
+apiVersion: provisioning.cattle.io/v1
+kind: Cluster
+
+metadata:
+  name: {{ required "cluster.name is required" .Values.cluster.name }}
+  namespace: fleet-default
+  labels:
+    {{- include "fsas-cluster-template.labels" . | nindent 4 }}
+
+spec:
+
+  cloudCredentialSecretName: {{ required "cluster.cloudCredentialSecretName is required" .Values.cluster.cloudCredentialSecretName }}
+  kubernetesVersion: {{ .Values.cluster.kubernetesVersion }}
+
+  localClusterAuthEndpoint:
+{{ toYaml .Values.cluster.localClusterAuthEndpoint | indent 4 }}
+
+  rkeConfig:
+
+    chartValues:
+      rke2-calico: {}
+      rke2-ingress-nginx: {}
+      rke2-traefik: {}
+
+    dataDirectories: {}
+
+    etcd:
+      snapshotRetention: {{ .Values.rkeConfig.etcd.snapshotRetention }}
+      snapshotScheduleCron: {{ .Values.rkeConfig.etcd.snapshotScheduleCron | quote }}
+
+    machineGlobalConfig:
+      cni: {{ .Values.rkeConfig.cni }}
+      disable-kube-proxy: {{ .Values.rkeConfig.disableKubeProxy }}
+      etcd-expose-metrics: {{ .Values.rkeConfig.etcdExposeMetrics }}
+      ingress-controller: {{ .Values.rkeConfig.ingressController }}
+      {{- toYaml .Values.rkeConfig.machineGlobalConfig | nindent 6 }}
+
+    machinePoolDefaults: {}
+
+    machinePools:
+
+      - name: cp
+        quantity: {{ required "controlPlane.quantity is required" .Values.controlPlane.quantity }}
+        controlPlaneRole: true
+        etcdRole: true
+        workerRole: {{ .Values.controlPlane.workerRole }}
+
+        drainBeforeDelete: true
+        unhealthyNodeTimeout: 0s
+
+        machineConfigRef:
+          apiVersion: rke-machine-config.cattle.io/v1
+          kind: FsasConfig
+          name: {{ include "fsas-cluster-template.cpConfigName" . }}
+
+{{- if .Values.worker.enabled }}
+
+      - name: wk
+        quantity: {{ required "worker.quantity is required" .Values.worker.quantity }}
+
+        controlPlaneRole: false
+        etcdRole: false
+        workerRole: true
+
+{{- if .Values.worker.autoscalingEnabled }}
+        autoscalingMaxSize: {{ .Values.worker.autoscalingMaxSize }}
+        autoscalingMinSize: {{ .Values.worker.autoscalingMinSize }}
+{{- end }}
+
+        drainBeforeDelete: true
+        unhealthyNodeTimeout: 0s
+
+        machineConfigRef:
+          apiVersion: rke-machine-config.cattle.io/v1
+          kind: FsasConfig
+          name: {{ include "fsas-cluster-template.workerConfigName" . }}
+
+{{- end }}
+
+    machineSelectorConfig:
+      - config:
+          protect-kernel-defaults: false
+
+    networking: {}
+
+    registries: {}
+
+    upgradeStrategy:
+
+      controlPlaneConcurrency: "1"
+
+      controlPlaneDrainOptions:
+        deleteEmptyDirData: true
+        disableEviction: false
+        enabled: false
+        force: false
+        gracePeriod: -1
+        ignoreDaemonSets: true
+        skipWaitForDeleteTimeoutSeconds: 0
+        timeout: 120
+
+      workerConcurrency: "1"
+
+      workerDrainOptions:
+        deleteEmptyDirData: true
+        disableEviction: false
+        enabled: false
+        force: false
+        gracePeriod: -1
+        ignoreDaemonSets: true
+        skipWaitForDeleteTimeoutSeconds: 0
+        timeout: 120
