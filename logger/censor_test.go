@@ -55,6 +55,88 @@ func TestCensorTextWithRegex_DefaultPhrases(t *testing.T) {
 			input:    `response_body={"password":"secret\"still-secret"};`,
 			expected: `response_body={"password":[REDACTED]};`,
 		},
+		{name: "cloud config with RSA authorized key",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd user@example.com
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa [REDACTED]
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+		},
+		{name: "cloud config with modern authorized keys",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKey host-comment
+				- ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY=
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-ed25519 [REDACTED]
+				- ecdsa-sha2-nistp256 [REDACTED]
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+		},
+		{name: "cloud config with write files content",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd
+write_files:
+		- encoding: gzip+b64
+			content: H4sIAAAAAAAA/wAAAP//BMBdCsMgDADgqwxfR3DOLP7ADpPMZEgLLdr2/P2WU3TVA3j8n/Xh9rFdvemA3r42ecKv9er9C8kUcwZJ9gYMZiBFCFIMyLF8AhO5OwAA//8JvHBdSwAAAA==
+			permissions: "0644"
+			path: /etc/rancher/k3s/config.yaml.d/100-fsas-providerid.yaml
+		- encoding: gzip+b64
+			content: H4sIAAAAAAAA/wAAAP//SecondEncodedPayload==
+			permissions: "0644"
+			path: /etc/rancher/rke2/config.yaml.d/100-fsas-providerid.yaml
+runcmd:
+		- sh /usr/local/custom_script/install.sh
+		- rm /tmp/register-suse-modules.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa [REDACTED]
+write_files:
+		- encoding: gzip+b64
+			content: [REDACTED]
+			permissions: "0644"
+			path: /etc/rancher/k3s/config.yaml.d/100-fsas-providerid.yaml
+		- encoding: gzip+b64
+			content: [REDACTED]
+			permissions: "0644"
+			path: /etc/rancher/rke2/config.yaml.d/100-fsas-providerid.yaml
+runcmd:
+		- sh /usr/local/custom_script/install.sh
+		- rm /tmp/register-suse-modules.sh`,
+		},
 		{name: "SSH command with SLES subscription registration code - debug",
 			input:    "Running command via SSH:  command=sudo SUSEConnect -r XXXXXXXXXXXXXXXX -e user@example.com, host=192.168.122.126, user=rancher",
 			expected: "Running command via SSH:  command=sudo SUSEConnect -r [REDACTED] -e user@example.com, host=192.168.122.126, user=rancher",

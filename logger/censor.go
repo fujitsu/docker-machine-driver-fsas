@@ -42,6 +42,16 @@ var defaultForbiddenPhrases = []CensorRegexRedactor{
 		Prefix: "[Bearer",
 		Suffix: "]",
 	},
+	// Preserve YAML formatting and the OpenSSH key type while redacting the
+	// base64 key material and any trailing comment up to the end of the line.
+	{Regex: `(?m)(^|[ \t-])((?:ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp(?:256|384|521)|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)(?:-cert-v01@openssh\.com)?)[ \t]+[A-Za-z0-9+/]+={0,3}(?:[ \t]+[^\r\n]*)?`,
+		Prefix: `${1}${2} `,
+	},
+	// Preserve YAML indentation and the field name while redacting arbitrary
+	// single-line file content, including gzip+base64 write_files payloads.
+	{Regex: `(?m)^([ \t-]*content:[ \t]*).+$`,
+		Prefix: `${1}`,
+	},
 	// Match compact or formatted JSON fields. The value expression accepts escaped
 	// characters without stopping at an escaped quote.
 	{Regex: `(?i)"access_token"\s*:\s*"([^"\\]|\\.)*"`,
