@@ -1,6 +1,7 @@
 package keycloak
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 
 	httputils "github.com/fujitsu/docker-machine-driver-fsas/httputils/mock"
 	keycloakMock "github.com/fujitsu/docker-machine-driver-fsas/keycloak/mock"
+	fsaslogger "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 
 	"github.com/stretchr/testify/assert"
@@ -69,6 +71,54 @@ func TestNewKeycloakAuthService_MissingArgs(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNoneOfConstructorArgsCanBeEmpty)
 		assert.Nil(t, authService)
 	}
+}
+
+func TestNewKeycloakAuthService_MissingArgsRedactsPassword(t *testing.T) {
+	t.Setenv("FSAS_DEBUG", "true")
+	var output bytes.Buffer
+	restoreLogger := fsaslogger.SetLogger(&output)
+	t.Cleanup(restoreLogger)
+
+	const userPassword = "password-that-must-not-be-logged"
+	authService, err := NewKeycloak("", "user", userPassword, "uri", "endpoint")
+
+	assert.ErrorIs(t, err, ErrNoneOfConstructorArgsCanBeEmpty)
+	assert.Nil(t, authService)
+	assert.NotContains(t, output.String(), userPassword)
+	assert.Contains(t, output.String(), "userPassword=[REDACTED]")
+}
+
+func TestNewKeycloakAuthService_MissingClientIDRedactsSensitiveEnvironmentValues(t *testing.T) {
+	t.Setenv("FSAS_DEBUG", "true")
+	t.Setenv("CLIENT_ID", "") // Actually invokes the logAllEnvVars helper
+	t.Setenv("CLIENT_SECRET", "client-secret-that-must-not-be-logged")
+	t.Setenv("FSAS_SSH_PASSWORD", "ssh-password-that-must-not-be-logged")
+	t.Setenv("FSAS_CREDENTIALS_PASSWORD", "user-password-that-must-not-be-logged")
+	t.Setenv("NON_SENSITIVE_ENV_VAR", "ordinary-value-that-must-be-logged")
+
+	var output bytes.Buffer
+	restoreLogger := fsaslogger.SetLogger(&output)
+	t.Cleanup(restoreLogger)
+
+	authService, err := NewKeycloak("realm", "user", "password", "uri", "endpoint")
+
+	assert.ErrorContains(t, err, "CLIENT_ID")
+	assert.Nil(t, authService)
+	for _, envVarName := range []string{
+		"CLIENT_SECRET",
+		"FSAS_SSH_PASSWORD",
+		"FSAS_CREDENTIALS_PASSWORD",
+	} {
+		assert.Contains(t, output.String(), fmt.Sprintf("%s=[REDACTED]", envVarName))
+	}
+	for _, secret := range []string{
+		"client-secret-that-must-not-be-logged",
+		"ssh-password-that-must-not-be-logged",
+		"user-password-that-must-not-be-logged",
+	} {
+		assert.NotContains(t, output.String(), secret)
+	}
+	assert.Contains(t, output.String(), "NON_SENSITIVE_ENV_VAR=ordinary-value-that-must-be-logged")
 }
 
 func Test_getTokenFromResponse_Success(t *testing.T) {
@@ -157,12 +207,12 @@ func Test_refreshToken_Fail404(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil))) // Suppress slog output in test
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	authService := &KeycloakClient{
-		Realm:         "test-realm",
-		UserName:      "test-user",
-		UserPassword:  "test-password",
-		clientId:      mockClientId,
-		clientSecret:  mockClientSecret,
-		cdiClient:     mockClient,
+		Realm:        "test-realm",
+		UserName:     "test-user",
+		UserPassword: "test-password",
+		clientId:     mockClientId,
+		clientSecret: mockClientSecret,
+		cdiClient:    mockClient,
 	}
 
 	simulatedError := fmt.Errorf("request failed: %s", models.TestBearerTokenResponse)
@@ -189,12 +239,12 @@ func Test_getTokens_Success(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil))) // Suppress slog output in test
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	authService := &KeycloakClient{
-		Realm:         "test-realm",
-		UserName:      "test-user",
-		UserPassword:  "test-password",
-		clientId:      mockClientId,
-		clientSecret:  mockClientSecret,
-		cdiClient:     mockClient,
+		Realm:        "test-realm",
+		UserName:     "test-user",
+		UserPassword: "test-password",
+		clientId:     mockClientId,
+		clientSecret: mockClientSecret,
+		cdiClient:    mockClient,
 	}
 
 	expectedData := make(map[string]any)
@@ -227,12 +277,12 @@ func TestGetBearerToken_InvalidResponse(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil))) // Suppress slog output in test
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	authService := &KeycloakClient{
-		Realm:         "test-realm",
-		UserName:      "test-user",
-		UserPassword:  "test-password",
-		clientId:      mockClientId,
-		clientSecret:  mockClientSecret,
-		cdiClient:     mockClient,
+		Realm:        "test-realm",
+		UserName:     "test-user",
+		UserPassword: "test-password",
+		clientId:     mockClientId,
+		clientSecret: mockClientSecret,
+		cdiClient:    mockClient,
 	}
 
 	simulatedError := fmt.Errorf("request failed: %s", models.TestBearerTokenResponse)
@@ -258,12 +308,12 @@ func TestGetBearerToken_NoAccessToken(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil))) // Suppress slog output in test
 	mockClient := httputils.NewMockCdiHTTPClient(t)
 	authService := &KeycloakClient{
-		Realm:         "test-realm",
-		UserName:      "test-user",
-		UserPassword:  "test-password",
-		clientId:      mockClientId,
-		clientSecret:  mockClientSecret,
-		cdiClient:     mockClient,
+		Realm:        "test-realm",
+		UserName:     "test-user",
+		UserPassword: "test-password",
+		clientId:     mockClientId,
+		clientSecret: mockClientSecret,
+		cdiClient:    mockClient,
 	}
 
 	expectedData := make(map[string]any)
@@ -618,10 +668,10 @@ func TestGetRequestBodyWithToken(t *testing.T) {
 
 func TestGetRequestBodyForBearerToken(t *testing.T) {
 	authService := &KeycloakClient{
-		clientId:      "test-client-id",
-		clientSecret:  "test-client-secret",
-		UserName:      "test-username",
-		UserPassword:  "test-password",
+		clientId:     "test-client-id",
+		clientSecret: "test-client-secret",
+		UserName:     "test-username",
+		UserPassword: "test-password",
 	}
 	requestBody := authService.getRequestBodyForAccessToken()
 
