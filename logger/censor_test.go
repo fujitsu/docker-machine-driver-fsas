@@ -71,6 +71,26 @@ ssh_pwauth: false
 users:
 		- name: rancher
 			ssh_authorized_keys:
+				- ssh-rsa [REDACTED] user@example.com
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+		},
+		{name: "cloud config with RSA authorized key",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
 				- ssh-rsa [REDACTED]
 runcmd:
 		- sh /usr/local/custom_script/install.sh`,
@@ -92,10 +112,14 @@ ssh_pwauth: false
 users:
 		- name: rancher
 			ssh_authorized_keys:
-				- ssh-ed25519 [REDACTED]
+				- ssh-ed25519 [REDACTED] host-comment
 				- ecdsa-sha2-nistp256 [REDACTED]
 runcmd:
 		- sh /usr/local/custom_script/install.sh`,
+		},
+		{name: "structured log with SSH public key",
+			input:    "ssh public key: keyName=id_rsa.pub, keyValue=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd;",
+			expected: "ssh public key: keyName=id_rsa.pub, keyValue=ssh-rsa [REDACTED];",
 		},
 		{name: "cloud config with write files content",
 			input: `#cloud-config

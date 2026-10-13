@@ -42,9 +42,9 @@ var defaultForbiddenPhrases = []CensorRegexRedactor{
 		Prefix: "[Bearer",
 		Suffix: "]",
 	},
-	// Preserve YAML formatting and the OpenSSH key type while redacting the
-	// base64 key material and any trailing comment up to the end of the line.
-	{Regex: `(?m)(^|[ \t-])((?:ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp(?:256|384|521)|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)(?:-cert-v01@openssh\.com)?)[ \t]+[A-Za-z0-9+/]+={0,3}(?:[ \t]+[^\r\n]*)?`,
+	// Preserve delimiters and the OpenSSH key type while redacting only the
+	// base64 key material. This leaves YAML comments and subsequent log fields intact.
+	{Regex: `(?m)(^|[ \t=-])((?:ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp(?:256|384|521)|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)(?:-cert-v01@openssh\.com)?)[ \t]+[A-Za-z0-9+/]+={0,3}`,
 		Prefix: `${1}${2} `,
 	},
 	// Preserve YAML indentation and the field name while redacting arbitrary
