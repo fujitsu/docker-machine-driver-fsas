@@ -84,7 +84,7 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 		envVars := os.Environ()
 		slog.Debug("All environment variables")
 		for i, envVar := range envVars {
-			envVarKey := strings.SplitN(envVar, "=", 2)[0]
+			envVarKey, _, _ := strings.Cut(envVar, "=")
 			if strings.HasPrefix(envVarKey, "CLIENT_SECRET") || strings.HasPrefix(envVarKey, "FSAS_SSH_PASSWORD") || strings.HasPrefix(envVarKey, "FSAS_CREDENTIALS_PASSWORD") {
 				slog.Debug("env var", "i", i, "envVar", fmt.Sprintf("%s=[REDACTED]", envVarKey))
 			} else {
