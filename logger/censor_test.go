@@ -27,16 +27,146 @@ func TestCensorTextWithRegex_DefaultPhrases(t *testing.T) {
 			input:    "Initiating POST request: ; endpoint=/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token, payload=client_id=cdi&client_secret=SensitiveInfo&grant_type=password&password=foobar&response=id_token+token&scope=openid&username=jdoe&token=eyJh-LMMw",
 			expected: "Initiating POST request: ; endpoint=/realms/12345678-1234-1234-1234-123456789012/protocol/openid-connect/token, payload=client_id=cdi&client_secret=[REDACTED]&grant_type=password&password=[REDACTED]&response=id_token+token&scope=openid&username=jdoe&token=[REDACTED]",
 		},
+		{name: "refresh token form payload",
+			input:    "Initiating POST request: endpoint=/token, payload=client_id=cdi&client_secret=SensitiveInfo&grant_type=refresh_token&refresh_token=eyJh-LMMw",
+			expected: "Initiating POST request: endpoint=/token, payload=client_id=cdi&client_secret=[REDACTED]&grant_type=refresh_token&refresh_token=[REDACTED]",
+		},
+		{name: "access and ID token form parameters",
+			input:    "access_token=access-secret&id_token=id-secret&scope=openid",
+			expected: "access_token=[REDACTED]&id_token=[REDACTED]&scope=openid",
+		},
+		{name: "access token as first payload parameter",
+			input:    "Initiating POST request: endpoint=/token, payload=access_token=access-secret&id_token=id-secret&scope=openid",
+			expected: "Initiating POST request: endpoint=/token, payload=access_token=[REDACTED]&id_token=[REDACTED]&scope=openid",
+		},
+		{name: "access token query parameter",
+			input:    "https://example.test/callback?access_token=access-secret&state=expected",
+			expected: "https://example.test/callback?access_token=[REDACTED]&state=expected",
+		},
 		{name: "simplified real-life http response with default phrases",
 			input:    `response_body={"access_token":"eyJhn0.eyJQ.W418g","expires_in":1750,"refresh_expires_in":7200,"refresh_token":"eyJhbGcX43A","token_type":"Bearer","id_token":"eyJhbGciOi36vyHeg","not-before-policy":0,"session_state":"d8321164-bd12-4606-922e-f170f2b2088d","scope":"openid pgcdi_privileges email profile"};`,
 			expected: `response_body={"access_token":[REDACTED],"expires_in":1750,"refresh_expires_in":7200,"refresh_token":[REDACTED],"token_type":"Bearer","id_token":[REDACTED],"not-before-policy":0,"session_state":"d8321164-bd12-4606-922e-f170f2b2088d","scope":"openid pgcdi_privileges email profile"};`,
 		},
+		{name: "formatted JSON response with sensitive fields",
+			input:    `response_body={ "access_token" : "access", "refresh_token" : "refresh", "id_token" : "id", "password" : "pass", "client_secret" : "secret" };`,
+			expected: `response_body={ "access_token":[REDACTED], "refresh_token":[REDACTED], "id_token":[REDACTED], "password":[REDACTED], "client_secret":[REDACTED] };`,
+		},
+		{name: "JSON response with escaped sensitive value",
+			input:    `response_body={"password":"secret\"still-secret"};`,
+			expected: `response_body={"password":[REDACTED]};`,
+		},
+		{name: "cloud config with RSA authorized key",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd user@example.com
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa [REDACTED] user@example.com
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+		},
+		{name: "cloud config with RSA authorized key",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa [REDACTED]
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+		},
+		{name: "cloud config with modern authorized keys",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKey host-comment
+				- ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY=
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-ed25519 [REDACTED] host-comment
+				- ecdsa-sha2-nistp256 [REDACTED]
+runcmd:
+		- sh /usr/local/custom_script/install.sh`,
+		},
+		{name: "structured log with SSH public key",
+			input:    "ssh public key: keyName=id_rsa.pub, keyValue=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd;",
+			expected: "ssh public key: keyName=id_rsa.pub, keyValue=ssh-rsa [REDACTED];",
+		},
+		{name: "cloud config with write files content",
+			input: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSN2gEt9vvQ66lzJYTPmYnIdi/+OfEycrqd
+write_files:
+		- encoding: gzip+b64
+			content: H4sIAAAAAAAA/wAAAP//BMBdCsMgDADgqwxfR3DOLP7ADpPMZEgLLdr2/P2WU3TVA3j8n/Xh9rFdvemA3r42ecKv9er9C8kUcwZJ9gYMZiBFCFIMyLF8AhO5OwAA//8JvHBdSwAAAA==
+			permissions: "0644"
+			path: /etc/rancher/k3s/config.yaml.d/100-fsas-providerid.yaml
+		- encoding: gzip+b64
+			content: H4sIAAAAAAAA/wAAAP//SecondEncodedPayload==
+			permissions: "0644"
+			path: /etc/rancher/rke2/config.yaml.d/100-fsas-providerid.yaml
+runcmd:
+		- sh /usr/local/custom_script/install.sh
+		- rm /tmp/register-suse-modules.sh`,
+			expected: `#cloud-config
+hostname: test-node
+ssh_pwauth: false
+users:
+		- name: rancher
+			ssh_authorized_keys:
+				- ssh-rsa [REDACTED]
+write_files:
+		- encoding: gzip+b64
+			content: [REDACTED]
+			permissions: "0644"
+			path: /etc/rancher/k3s/config.yaml.d/100-fsas-providerid.yaml
+		- encoding: gzip+b64
+			content: [REDACTED]
+			permissions: "0644"
+			path: /etc/rancher/rke2/config.yaml.d/100-fsas-providerid.yaml
+runcmd:
+		- sh /usr/local/custom_script/install.sh
+		- rm /tmp/register-suse-modules.sh`,
+		},
 		{name: "SSH command with SLES subscription registration code - debug",
-			input: "Running command via SSH:  command=sudo SUSEConnect -r XXXXXXXXXXXXXXXX -e user@example.com, host=192.168.122.126, user=rancher",
+			input:    "Running command via SSH:  command=sudo SUSEConnect -r XXXXXXXXXXXXXXXX -e user@example.com, host=192.168.122.126, user=rancher",
 			expected: "Running command via SSH:  command=sudo SUSEConnect -r [REDACTED] -e user@example.com, host=192.168.122.126, user=rancher",
 		},
 		{name: "SSH command with SLES subscription registration code - error",
-			input: "Error running command: command=sudo SUSEConnect -r XXXXXXXXXXXXXXXX -e user@example.com, output=sudo: SUSEConnect: command not found",
+			input:    "Error running command: command=sudo SUSEConnect -r XXXXXXXXXXXXXXXX -e user@example.com, output=sudo: SUSEConnect: command not found",
 			expected: "Error running command: command=sudo SUSEConnect -r [REDACTED] -e user@example.com, output=sudo: SUSEConnect: command not found",
 		},
 	}

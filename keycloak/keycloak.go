@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	masterRealm = "master"
+	masterRealm      = "master"
 	accessTokenType  = "access_token"
 	refreshTokenType = "refresh_token"
 )
@@ -54,13 +54,13 @@ type Keycloak interface {
 }
 
 type KeycloakClient struct {
-	Realm         string
-	UserName      string
-	UserPassword  string
-	clientId      string
-	clientSecret  string
-	AccessToken   string
-	RefreshToken  string
+	Realm        string
+	UserName     string
+	UserPassword string
+	clientId     string
+	clientSecret string
+	AccessToken  string
+	RefreshToken string
 
 	userRoles    []string
 	userClusters []string
@@ -75,7 +75,7 @@ var _ Keycloak = (*KeycloakClient)(nil)
 func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*KeycloakClient, error) {
 	if realm == "" || userName == "" || userPassword == "" || baseURI == "" || endpoint == "" {
 		slog.Debug("Keycloak constructor", "realm", realm, "userName", userName,
-			"userPassword", userPassword, "baseURI", baseURI, "endpoint", endpoint)
+			"userPassword", "[REDACTED]", "baseURI", baseURI, "endpoint", endpoint)
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
 	}
@@ -84,17 +84,18 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 		envVars := os.Environ()
 		slog.Debug("All environment variables")
 		for i, envVar := range envVars {
-			if strings.HasPrefix(envVar, "CLIENT_SECRET") {
-				slog.Debug("env var", "i", i, "envVar", "CLIENT_SECRET=<hidden-for-security-reasons>")
-				continue
+			envVarKey, _, _ := strings.Cut(envVar, "=")
+			if strings.HasPrefix(envVarKey, "CLIENT_SECRET") || strings.HasPrefix(envVarKey, "FSAS_SSH_PASSWORD") || strings.HasPrefix(envVarKey, "FSAS_CREDENTIALS_PASSWORD") {
+				slog.Debug("env var", "i", i, "envVar", fmt.Sprintf("%s=[REDACTED]", envVarKey))
+			} else {
+				slog.Debug("env var", "i", i, "envVar", envVar)
 			}
-			slog.Debug("env var", "i", i, "envVar", envVar)
 		}
 	}
 
 	const (
-		envVarForClientId      = "CLIENT_ID"
-		envVarForClientSecret  = "CLIENT_SECRET"
+		envVarForClientId     = "CLIENT_ID"
+		envVarForClientSecret = "CLIENT_SECRET"
 	)
 
 	clientId := os.Getenv(envVarForClientId)
@@ -113,14 +114,14 @@ func NewKeycloak(realm, userName, userPassword, baseURI, endpoint string) (*Keyc
 	isInit = true
 
 	return &KeycloakClient{
-		Realm:         realm,
-		UserName:      userName,
-		UserPassword:  userPassword,
-		clientId:      clientId,
-		clientSecret:  clientSecret,
-		AccessToken:   "",
-		RefreshToken:  "",
-		cdiClient:     httputils.NewStandardCdiHTTPClient(serverURI),
+		Realm:        realm,
+		UserName:     userName,
+		UserPassword: userPassword,
+		clientId:     clientId,
+		clientSecret: clientSecret,
+		AccessToken:  "",
+		RefreshToken: "",
+		cdiClient:    httputils.NewStandardCdiHTTPClient(serverURI),
 	}, nil
 }
 

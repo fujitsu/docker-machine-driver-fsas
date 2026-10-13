@@ -24,6 +24,17 @@ var defaultForbiddenPhrases = []CensorRegexRedactor{
 		Prefix: "secret=",
 		Suffix: "&",
 	},
+	// Match tokens in query strings and form payloads. Capture group 1 preserves
+	// the leading delimiter while the value stops before the next field or log delimiter.
+	{Regex: `(?i)(^|[?&]|payload=)access_token=[^&\s,;]*`,
+		Prefix: `${1}access_token=`,
+	},
+	{Regex: `(?i)(^|[?&]|payload=)refresh_token=[^&\s,;]*`,
+		Prefix: `${1}refresh_token=`,
+	},
+	{Regex: `(?i)(^|[?&]|payload=)id_token=[^&\s,;]*`,
+		Prefix: `${1}id_token=`,
+	},
 	{Regex: "(?i)&token=.*",
 		Prefix: "&token=",
 	},
@@ -31,14 +42,32 @@ var defaultForbiddenPhrases = []CensorRegexRedactor{
 		Prefix: "[Bearer",
 		Suffix: "]",
 	},
-	{Regex: `(?i)"access_token":".*?"`,
+	// Preserve delimiters and the OpenSSH key type while redacting only the
+	// base64 key material. This leaves YAML comments and subsequent log fields intact.
+	{Regex: `(?m)(^|[ \t=-])((?:ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp(?:256|384|521)|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)(?:-cert-v01@openssh\.com)?)[ \t]+[A-Za-z0-9+/]+={0,3}`,
+		Prefix: `${1}${2} `,
+	},
+	// Preserve YAML indentation and the field name while redacting arbitrary
+	// single-line file content, including gzip+base64 write_files payloads.
+	{Regex: `(?m)^([ \t-]*content:[ \t]*).+$`,
+		Prefix: `${1}`,
+	},
+	// Match compact or formatted JSON fields. The value expression accepts escaped
+	// characters without stopping at an escaped quote.
+	{Regex: `(?i)"access_token"\s*:\s*"([^"\\]|\\.)*"`,
 		Prefix: `"access_token":`,
 	},
-	{Regex: `(?i)"refresh_token":".*?"`,
+	{Regex: `(?i)"refresh_token"\s*:\s*"([^"\\]|\\.)*"`,
 		Prefix: `"refresh_token":`,
 	},
-	{Regex: `(?i)"id_token":".*?"`,
+	{Regex: `(?i)"id_token"\s*:\s*"([^"\\]|\\.)*"`,
 		Prefix: `"id_token":`,
+	},
+	{Regex: `(?i)"password"\s*:\s*"([^"\\]|\\.)*"`,
+		Prefix: `"password":`,
+	},
+	{Regex: `(?i)"client_secret"\s*:\s*"([^"\\]|\\.)*"`,
+		Prefix: `"client_secret":`,
 	},
 	{Regex: "(?i)SUSEConnect -r.*?-e", Prefix: "SUSEConnect -r ", Suffix: " -e"},
 }
