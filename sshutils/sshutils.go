@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,13 +28,14 @@ const (
 	cmdGetStatusOS                          = "sudo -E SUSEConnect -s"
 	cmdDeregisterOS                         = "sudo -E SUSEConnect -d"
 	remoteScriptDir                         = "/tmp/fsas-nodedriver"
-	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 30 * time.Second
+	SSH_CONNECT_ATTEMPT_DELAY time.Duration = 10 * time.Second
 )
 
 var (
 	ErrNoneOfConstructorArgsCanBeEmpty = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'sshKeyPath', 'hostPublicKey'")
 	isReady                            = false
 	IsPublicKeyValid                   = false
+	SSHDial                            = gossh.Dial
 )
 
 // SSHKeyParser defines the interface for parsing an SSH key from a path.
@@ -86,8 +88,7 @@ type SshManager interface {
 type StandardSshManager struct {
 	HostName      string
 	UserName      string
-	SshPassword   string
-	SshKeyPath    string
+	SshKeyPaths   []string
 	Client        ssh.Client
 	HostPublicKey gossh.PublicKey
 	keyParser     SSHKeyParser
@@ -127,10 +128,10 @@ func ParseSSHPublicKey(key string) (gossh.PublicKey, error) {
 
 // NewStandardSshManager Returns new instance of Standard SSH Manager and error.
 // The hostPublicKey parameter must be a pre-parsed gossh.PublicKey (use ParseSSHPublicKey to obtain one).
-func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
+func NewStandardSshManager(hostName, userName string, sshKeyPaths []string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
 	slog.Debug("Standard SSH Manager constructor", "host", hostName, "user", userName)
 
-	if hostName == "" || userName == "" || sshPassword == "" || sshKeyPath == "" || hostPublicKey == nil {
+	if hostName == "" || userName == "" || len(sshKeyPaths) == 0 || hostPublicKey == nil {
 
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
@@ -139,10 +140,9 @@ func NewStandardSshManager(hostName, userName, sshPassword, sshKeyPath string, h
 	return &StandardSshManager{
 		HostName:      hostName,
 		UserName:      userName,
-		SshPassword:   sshPassword,
 		Client:        &ssh.NativeClient{},
 		HostPublicKey: hostPublicKey,
-		SshKeyPath:    sshKeyPath,
+		SshKeyPaths:   sshKeyPaths,
 		keyParser:     NewFileSSHKeyParser(),
 	}, nil
 }
@@ -151,7 +151,7 @@ func (sc *StandardSshManager) String() string {
 	return "{" +
 		fmt.Sprintf("HostName: %s, ", sc.HostName) +
 		fmt.Sprintf("UserName: %s, ", sc.UserName) +
-		fmt.Sprintf("SshKeyPath: %s", sc.SshKeyPath) +
+		fmt.Sprintf("SshKeyPath: %s", sc.SshKeyPaths) +
 		"}"
 }
 
@@ -164,12 +164,19 @@ func (sc *StandardSshManager) IsReady() bool {
 }
 
 func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
-	authMethods := []gossh.AuthMethod{
-		gossh.Password(sc.SshPassword),
+
+	authMethods := []gossh.AuthMethod{}
+
+	for _, sshKeyPath := range sc.SshKeyPaths {
+		if sshPrivateKey := sc.keyParser.Parse(sshKeyPath); sshPrivateKey != nil {
+			authMethods = append(authMethods, gossh.PublicKeys(sshPrivateKey))
+			slog.Debug("Added SSH private key to auth methods",
+				"keyPath", sshKeyPath,
+				"pubkey", string(gossh.MarshalAuthorizedKey(sshPrivateKey.PublicKey())))
+		}
 	}
-	if sshPrivateKey := sc.keyParser.Parse(sc.SshKeyPath); sshPrivateKey != nil {
-		authMethods = append(authMethods, gossh.PublicKeys(sshPrivateKey))
-	}
+
+	slog.Debug("host public key", "hostPublicKey", string(gossh.MarshalAuthorizedKey(sc.HostPublicKey)))
 
 	config := &gossh.ClientConfig{
 		User:              sc.UserName,
@@ -181,41 +188,68 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 }
 
 // HostPublicKeyIsValid checks if the remote host's public key complies with the given one passed as param.
+/*
+	Do not assign:
+		HostKeyCallback:   gossh.FixedHostKey(sc.HostPublicKey)
+	because gossh.Dial performs the full flow:
+	1. connect TCP
+	2. receive server host key
+	3. call HostKeyCallback
+	4. if callback returned nil, continue
+	5. try authentication
+	6. if authentication fails, return that auth error from gossh.Dial
+
+	and in this method we do not deliver any authentication methods.
+	We just want to verify keys. Nothing else.
+*/
 func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
-
-	if IsPublicKeyValid {
-		return nil
-	}
-
+	slog.Info("try to verify SSH host key", "host", sc.HostName)
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
 
-	config := sc.getSshClientConfig()
+	var hostKeyVerified bool
+	var hostKeyErr error
+
+	config := &gossh.ClientConfig{
+		User: sc.UserName,
+		HostKeyCallback: func(hostname string, remote net.Addr, key gossh.PublicKey) error {
+			if !bytes.Equal(key.Marshal(), sc.HostPublicKey.Marshal()) {
+				slog.Error("ssh host key verification error",
+					"host-key", key.Marshal(), "reference-key", sc.HostPublicKey.Marshal())
+				hostKeyErr = fmt.Errorf("host key mismatch")
+				return hostKeyErr
+			}
+			hostKeyVerified = true
+			IsPublicKeyValid = true
+			return nil
+		},
+		HostKeyAlgorithms: []string{sc.HostPublicKey.Type()},
+	}
+
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
 
 	for currentAttempt := 1; ; currentAttempt++ {
-		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt)
-		client, err := gossh.Dial("tcp", address, config)
+		client, err := SSHDial("tcp", address, config)
+		if client != nil {
+			client.Close()
+		}
 
-		if err == nil {
-			defer client.Close()
-			slog.Info("Host public key verification succeeded")
-			IsPublicKeyValid = true
-			isReady = true
+		if hostKeyErr != nil {
+			return hostKeyErr
+		}
+
+		if hostKeyVerified {
+			slog.Info("ssh host key successfully verified", "host", sc.HostName)
 			return nil
 		}
 
 		if currentAttempt >= maxAttempts {
-			return fmt.Errorf("failed to dial SSH server: %w", err)
+			return fmt.Errorf("failed to verify SSH host key: %w", err)
 		}
 
-		if strings.Contains(err.Error(), "connection refused") {
-			slog.Warn("Connection refused, waiting before next attempt", "delay", SSH_CONNECT_ATTEMPT_DELAY)
-			time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
-		} else {
-			slog.Warn("Failed to dial SSH server", "err", err)
-		}
+		slog.Debug("Sleep and retry next SSH host key verification", "currentAttempt", currentAttempt)
+		time.Sleep(SSH_CONNECT_ATTEMPT_DELAY)
 	}
 }
 
@@ -223,11 +257,8 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 func (sc *StandardSshManager) initNativeClient() error {
 	if _, ok := sc.Client.(*ssh.NativeClient); ok {
 
-		slog.Debug("Authenticating using password and SSH key", "path", sc.SshKeyPath)
-		auth := &ssh.Auth{
-			Passwords: []string{sc.SshPassword},
-			Keys:      []string{sc.SshKeyPath},
-		}
+		slog.Debug("Authenticating using SSH key", "path", sc.SshKeyPaths)
+		auth := &ssh.Auth{Keys: sc.SshKeyPaths}
 
 		nativeClient, err := ssh.NewNativeClient(sc.UserName, sc.HostName, port, auth)
 		if err != nil {
