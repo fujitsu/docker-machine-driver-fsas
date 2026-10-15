@@ -1,0 +1,70 @@
+cluster:
+  name: t3606
+  namespace: fleet-default
+
+  cloudCredentialSecretName: cattle-global-data:<cc-id>
+  kubernetesVersion: v1.35.6+rke2r1
+
+  localClusterAuthEndpoint: {}
+
+rkeConfig:
+  cni: calico
+  ingressController: traefik
+  disableKubeProxy: false
+  etcdExposeMetrics: false
+
+  etcd:
+    snapshotRetention: 5
+    snapshotScheduleCron: "0 */5 * * *"
+
+  machineGlobalConfig:
+    etcdArgs: []
+
+controlPlane:
+  enabled: true
+  quantity: 1
+  # Set to true for a single-node cluster
+  workerRole: false
+
+worker:
+  enabled: true
+  quantity: 2
+
+  autoscalingEnabled: false
+  autoscalingMinSize: 1
+  autoscalingMaxSize: 3
+
+fsas:
+  controlPlane:
+    networkBaremetalUuid: ""
+    networkProvisionUuid: <netp-id>
+    networkProvisionDefaultGw: <netp-gw>
+    enableBaremetalBonding: "false"
+    osImageName: <os-image-name>
+    sshUser: <ssh-user>
+    sshPassword: <ssh-pwd>
+    imageOsSshHostPubKey: <image-ssh-pub-key>
+    userdata:
+
+    computeConditionsJson: >
+      <comp-cond-1-json>
+
+    devicesSpecJson: >
+      <dev-spec-1-json>
+
+  worker:
+    networkBaremetalUuid: ""
+    networkProvisionUuid: <netp-id>
+    networkProvisionDefaultGw: <netp-gw>
+    enableBaremetalBonding: "false"
+    osImageName: <os-image-name>
+    imageOsSshHostPubKey: <image-ssh-pub-key>
+    sshUser: <ssh-user>
+    sshPassword: <ssh-pwd>
+    userdata:
+
+    computeConditionsJson: >
+      <comp-cond-1-json>
+
+    devicesSpecJson: >
+      <dev-spec-1-json>
