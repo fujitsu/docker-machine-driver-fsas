@@ -36,7 +36,7 @@ fsas:
     networkBaremetalUuid: <netb-id>
     networkProvisionUuid: <netp-id>
     networkProvisionDefaultGw: <netp-gw>
-    enableBaremetalBonding: false
+    enableBaremetalBonding: "false"
     osImageName: <os-image-name>
     sshUser: <ssh-user>
     sshPassword: <ssh-pwd>
@@ -44,10 +44,10 @@ fsas:
     userdata:
 
     computeConditionsJson: >
-      <comp-cond-1-json>
+      <comp-cond-json>
 
     devicesSpecJson: >
-      <dev-spec-1-json>
+      <dev-spec-json>
 
   worker:
     networkBaremetalUuid:

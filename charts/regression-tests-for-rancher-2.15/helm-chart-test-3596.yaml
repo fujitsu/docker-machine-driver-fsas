@@ -44,10 +44,10 @@ fsas:
     userdata:
 
     computeConditionsJson: >
-      <comp-cond-1-json>
+      <comp-cond-json>
 
     devicesSpecJson: >
-      <dev-spec-1-json>
+      <dev-spec-json>
 
   worker:
     networkBaremetalUuid:
