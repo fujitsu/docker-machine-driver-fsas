@@ -1,0 +1,63 @@
+cluster:
+  name: t3698
+  namespace: fleet-default
+
+  cloudCredentialSecretName: cattle-global-data:<cc-id>
+  kubernetesVersion: v1.35.6+rke2r1
+
+  localClusterAuthEndpoint: {}
+
+rkeConfig:
+  cni: calico
+  ingressController: traefik
+  disableKubeProxy: false
+  etcdExposeMetrics: false
+
+  etcd:
+    snapshotRetention: 5
+    snapshotScheduleCron: "0 */5 * * *"
+
+controlPlane:
+  enabled: true
+  quantity: 1
+  # Set to true for a single-node cluster
+  workerRole: true
+
+worker:
+  enabled: false
+  quantity: 1
+
+  autoscalingEnabled: false
+  autoscalingMinSize: 1
+  autoscalingMaxSize: 3
+
+fsas:
+  controlPlane:
+    networkBaremetalUuid: <netb-id>
+    networkProvisionUuid: <netp-id>
+    networkProvisionDefaultGw: <netp-gw>
+    enableBaremetalBonding: "true"
+    osImageName: <os-image-name>
+    sshUser: <ssh-user>
+    sshPassword: <ssh-pwd>
+    imageOsSshHostPubKey: <image-ssh-pub-key>
+    userdata:
+
+    computeConditionsJson: >
+      <comp-cond-json>
+
+    devicesSpecJson: >
+      <dev-spec-json-2-comp-nic-prov-bare>
+
+  worker:
+    networkBaremetalUuid:
+    networkProvisionUuid:
+    networkProvisionDefaultGw:
+    enableBaremetalBonding:
+    osImageName:
+    imageOsSshHostPubKey:
+    sshUser:
+    sshPassword:
+    userdata:
+    computeConditionsJson:
+    devicesSpecJson:

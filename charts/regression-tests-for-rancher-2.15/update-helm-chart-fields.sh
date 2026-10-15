@@ -21,6 +21,8 @@ declare -A pairs=(
     ['<dev-spec-json-1-comp-nic-prov>']='dev-spec-1-comp-nic-234'
     ['<dev-spec-json-1-comp-nic-bare>']='dev-spec-1-comp-nic-235'
     ['<dev-spec-json-1-comp-nic-3rd-sub>']='dev-spec-1-comp-nic-236'
+    ['<dev-spec-json-2-comp-nic-prov-bare>']='dev-spec-2-comp-nic-prov-bare-345'
+    ['<dev-spec-json-2-comp-nic-3rd-sub>']='dev-spec-2-comp-nic-3rd-sub-456'
 
 )
 
