@@ -214,7 +214,6 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 		maxAttempts = 1
 	}
 
-	var hostKeyVerified bool
 	var hostKeyErr error
 
 	config := &gossh.ClientConfig{
@@ -226,7 +225,6 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 				hostKeyErr = fmt.Errorf("host key mismatch")
 				return hostKeyErr
 			}
-			hostKeyVerified = true
 			IsPublicKeyValid = true
 			return nil
 		},
@@ -246,8 +244,8 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 			return hostKeyErr
 		}
 
-		if hostKeyVerified {
-			slog.Info("ssh host key successfully verified", "host", sc.HostName)
+		if IsPublicKeyValid {
+			slog.Info("SSH host key successfully verified", "host", sc.HostName)
 			return nil
 		}
 
