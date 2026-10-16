@@ -73,29 +73,11 @@ type Driver struct {
 // NewDriver creates and returns a new instance of the FSAS CDI driver
 func NewDriver() *Driver {
 	return &Driver{
-		BaseDriver:                &drivers.BaseDriver{},
-		TenantUuid:                "",
-		Username:                  "",
-		Password:                  "",
-		ApiUrl:                    "",
-		NtpUrl:                    "",
-		DnsIp:                     "",
-		ComputeConditionsJson:     "",
-		DevicesSpecJson:           "",
-		EnableBaremetalBonding:    false,
-		NetworkBaremetalUUID:      "",
-		NetworkProvisionUUID:      "",
-		NetworkProvisionDefaultGW: "",
-		PrivateIPAddress:          "",
-		OsImageName:               "",
-		MachineUUID:               "",
-		UserDataFile:              "",
-		SlesRegistrationCode:      "",
-		SlesRegistrationEmail:     "",
-		FabricManager:             &fm.FabricManagerClient{},
-		Keycloak:                  &keycloak.KeycloakClient{},
-		SshManager:                &sshutils.StandardSshManager{},
-		CfgManager:                &cfgutils.StandardCfgManager{},
+		BaseDriver:    &drivers.BaseDriver{},
+		FabricManager: &fm.FabricManagerClient{},
+		Keycloak:      &keycloak.KeycloakClient{},
+		SshManager:    &sshutils.StandardSshManager{},
+		CfgManager:    &cfgutils.StandardCfgManager{},
 	}
 }
 
@@ -464,8 +446,7 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 		// (e.g. during Remove, Start, Stop) because it is not serializable.
 		// In that case, re-parse from the raw string.
 		if d.OsImageSshHostParsedKey == nil && d.OsImageSshHostPubKey != "" {
-			slog.Debug("Condition true: d.OsImageSshHostParsedKey == nil && d.OsImageSshHostPubKey != ''",
-				"parsedKey", d.OsImageSshHostParsedKey, "rawKey", d.OsImageSshHostPubKey)
+
 			parsedKey, err := sshutils.ParseSSHPublicKey(d.OsImageSshHostPubKey)
 			if err != nil {
 				slog.Error("Could not parse SSH host public key", "err", err)

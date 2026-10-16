@@ -131,7 +131,7 @@ func ParseSSHPublicKey(key string) (gossh.PublicKey, error) {
 func NewStandardSshManager(hostName, userName string, sshKeyPaths []string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
 	slog.Debug("Standard SSH Manager constructor", "host", hostName, "user", userName)
 
-	if hostName == "" || userName == "" || len(sshKeyPaths) == 0 || hostPublicKey == nil {
+	if hostName == "" || userName == "" || len(sshKeyPaths) != 2 || hostPublicKey == nil {
 
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
@@ -203,7 +203,13 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 	We just want to verify keys. Nothing else.
 */
 func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
-	slog.Info("try to verify SSH host key", "host", sc.HostName)
+	slog.Info("Verifying SSH host key", "host", sc.HostName)
+
+	if IsPublicKeyValid {
+		slog.Info("SSH host key already verified", "host", sc.HostName)
+		return nil
+	}
+
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
@@ -215,7 +221,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 		User: sc.UserName,
 		HostKeyCallback: func(hostname string, remote net.Addr, key gossh.PublicKey) error {
 			if !bytes.Equal(key.Marshal(), sc.HostPublicKey.Marshal()) {
-				slog.Error("ssh host key verification error",
+				slog.Error("SSH host key verification error",
 					"host-key", key.Marshal(), "reference-key", sc.HostPublicKey.Marshal())
 				hostKeyErr = fmt.Errorf("host key mismatch")
 				return hostKeyErr
@@ -230,6 +236,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 	address := fmt.Sprintf("%s:%d", sc.HostName, port)
 
 	for currentAttempt := 1; ; currentAttempt++ {
+		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt, "host", sc.HostName)
 		client, err := SSHDial("tcp", address, config)
 		if client != nil {
 			client.Close()
@@ -246,6 +253,12 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 		if currentAttempt >= maxAttempts {
 			return fmt.Errorf("failed to verify SSH host key: %w", err)
+		}
+
+		if strings.Contains(err.Error(), "connection refused") {
+			slog.Warn("Connection refused, waiting before next attempt")
+		} else {
+			slog.Warn("Failed to dial SSH server", "err", err)
 		}
 
 		slog.Debug("Sleep and retry next SSH host key verification", "currentAttempt", currentAttempt)
