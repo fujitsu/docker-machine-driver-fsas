@@ -927,13 +927,13 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 		assert.Equal(t, "192.168.1.10:22", addr)
 		assert.Equal(t, "rancher", config.User)
 		err := config.HostKeyCallback("192.168.1.10", nil, mismatchedKey)
-		require.EqualError(t, err, "host key mismatch")
-		return nil, fmt.Errorf("dial aborted after host key mismatch")
+		require.EqualError(t, err, "mismatch between received host key and reference host key")
+		return nil, fmt.Errorf("mismatch between received host key and reference host key")
 	})
 
 	err = driver.initSshManager(3)
 	assert.Error(t, err)
-	assert.EqualError(t, err, "host key mismatch")
+	assert.EqualError(t, err, "mismatch between received host key and reference host key")
 	// SshManager must NOT be replaced when HostPublicKeyIsValid fails, so that
 	// subsequent callers (e.g. Remove) correctly see IsReady()==false and skip SSH.
 	assert.Same(t, mockSSH, driver.SshManager)
