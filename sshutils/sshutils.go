@@ -234,7 +234,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 		maxAttempts = 1
 	}
 
-	var hostKeyErr error
+	const hostKeyMismatchErrStr = "mismatch between received host key and reference host key"
 
 	config := &gossh.ClientConfig{
 		User: sc.UserName,
@@ -242,8 +242,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 			if !bytes.Equal(key.Marshal(), sc.HostPublicKey.Marshal()) {
 				slog.Error("SSH host key verification error",
 					"host-key", key.Marshal(), "reference-key", sc.HostPublicKey.Marshal())
-				hostKeyErr = fmt.Errorf("host key mismatch")
-				return hostKeyErr
+				return fmt.Errorf(hostKeyMismatchErrStr)
 			}
 			IsPublicKeyValid = true
 			return nil
@@ -260,23 +259,23 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 			client.Close()
 		}
 
-		if hostKeyErr != nil {
-			return hostKeyErr
-		}
-
 		if IsPublicKeyValid {
 			slog.Info("SSH host key successfully verified", "host", sc.HostName)
 			return nil
 		}
 
 		if currentAttempt >= maxAttempts {
-			return fmt.Errorf("failed to verify SSH host key: %w", err)
+			return fmt.Errorf("failed to verify SSH host key. Max attempts exceeded: %w", err)
 		}
 
-		if strings.Contains(err.Error(), "connection refused") {
+		switch {
+		case strings.Contains(err.Error(), hostKeyMismatchErrStr):
+			slog.Error("SSH host key mismatch", "host", sc.HostName, "err", err)
+			return err
+		case strings.Contains(err.Error(), "connection refused"):
 			slog.Warn("Connection refused, waiting before next attempt")
-		} else {
-			slog.Warn("Failed to dial SSH server", "err", err)
+		default:
+			slog.Warn("Failed to dial SSH server", "host", sc.HostName, "err", err)
 		}
 
 		slog.Debug("Sleep and retry next SSH host key verification", "currentAttempt", currentAttempt)
