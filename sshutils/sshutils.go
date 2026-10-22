@@ -229,11 +229,14 @@ func (sc *StandardSshManager) initNativeClient() error {
 			Keys:      []string{sc.SshKeyPath},
 		}
 
-		nativeClient, err := ssh.NewNativeClient(sc.UserName, sc.HostName, port, auth)
+		client, err := ssh.NewNativeClient(sc.UserName, sc.HostName, port, auth)
 		if err != nil {
 			slog.Error("Error creating SSH client", "err", err)
 			return err
 		}
+		nativeClient := client.(*ssh.NativeClient)
+		nativeClient.Config.HostKeyCallback = gossh.FixedHostKey(sc.HostPublicKey)
+		nativeClient.Config.HostKeyAlgorithms = []string{sc.HostPublicKey.Type()}
 		slog.Info("SSH native client successfully initialized", "host", sc.HostName, "user", sc.UserName)
 		sc.Client = nativeClient
 	}
