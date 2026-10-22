@@ -3,6 +3,7 @@ updates:
   # Go modules
   - package-ecosystem: "gomod"
     directory: "/"
+    target-branch: "development"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -10,6 +11,7 @@ updates:
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "development"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
