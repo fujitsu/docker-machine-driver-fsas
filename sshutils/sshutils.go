@@ -32,10 +32,10 @@ const (
 )
 
 var (
-	ErrNoneOfConstructorArgsCanBeEmpty            = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'sshKeyPath', 'hostPublicKey'")
-	isReady                                       = false
-	IsPublicKeyValid                              = false
-	SSHDial                            ISSHDialer = sshDialer{}
+	ErrNoneOfConstructorArgsCanBeEmpty = errors.New("none of the arguments can be empty; neither 'hostName', 'userName', 'sshPassword', 'sshKeyPath', 'hostPublicKey'")
+	isReady                            = false
+	IsPublicKeyValid                   = false
+	SSHDial                            = gossh.Dial
 )
 
 // SSHKeyParser defines the interface for parsing an SSH key from a path.
@@ -84,16 +84,6 @@ type SshManager interface {
 	HostPublicKeyIsValid(maxAttempts int) error
 }
 
-type ISSHDialer interface {
-	Dial(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error)
-}
-
-type sshDialer struct{}
-
-func (sshDialer) Dial(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
-	return gossh.Dial(network, addr, config)
-}
-
 // StandardSshManager struct holds configuration for SSH Manager interaction.
 type StandardSshManager struct {
 	HostName      string
@@ -102,7 +92,6 @@ type StandardSshManager struct {
 	Client        ssh.Client
 	HostPublicKey gossh.PublicKey
 	keyParser     SSHKeyParser
-	sshDial       ISSHDialer
 }
 
 var _ SshManager = (*StandardSshManager)(nil)
@@ -155,7 +144,6 @@ func NewStandardSshManager(hostName, userName string, sshKeyPaths []string, host
 		HostPublicKey: hostPublicKey,
 		SshKeyPaths:   sshKeyPaths,
 		keyParser:     NewFileSSHKeyParser(),
-		sshDial:       SSHDial,
 	}, nil
 }
 
@@ -246,7 +234,7 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 
 	for currentAttempt := 1; ; currentAttempt++ {
 		slog.Debug("Attempt to dial", "currentAttempt", currentAttempt, "host", sc.HostName)
-		client, err := sc.sshDial.Dial("tcp", address, config)
+		client, err := SSHDial("tcp", address, config)
 		if client != nil {
 			client.Close()
 		}
@@ -418,7 +406,7 @@ func (sc *StandardSshManager) WriteFileOnRemoteMachine(path, fileContent string,
 	if _, ok := sc.Client.(*ssh.NativeClient); ok {
 		config := sc.getSshClientConfig()
 		address := fmt.Sprintf("%s:%d", sc.HostName, port)
-		conn, err := sc.sshDial.Dial("tcp", address, config)
+		conn, err := SSHDial("tcp", address, config)
 		if err != nil {
 			slog.Error("Failed to dial SSH host", "host", sc.HostName, "err", err)
 			return err
