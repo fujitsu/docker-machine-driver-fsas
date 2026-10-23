@@ -18,6 +18,7 @@ import (
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 	mock "github.com/fujitsu/docker-machine-driver-fsas/sshutils/mock"
+	machinessh "github.com/rancher/machine/libmachine/ssh"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
@@ -156,6 +157,36 @@ func TestNewStandardSshManagerNilHostPublicKey(t *testing.T) {
 	manager, err := NewStandardSshManager("host1", "user1", "password1", "mock/path", nil)
 	assert.Nil(t, manager)
 	assert.ErrorIs(t, err, ErrNoneOfConstructorArgsCanBeEmpty)
+}
+
+func TestInitNativeClientUsesConfiguredHostKey(t *testing.T) {
+	// Create a valid client key so initNativeClient builds the same Rancher
+	// NativeClient used for command execution instead of exercising a mock.
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	keyPath := filepath.Join(t.TempDir(), "id_rsa")
+	require.NoError(t, os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}), 0600))
+
+	expectedHostKey := parsedHostPublicKey(t)
+	manager, err := NewStandardSshManager("host1", "user1", "password1", keyPath, expectedHostKey)
+	require.NoError(t, err)
+	require.NoError(t, manager.initNativeClient())
+
+	nativeClient, ok := manager.Client.(*machinessh.NativeClient)
+	require.True(t, ok)
+	// The operational client must accept the configured server key.
+	assert.Equal(t, []string{expectedHostKey.Type()}, nativeClient.Config.HostKeyAlgorithms)
+	require.NoError(t, nativeClient.Config.HostKeyCallback("host1:22", &net.TCPAddr{}, expectedHostKey))
+
+	// A different server key must be rejected to prevent a MITM connection.
+	unexpectedPublicKey, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	unexpectedHostKey, err := gossh.NewPublicKey(unexpectedPublicKey)
+	require.NoError(t, err)
+	assert.Error(t, nativeClient.Config.HostKeyCallback("host1:22", &net.TCPAddr{}, unexpectedHostKey))
 }
 
 func Test_runCommand_Success(t *testing.T) {
