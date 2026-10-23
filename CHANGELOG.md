@@ -94,15 +94,15 @@ Changelog generated at: 2026-10-23T13:14:44+00:00
 
 ## [v1.0.0-dev1](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v1.0.0-dev1) (2026-05-19)
 
-[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v1.0.0-dev0...v1.0.0-dev1)
-
-## [v1.0.0-dev0](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v1.0.0-dev0) (2026-05-15)
-
-[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v1.0.0-dev...v1.0.0-dev0)
+[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v1.0.0-dev...v1.0.0-dev1)
 
 ## [v1.0.0-dev](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v1.0.0-dev) (2026-05-15)
 
-[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.12...v1.0.0-dev)
+[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v1.0.0-dev0...v1.0.0-dev)
+
+## [v1.0.0-dev0](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v1.0.0-dev0) (2026-05-15)
+
+[Full Changelog](https://github.com/fujitsu/docker-machine-driver-fsas/compare/v0.1.12...v1.0.0-dev0)
 
 ## [v0.1.12](https://github.com/fujitsu/docker-machine-driver-fsas/tree/v0.1.12) (2026-03-06)
 
