@@ -43,7 +43,6 @@ const (
 // Driver is the implementation of BaseDriver interface
 type Driver struct {
 	*drivers.BaseDriver
-	SSHPassword               string
 	TenantUuid                string
 	Username                  string
 	Password                  string
@@ -68,41 +67,22 @@ type Driver struct {
 	Keycloak                  keycloak.Keycloak   `json:"-"`
 	SshManager                sshutils.SshManager `json:"-"`
 	CfgManager                cfgutils.CfgManager `json:"-"`
+	FirstLoginSshKey          string              `json:"firstLoginSshKey"` // Matches the name used in annotations
 }
 
 // NewDriver creates and returns a new instance of the FSAS CDI driver
 func NewDriver() *Driver {
 	return &Driver{
-		BaseDriver:                &drivers.BaseDriver{},
-		SSHPassword:               "",
-		TenantUuid:                "",
-		Username:                  "",
-		Password:                  "",
-		ApiUrl:                    "",
-		NtpUrl:                    "",
-		DnsIp:                     "",
-		ComputeConditionsJson:     "",
-		DevicesSpecJson:           "",
-		EnableBaremetalBonding:    false,
-		NetworkBaremetalUUID:      "",
-		NetworkProvisionUUID:      "",
-		NetworkProvisionDefaultGW: "",
-		PrivateIPAddress:          "",
-		OsImageName:               "",
-		MachineUUID:               "",
-		UserDataFile:              "",
-		SlesRegistrationCode:      "",
-		SlesRegistrationEmail:     "",
-		FabricManager:             &fm.FabricManagerClient{},
-		Keycloak:                  &keycloak.KeycloakClient{},
-		SshManager:                &sshutils.StandardSshManager{},
-		CfgManager:                &cfgutils.StandardCfgManager{},
+		BaseDriver:    &drivers.BaseDriver{},
+		FabricManager: &fm.FabricManagerClient{},
+		Keycloak:      &keycloak.KeycloakClient{},
+		SshManager:    &sshutils.StandardSshManager{},
+		CfgManager:    &cfgutils.StandardCfgManager{},
 	}
 }
 
 const (
 	defaultSSHUser               = "rancher"
-	defaultSSHPassword           = "rancher"
 	defaultFabricManagerEndpoint = "/fabric_manager/api/v1"
 	defaultKeycloakEndpoint      = "/id_manager"
 	errorMandatoryOption         = "%s must be specified using the CLI option %s"
@@ -148,12 +128,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "OS image SSH username",
 			Value:  defaultSSHUser,
 			EnvVar: "FSAS_SSH_USER",
-		},
-		mcnflag.StringFlag{
-			Name:   "fsas-ssh-password",
-			Usage:  "OS image SSH password",
-			Value:  defaultSSHPassword,
-			EnvVar: "FSAS_SSH_PASSWORD",
 		},
 		mcnflag.StringFlag{
 			Name:   "fsas-tenant-uuid",
@@ -241,6 +215,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "fsas-userdata",
 			EnvVar: "FSAS_USERDATA",
 		},
+		mcnflag.StringFlag{
+			Name:   "fsas-first-login-ssh-key",
+			Usage:  "SSH private key for first log in",
+			EnvVar: "FSAS_FIRST_LOGIN_SSH_KEY",
+		},
 	}
 }
 
@@ -325,9 +304,6 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SSHPort = drivers.DefaultSSHPort
 	slog.Debug("Driver", "ssh-port", d.SSHPort)
 
-	d.SSHPassword = flags.String("fsas-ssh-password")
-	slog.Debug("Driver", "ssh-password", "<hidden-for-security-reasons>")
-
 	d.TenantUuid = strings.TrimSpace(flags.String("fsas-tenant-uuid"))
 	slog.Debug("Driver", "Tenant Uuid", d.TenantUuid)
 
@@ -383,6 +359,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 
 	d.SlesRegistrationEmail = strings.TrimSpace(flags.String("fsas-sles-registration-email"))
 	slog.Debug("Driver", "FSAS SLES registration email", d.SlesRegistrationEmail)
+
+	d.FirstLoginSshKey = strings.TrimSpace(flags.String("fsas-first-login-ssh-key"))
+	slog.Debug("Driver ", "FSAS first login SSH key", d.FirstLoginSshKey)
 
 	return d.checkConfig()
 }
@@ -467,6 +446,7 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 		// (e.g. during Remove, Start, Stop) because it is not serializable.
 		// In that case, re-parse from the raw string.
 		if d.OsImageSshHostParsedKey == nil && d.OsImageSshHostPubKey != "" {
+
 			parsedKey, err := sshutils.ParseSSHPublicKey(d.OsImageSshHostPubKey)
 			if err != nil {
 				slog.Error("Could not parse SSH host public key", "err", err)
@@ -481,7 +461,8 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 			return err
 		}
 		slog.Info("Acquired SSH hostname", "hostname", hostName)
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), d.SSHPassword, d.GetSSHKeyPath(), d.OsImageSshHostParsedKey)
+		sshKeyPaths := []string{d.FirstLoginSshKey, d.GetSSHKeyPath()}
+		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), sshKeyPaths, d.OsImageSshHostParsedKey)
 		if err != nil {
 			slog.Error("Could not create SSH Manager because of an error", "err", err)
 			return err
@@ -502,9 +483,6 @@ func (d *Driver) checkConfig() error {
 
 	if d.SSHUser == "" {
 		return fmt.Errorf(errorMandatoryOption, "SSH user", "--fsas-ssh-user")
-	}
-	if d.SSHPassword == "" {
-		return fmt.Errorf(errorMandatoryOption, "SSH password", "--fsas-ssh-password")
 	}
 	if d.ComputeConditionsJson == "" {
 		return fmt.Errorf(errorMandatoryOption, "Compute conditions (JSON)", "--fsas-compute-conditions-json")
@@ -527,6 +505,10 @@ func (d *Driver) checkConfig() error {
 
 	if d.EnableBaremetalBonding && d.NetworkBaremetalUUID == "" {
 		return fmt.Errorf(errorMandatoryOption, "Baremetal subnet UUID", "--fsas-network-baremetal-uuid")
+	}
+
+	if d.FirstLoginSshKey == "" {
+		return fmt.Errorf(errorMandatoryOption, "First login SSH key", "--fsas-first-login-ssh-key")
 	}
 
 	if err := d.FabricManager.ValidateTenant(d.TenantUuid, d.Keycloak.GetToken()); err != nil {
