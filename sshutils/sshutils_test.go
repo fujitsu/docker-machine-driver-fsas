@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -162,6 +163,14 @@ func TestInitNativeClientUsesConfiguredHostKey(t *testing.T) {
 	// NativeClient used for command execution instead of exercising a mock.
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
+	firstPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	firstKeyPath := filepath.Join(t.TempDir(), "id_rsa2")
+	require.NoError(t, os.WriteFile(firstKeyPath, pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(firstPrivateKey),
+	}), 0600))
+
 	keyPath := filepath.Join(t.TempDir(), "id_rsa")
 	require.NoError(t, os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
@@ -169,7 +178,7 @@ func TestInitNativeClientUsesConfiguredHostKey(t *testing.T) {
 	}), 0600))
 
 	expectedHostKey := parsedHostPublicKey(t)
-	manager, err := NewStandardSshManager("host1", "user1", "password1", keyPath, expectedHostKey)
+	manager, err := NewStandardSshManager("host1", "user1", []string{firstKeyPath, keyPath}, expectedHostKey)
 	require.NoError(t, err)
 	require.NoError(t, manager.initNativeClient())
 
