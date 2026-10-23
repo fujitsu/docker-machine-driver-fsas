@@ -44,12 +44,6 @@ type MockSSHClient struct {
 	OutputFunc       func(command string) (string, error)
 }
 
-type sshDialFunc func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error)
-
-func (dial sshDialFunc) Dial(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
-	return dial(network, addr, config)
-}
-
 // Output runs a command on the remote host and returns its output
 func (c *MockSSHClient) Output(command string) (string, error) {
 	c.ExecutedCommands = append(c.ExecutedCommands, command)
@@ -655,13 +649,13 @@ func TestHostPublicKeyIsValid_AlreadyValid(t *testing.T) {
 	}()
 
 	IsPublicKeyValid = false
-	SSHDial = sshDialFunc(func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
 		assert.Equal(t, "tcp", network)
 		assert.Equal(t, "host1:22", addr)
 		assert.Equal(t, "user1", config.User)
 		require.NoError(t, config.HostKeyCallback("host1", nil, parsedKey))
 		return nil, fmt.Errorf("handshake terminated after host key verification")
-	})
+	}
 
 	err = manager.HostPublicKeyIsValid(1)
 	assert.NoError(t, err)
@@ -678,12 +672,12 @@ func TestHostPublicKeyIsValid_OtherDialError_ReturnsWrappedError(t *testing.T) {
 	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
 	require.NoError(t, err)
 
-	SSHDial = sshDialFunc(func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
 		assert.Equal(t, "tcp", network)
 		assert.Equal(t, "nonexistent-host.invalid:22", addr)
 		assert.Equal(t, "user1", config.User)
 		return nil, fmt.Errorf("lookup nonexistent-host.invalid: no such host")
-	})
+	}
 
 	err = manager.HostPublicKeyIsValid(1)
 	assert.Error(t, err)
@@ -702,13 +696,13 @@ func TestHostPublicKeyIsValid_ZeroMaxAttempts_NormalizedToOne(t *testing.T) {
 	require.NoError(t, err)
 
 	dialCalls := 0
-	SSHDial = sshDialFunc(func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
 		dialCalls++
 		assert.Equal(t, "tcp", network)
 		assert.Equal(t, "nonexistent-host.invalid:22", addr)
 		assert.Equal(t, "user1", config.User)
 		return nil, fmt.Errorf("lookup nonexistent-host.invalid: no such host")
-	})
+	}
 
 	err = manager.HostPublicKeyIsValid(0)
 	assert.Error(t, err)
@@ -726,12 +720,12 @@ func TestHostPublicKeyIsValid_ConnectionRefused_ReturnsError(t *testing.T) {
 	manager, err := NewStandardSshManager("127.0.0.1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
 	require.NoError(t, err)
 
-	SSHDial = sshDialFunc(func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
 		assert.Equal(t, "tcp", network)
 		assert.Equal(t, "127.0.0.1:22", addr)
 		assert.Equal(t, "user1", config.User)
 		return nil, fmt.Errorf("dial tcp 127.0.0.1:22: connect: connection refused")
-	})
+	}
 
 	err = manager.HostPublicKeyIsValid(1)
 	assert.Error(t, err)

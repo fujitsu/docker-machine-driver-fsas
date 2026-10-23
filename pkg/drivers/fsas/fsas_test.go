@@ -34,13 +34,6 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
-// sshutilsDialFunc is a helper type to mock the Dial function of sshutils in tests.
-type sshutilsDialFunc func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error)
-
-func (dial sshutilsDialFunc) Dial(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
-	return dial(network, addr, config)
-}
-
 func TestMain(m *testing.M) {
 
 	/* setup code here */
@@ -881,13 +874,13 @@ func TestInitSshManagerSuccess(t *testing.T) {
 		sshutils.IsPublicKeyValid = oldIsPublicKeyValid
 	}()
 	sshutils.IsPublicKeyValid = false
-	sshutils.SSHDial = sshutilsDialFunc(func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	sshutils.SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
 		assert.Equal(t, "tcp", network)
 		assert.Equal(t, "192.168.1.10:22", addr)
 		assert.Equal(t, "rancher", config.User)
 		require.NoError(t, config.HostKeyCallback("192.168.1.10", nil, parsedKey))
 		return nil, fmt.Errorf("handshake terminated after host key verification")
-	})
+	}
 
 	err = driver.initSshManager(3)
 
@@ -922,14 +915,14 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 		sshutils.IsPublicKeyValid = oldIsPublicKeyValid
 	}()
 	sshutils.IsPublicKeyValid = false
-	sshutils.SSHDial = sshutilsDialFunc(func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	sshutils.SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
 		assert.Equal(t, "tcp", network)
 		assert.Equal(t, "192.168.1.10:22", addr)
 		assert.Equal(t, "rancher", config.User)
 		err := config.HostKeyCallback("192.168.1.10", nil, mismatchedKey)
 		require.EqualError(t, err, "mismatch between received host key and reference host key")
 		return nil, fmt.Errorf("mismatch between received host key and reference host key")
-	})
+	}
 
 	err = driver.initSshManager(3)
 	assert.Error(t, err)
@@ -1005,13 +998,13 @@ func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 		sshutils.IsPublicKeyValid = oldIsPublicKeyValid
 	}()
 	sshutils.IsPublicKeyValid = false
-	sshutils.SSHDial = sshutilsDialFunc(func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+	sshutils.SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
 		assert.Equal(t, "tcp", network)
 		assert.Equal(t, "192.168.1.10:22", addr)
 		assert.Equal(t, "rancher", config.User)
 		require.NoError(t, config.HostKeyCallback("192.168.1.10", nil, parsedKey))
 		return nil, fmt.Errorf("handshake terminated after host key verification")
-	})
+	}
 
 	err = driver.initSshManager(3)
 	assert.NoError(t, err)
