@@ -435,7 +435,6 @@ func (sc *StandardCfgManager) RemoveFirstSSHLogin(firstLoginSSHKeyPath string) e
 	return nil
 }
 
-// getPublicKeyFromPrivateKey extracts the public key from a given private key file in OpenSSH format.
 func getPublicKeyFromPrivateKey(privateKeyPath string) (string, error) {
 	slog.Debug("Read first login SSH private key from path", "path", privateKeyPath)
 	privateKeyBytes, err := os.ReadFile(privateKeyPath)
