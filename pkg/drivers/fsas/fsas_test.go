@@ -1224,6 +1224,7 @@ func TestCreate(t *testing.T) {
 		SlesRegistrationCode:  "somecode010101",
 		SlesRegistrationEmail: "hoge@example.com",
 		FirstLoginSshKey:      "firstLoginSSHKeyPath",
+		FirstLoginSshKey:      "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1255,6 +1256,7 @@ func TestCreate(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
+	mockCfg.On("DisableSSHLogin").Return(nil)
 	mockCfg.On("RemoveFirstSSHLogin", "firstLoginSSHKeyPath").Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
@@ -1306,6 +1308,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 		SlesRegistrationCode:  "somecode010101",
 		SlesRegistrationEmail: "hoge@example.com",
 		FirstLoginSshKey:      "firstLoginSSHKeyPath",
+		FirstLoginSshKey:      "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1336,6 +1339,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
+	mockCfg.On("DisableSSHLogin").Return(nil)
 	mockCfg.On("RemoveFirstSSHLogin", "firstLoginSSHKeyPath").Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
@@ -2573,6 +2577,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 		NtpUrl:                 "test",
 		DnsIp:                  "test",
 		FirstLoginSshKey:       "firstLoginSSHKeyPath",
+		FirstLoginSshKey:       "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -2606,6 +2611,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", testMachineUUID).Return(nil)
 	mockCfg.On("InjectOSRegistration", "", "").Return(nil)
+	mockCfg.On("DisableSSHLogin").Return(nil)
 	mockCfg.On("RemoveFirstSSHLogin", "firstLoginSSHKeyPath").Return(nil)
 
 	expectedBootCmds := []string{
