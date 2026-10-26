@@ -32,6 +32,7 @@ type CfgManager interface {
 	ImplantRKE2Config(configName, machineUUID string) error
 	InjectOSRegistration(regcode, email string) error
 	DisableSSHLogin() error
+	RemoveFirstSSHLogin(firstLoginSSHKeyPath string) error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -442,8 +443,9 @@ func (sc *StandardCfgManager) RemoveFirstSSHLogin(firstLoginSSHKeyPath string) e
 		return err
 	}
 
+	slog.Debug("Public key extracted from private key", "publicKey", publicKey)
 	if err := sc.ExtendUserdataRunCmd([]string{
-		fmt.Sprintf(`sed -i "\|^%s.*|d" $HOME/.ssh/authorized_keys`, publicKey),
+		fmt.Sprintf(`sed -i "\|^%s.*|d" /home/rancher/.ssh/authorized_keys`, publicKey),
 	}); err != nil {
 		slog.Error("Failed to extend userdata (runcmd)", "err", err)
 		return err
@@ -454,6 +456,7 @@ func (sc *StandardCfgManager) RemoveFirstSSHLogin(firstLoginSSHKeyPath string) e
 
 // getPublicKeyFromPrivateKey extracts the public key from a given private key file in OpenSSH format.
 func getPublicKeyFromPrivateKey(privateKeyPath string) (string, error) {
+	slog.Debug("Read first login SSH private key from path", "path", privateKeyPath)
 	privateKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		slog.Error("Failed to read private key", "path", privateKeyPath, "err", err)

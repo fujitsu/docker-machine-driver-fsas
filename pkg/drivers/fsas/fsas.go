@@ -660,6 +660,11 @@ func (d *Driver) innerCreate() error {
 		}
 	}
 
+	if err := d.CfgManager.RemoveFirstSSHLogin(d.FirstLoginSshKey); err != nil {
+		slog.Error("Failed to remove first SSH login", "err", err)
+		return err
+	}
+
 	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
