@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
@@ -1036,86 +1035,6 @@ func TestInjectOSRegistration(t *testing.T) {
 				assert.Equal(t, expected, observed)
 			}
 
-		})
-	}
-}
-
-func TestDisableSSHLogin(t *testing.T) {
-	testCases := []struct {
-		name            string
-		readFileContent []byte
-		expectedStr     string
-		expectedError   error
-	}{
-		{name: "case 1: add item to empty cloud-init file",
-			readFileContent: []byte(userdataSampleContentNoSections),
-			expectedStr:     expectedStrDisablePwdAuth,
-			expectedError:   nil,
-		},
-
-		{name: "case 2: add item when section 'runcmd' exists",
-			readFileContent: []byte(userdataSampleContent1rc),
-			expectedStr:     expectedStrDisablePwdAuth1rc,
-			expectedError:   nil,
-		},
-
-		{name: "case 3: section 'ssh_pwauth' does exist; should overwrite existing value",
-			readFileContent: []byte(sampleDisablePwdAuthExists),
-			expectedStr:     expectedStrDisablePwdAuth,
-			expectedError:   nil,
-		},
-
-		{name: "case 4: add item when sections 'runcmd' and 'write_files' exist",
-			readFileContent: []byte(sample1rc2wf),
-			expectedStr:     expectedDisablePwdAuth1rc2wf,
-			expectedError:   nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		var expected, observed cloudInitFile
-		t.Run(tc.name, func(t *testing.T) {
-			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
-			require.NoError(t, err, "Failed to create temp file")
-			defer func() {
-				err := tempFile.Close()
-				require.NoError(t, err, "Failed to close temp file")
-				err = os.Remove(tempFile.Name())
-				require.NoError(t, err, "Failed to delete temp file")
-			}()
-
-			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
-				require.NoError(t, err, "Failed to write to temp file")
-			}
-
-			sc := NewStandardCfgManager("[]", tempFile.Name())
-			err = sc.DisableSSHLogin()
-
-			if tc.expectedError != nil {
-				assert.ErrorIs(t, err, tc.expectedError,
-					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
-			} else {
-
-				/* convert to YAML objects;
-				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
-				   Thus compare YAML semantically and not textually.
-				*/
-				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
-					t.Fatalf("failed to unmarshal expected: %v", err)
-				}
-
-				fileContent, err := os.ReadFile(tempFile.Name())
-				require.NoError(t, err, "Failed to read from temp file")
-				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
-					t.Fatalf("failed to unmarshal observed: %v", err)
-				}
-
-				assert.Equal(t, expected, observed)
-
-				lines := strings.Split(string(fileContent), "\n")
-				assert.Contains(t, lines[1], "ssh_pwauth: false",
-					fmt.Sprintf("Expected annotation 'ssh_pwauth: false' not found in 1-st line"))
-			}
 		})
 	}
 }

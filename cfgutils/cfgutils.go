@@ -31,7 +31,6 @@ type CfgManager interface {
 	ImplantSSHKey(sshKeyPath, sshUser string) error
 	ImplantRKE2Config(configName, machineUUID string) error
 	InjectOSRegistration(regcode, email string) error
-	DisableSSHLogin() error
 	RemoveFirstSSHLogin(firstLoginSSHKeyPath string) error
 }
 
@@ -414,24 +413,6 @@ func (sc *StandardCfgManager) getRke2ConfigFileContent(machineUUID string) strin
 		configContent = providerIdEntry
 	}
 	return configContent
-}
-
-// DisableSSHLogin disables SSH login via password by extending cloud config
-func (sc *StandardCfgManager) DisableSSHLogin() error {
-	sshPasswordAuth := false
-	cif, err := NewCloudInitFile(
-		WithSSHPasswordAuth(&sshPasswordAuth),
-		WithWriteFiles([]CloudConfigItemWriteFiles{NewCloudConfigItemWriteFiles(
-			"/etc/ssh/sshd_config.d/30-auth-methods.conf", "AuthenticationMethods publickey")}),
-	)
-	if err != nil {
-		return err
-	}
-
-	if err := extendUserdata(sc.userDataFile, cif); err != nil {
-		return err
-	}
-	return nil
 }
 
 // RemoveFirstSSHLogin removes the first SSH login key from the authorized_keys file by extending cloud config with a run command.
