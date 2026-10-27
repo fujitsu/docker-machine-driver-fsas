@@ -31,7 +31,6 @@ type CfgManager interface {
 	ImplantSSHKey(sshKeyPath, sshUser string) error
 	ImplantRKE2Config(configName, machineUUID string) error
 	InjectOSRegistration(regcode, email string) error
-	DisableSSHLogin() error
 	RemoveFirstSSHLogin(firstLoginSSHKeyPath string) error
 }
 
