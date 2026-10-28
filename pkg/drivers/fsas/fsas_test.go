@@ -846,7 +846,7 @@ func TestInitSshManagerAlreadyInitialized(t *testing.T) {
 
 	mockSSH.On("IsReady").Return(true)
 
-	err := driver.initSshManager(3)
+	err := driver.initSshManager(3, []string{"/tmp/test-key"})
 	assert.NoError(t, err)
 }
 
@@ -882,7 +882,7 @@ func TestInitSshManagerSuccess(t *testing.T) {
 		return nil, fmt.Errorf("handshake terminated after host key verification")
 	}
 
-	err = driver.initSshManager(3)
+	err = driver.initSshManager(3, []string{"/tmp/test-key"})
 
 	assert.NoError(t, err)
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
@@ -924,7 +924,7 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 		return nil, fmt.Errorf("mismatch between received host key and reference host key")
 	}
 
-	err = driver.initSshManager(3)
+	err = driver.initSshManager(3, []string{"/tmp/test-key"})
 	assert.Error(t, err)
 	assert.EqualError(t, err, "mismatch between received host key and reference host key")
 	// SshManager must NOT be replaced when HostPublicKeyIsValid fails, so that
@@ -961,14 +961,14 @@ func TestInitSshManagerRetriggersAfterPublicKeyValidationFailed(t *testing.T) {
 	defer func() { sshutils.IsPublicKeyValid = oldIsPublicKeyValid }()
 
 	// First call — simulates innerCreate: HostPublicKeyIsValid fails.
-	err1 := driver.initSshManager(1)
+	err1 := driver.initSshManager(1, []string{"/tmp/test-key"})
 	require.Error(t, err1)
 
 	// Second call — simulates Remove: must retry initialization, NOT silently skip it.
 	// Before the fix: NewStandardSshManager set isReady=true, so this returned nil.
 	// After the fix: isReady stays false until HostPublicKeyIsValid succeeds,
 	// so this also returns an error (initialization is attempted again).
-	err2 := driver.initSshManager(1)
+	err2 := driver.initSshManager(1, []string{"/tmp/test-key"})
 	assert.Error(t, err2, "initSshManager must retry after a previous HostPublicKeyIsValid failure")
 }
 
@@ -1006,7 +1006,7 @@ func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 		return nil, fmt.Errorf("handshake terminated after host key verification")
 	}
 
-	err = driver.initSshManager(3)
+	err = driver.initSshManager(3, []string{"/tmp/test-key"})
 	assert.NoError(t, err)
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
 	// The parsed key should have been populated by lazy parsing
@@ -1029,7 +1029,7 @@ func TestInitSshManagerFailInvalidPubKeyFormat(t *testing.T) {
 
 	mockSSH.On("IsReady").Return(false)
 
-	err := driver.initSshManager(3)
+	err := driver.initSshManager(3, []string{"/tmp/test-key"})
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "invalid SSH host public key format")
 }
@@ -1045,7 +1045,7 @@ func TestInitSshManagerFailEmptyIPAddress(t *testing.T) {
 
 	mockSSH.On("IsReady").Return(false)
 
-	err := driver.initSshManager(3)
+	err := driver.initSshManager(3, []string{"/tmp/test-key"})
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "IPAddress is empty")
 }
@@ -1065,7 +1065,7 @@ func TestInitSshManagerFailNewStandardSshManager(t *testing.T) {
 
 	mockSSH.On("IsReady").Return(false)
 
-	err := driver.initSshManager(3)
+	err := driver.initSshManager(3, []string{"/tmp/test-key"})
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, sshutils.ErrNoneOfConstructorArgsCanBeEmpty)
 }
