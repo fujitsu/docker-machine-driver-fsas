@@ -131,7 +131,7 @@ func ParseSSHPublicKey(key string) (gossh.PublicKey, error) {
 func NewStandardSshManager(hostName, userName string, sshKeyPaths []string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
 	slog.Debug("Standard SSH Manager constructor", "host", hostName, "user", userName)
 
-	if hostName == "" || userName == "" || len(sshKeyPaths) != 2 || hostPublicKey == nil {
+	if hostName == "" || userName == "" || len(sshKeyPaths) == 0 || hostPublicKey == nil {
 
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
