@@ -425,9 +425,7 @@ func (sc *StandardCfgManager) RemoveFirstSSHLogin(firstLoginSSHKeyPath string) e
 	}
 
 	slog.Debug("Public key extracted from private key", "publicKey", publicKey)
-	slog.Debug("Public key extracted from private key", "publicKey", publicKey)
 	if err := sc.ExtendUserdataRunCmd([]string{
-		fmt.Sprintf(`sed -i "\|^%s.*|d" /home/rancher/.ssh/authorized_keys`, publicKey),
 		fmt.Sprintf(`sed -i "\|^%s.*|d" /home/rancher/.ssh/authorized_keys`, publicKey),
 	}); err != nil {
 		slog.Error("Failed to extend userdata (runcmd)", "err", err)
@@ -437,8 +435,8 @@ func (sc *StandardCfgManager) RemoveFirstSSHLogin(firstLoginSSHKeyPath string) e
 	return nil
 }
 
+// getPublicKeyFromPrivateKey extracts the public key from a given private key file in OpenSSH format.
 func getPublicKeyFromPrivateKey(privateKeyPath string) (string, error) {
-	slog.Debug("Read first login SSH private key from path", "path", privateKeyPath)
 	slog.Debug("Read first login SSH private key from path", "path", privateKeyPath)
 	privateKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {

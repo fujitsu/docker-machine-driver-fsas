@@ -1224,7 +1224,6 @@ func TestCreate(t *testing.T) {
 		SlesRegistrationCode:  "somecode010101",
 		SlesRegistrationEmail: "hoge@example.com",
 		FirstLoginSshKey:      "firstLoginSSHKeyPath",
-		FirstLoginSshKey:      "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1306,7 +1305,6 @@ func TestCreateCloudInitFail(t *testing.T) {
 		DnsIp:                 "test",
 		SlesRegistrationCode:  "somecode010101",
 		SlesRegistrationEmail: "hoge@example.com",
-		FirstLoginSshKey:      "firstLoginSSHKeyPath",
 		FirstLoginSshKey:      "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
@@ -2574,7 +2572,6 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 		NetworkProvisionUUID:   testProvisionUUID,
 		NtpUrl:                 "test",
 		DnsIp:                  "test",
-		FirstLoginSshKey:       "firstLoginSSHKeyPath",
 		FirstLoginSshKey:       "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
