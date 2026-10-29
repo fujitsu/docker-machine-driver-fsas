@@ -12,6 +12,7 @@ import (
 
 	slog "github.com/fujitsu/docker-machine-driver-fsas/logger"
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,7 +31,7 @@ type CfgManager interface {
 	ImplantSSHKey(sshKeyPath, sshUser string) error
 	ImplantRKE2Config(configName, machineUUID string) error
 	InjectOSRegistration(regcode, email string) error
-	DisableSSHLogin() error
+	RemoveFirstSSHLogin(firstLoginSSHKeyPath string) error
 }
 
 // StandardCfgManager struct holds configuration for Configuration Manager interaction.
@@ -414,20 +415,42 @@ func (sc *StandardCfgManager) getRke2ConfigFileContent(machineUUID string) strin
 	return configContent
 }
 
-// DisableSSHLogin disables SSH login via password by extending cloud config
-func (sc *StandardCfgManager) DisableSSHLogin() error {
-	sshPasswordAuth := false
-	cif, err := NewCloudInitFile(
-		WithSSHPasswordAuth(&sshPasswordAuth),
-		WithWriteFiles([]CloudConfigItemWriteFiles{NewCloudConfigItemWriteFiles(
-			"/etc/ssh/sshd_config.d/30-auth-methods.conf", "AuthenticationMethods publickey")}),
-	)
+// RemoveFirstSSHLogin removes the first SSH login key from the authorized_keys file by extending cloud config with a run command.
+func (sc *StandardCfgManager) RemoveFirstSSHLogin(firstLoginSSHKeyPath string) error {
+
+	publicKey, err := getPublicKeyFromPrivateKey(firstLoginSSHKeyPath)
 	if err != nil {
+		slog.Error("Failed to get public key from private key", "err", err)
 		return err
 	}
 
-	if err := extendUserdata(sc.userDataFile, cif); err != nil {
+	slog.Debug("Public key extracted from private key", "publicKey", publicKey)
+	if err := sc.ExtendUserdataRunCmd([]string{
+		fmt.Sprintf(`sed -i "\|^%s.*|d" /home/rancher/.ssh/authorized_keys`, publicKey),
+	}); err != nil {
+		slog.Error("Failed to extend userdata (runcmd)", "err", err)
 		return err
 	}
+
 	return nil
+}
+
+// getPublicKeyFromPrivateKey extracts the public key from a given private key file in OpenSSH format.
+func getPublicKeyFromPrivateKey(privateKeyPath string) (string, error) {
+	slog.Debug("Read first login SSH private key from path", "path", privateKeyPath)
+	privateKeyBytes, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		slog.Error("Failed to read private key", "path", privateKeyPath, "err", err)
+		return "", fmt.Errorf("read private key: %w", err)
+	}
+
+	signer, err := ssh.ParsePrivateKey(privateKeyBytes)
+	if err != nil {
+		slog.Error("Failed to parse private key", "path", privateKeyPath, "err", err)
+		return "", fmt.Errorf("parse private key: %w", err)
+	}
+
+	// OpenSSH format suitable for ~/.ssh/authorized_keys e.g. "ssh-ed25519 AAAAC3...";
+	publicKey := string(ssh.MarshalAuthorizedKey(signer.PublicKey()))
+	return strings.TrimSpace(publicKey), nil
 }

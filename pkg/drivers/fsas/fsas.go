@@ -646,11 +646,6 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.CfgManager.DisableSSHLogin(); err != nil {
-		slog.Error("Failed to disable SSH login via cloud config", "err", err)
-		return err
-	}
-
 	if d.EnableBaremetalBonding {
 		if err := d.CfgManager.ExtendUserdataBootCmd([]string{
 			`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
@@ -658,6 +653,11 @@ func (d *Driver) innerCreate() error {
 			slog.Error("Failed to inject bootcmd for baremetal bonding", "err", err)
 			return err
 		}
+	}
+
+	if err := d.CfgManager.RemoveFirstSSHLogin(d.FirstLoginSshKey); err != nil {
+		slog.Error("Failed to remove first SSH login", "err", err)
+		return err
 	}
 
 	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
