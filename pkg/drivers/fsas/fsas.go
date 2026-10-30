@@ -441,7 +441,7 @@ var getSSHMaxAttempts = func() int {
 func (d *Driver) initSshManager(maxAttempts int) error {
 	if !d.SshManager.IsReady() {
 		slog.Warn("SSH Manager is NOT initialized then start init procedure")
-
+		var sshKeyPath string
 		// OsImageSshHostParsedKey may be nil when the driver was restored from JSON
 		// (e.g. during Remove, Start, Stop) because it is not serializable.
 		// In that case, re-parse from the raw string.
@@ -453,6 +453,9 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 				return fmt.Errorf("invalid SSH host public key format: %w", err)
 			}
 			d.OsImageSshHostParsedKey = parsedKey
+			sshKeyPath = d.GetSSHKeyPath()
+		} else {
+			sshKeyPath = d.FirstLoginSshKey
 		}
 
 		hostName, err := d.GetSSHHostname()
@@ -461,8 +464,7 @@ func (d *Driver) initSshManager(maxAttempts int) error {
 			return err
 		}
 		slog.Info("Acquired SSH hostname", "hostname", hostName)
-		sshKeyPaths := []string{d.FirstLoginSshKey, d.GetSSHKeyPath()}
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), sshKeyPaths, d.OsImageSshHostParsedKey)
+		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), sshKeyPath, d.OsImageSshHostParsedKey)
 		if err != nil {
 			slog.Error("Could not create SSH Manager because of an error", "err", err)
 			return err

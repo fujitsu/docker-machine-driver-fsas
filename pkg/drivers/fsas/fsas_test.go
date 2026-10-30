@@ -864,6 +864,7 @@ func TestInitSshManagerSuccess(t *testing.T) {
 		OsImageSshHostPubKey:    hostPubKeyStr,
 		OsImageSshHostParsedKey: parsedKey,
 		SshManager:              mockSSH,
+		FirstLoginSshKey:        "firstLoginSSHKeyPath",
 	}
 
 	mockSSH.On("IsReady").Return(false)
@@ -905,6 +906,7 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 		OsImageSshHostPubKey:    hostPubKeyStr,
 		OsImageSshHostParsedKey: parsedKey,
 		SshManager:              mockSSH,
+		FirstLoginSshKey:        "firstLoginSSHKeyPath",
 	}
 
 	mockSSH.On("IsReady").Return(false)
