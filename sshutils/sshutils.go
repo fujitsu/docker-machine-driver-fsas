@@ -88,7 +88,7 @@ type SshManager interface {
 type StandardSshManager struct {
 	HostName      string
 	UserName      string
-	SshKeyPaths   []string
+	SshKeyPath    string
 	Client        ssh.Client
 	HostPublicKey gossh.PublicKey
 	keyParser     SSHKeyParser
@@ -128,10 +128,10 @@ func ParseSSHPublicKey(key string) (gossh.PublicKey, error) {
 
 // NewStandardSshManager Returns new instance of Standard SSH Manager and error.
 // The hostPublicKey parameter must be a pre-parsed gossh.PublicKey (use ParseSSHPublicKey to obtain one).
-func NewStandardSshManager(hostName, userName string, sshKeyPaths []string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
+func NewStandardSshManager(hostName, userName, sshKeyPath string, hostPublicKey gossh.PublicKey) (*StandardSshManager, error) {
 	slog.Debug("Standard SSH Manager constructor", "host", hostName, "user", userName)
 
-	if hostName == "" || userName == "" || len(sshKeyPaths) == 0 || hostPublicKey == nil {
+	if hostName == "" || userName == "" || sshKeyPath == "" || hostPublicKey == nil {
 
 		slog.Error(ErrNoneOfConstructorArgsCanBeEmpty.Error())
 		return nil, ErrNoneOfConstructorArgsCanBeEmpty
@@ -142,7 +142,7 @@ func NewStandardSshManager(hostName, userName string, sshKeyPaths []string, host
 		UserName:      userName,
 		Client:        &ssh.NativeClient{},
 		HostPublicKey: hostPublicKey,
-		SshKeyPaths:   sshKeyPaths,
+		SshKeyPath:    sshKeyPath,
 		keyParser:     NewFileSSHKeyParser(),
 	}, nil
 }
@@ -151,7 +151,7 @@ func (sc *StandardSshManager) String() string {
 	return "{" +
 		fmt.Sprintf("HostName: %s, ", sc.HostName) +
 		fmt.Sprintf("UserName: %s, ", sc.UserName) +
-		fmt.Sprintf("SshKeyPath: %s", sc.SshKeyPaths) +
+		fmt.Sprintf("SshKeyPath: %s", sc.SshKeyPath) +
 		"}"
 }
 
@@ -167,13 +167,11 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 
 	authMethods := []gossh.AuthMethod{}
 
-	for _, sshKeyPath := range sc.SshKeyPaths {
-		if sshPrivateKey := sc.keyParser.Parse(sshKeyPath); sshPrivateKey != nil {
-			authMethods = append(authMethods, gossh.PublicKeys(sshPrivateKey))
-			slog.Debug("Added SSH private key to auth methods",
-				"keyPath", sshKeyPath,
-				"pubkey", string(gossh.MarshalAuthorizedKey(sshPrivateKey.PublicKey())))
-		}
+	if sshPrivateKey := sc.keyParser.Parse(sc.SshKeyPath); sshPrivateKey != nil {
+		authMethods = append(authMethods, gossh.PublicKeys(sshPrivateKey))
+		slog.Debug("Added SSH private key to auth methods",
+			"keyPath", sc.SshKeyPath,
+			"pubkey", string(gossh.MarshalAuthorizedKey(sshPrivateKey.PublicKey())))
 	}
 
 	slog.Debug("host public key", "hostPublicKey", string(gossh.MarshalAuthorizedKey(sc.HostPublicKey)))
@@ -267,8 +265,8 @@ func (sc *StandardSshManager) HostPublicKeyIsValid(maxAttempts int) error {
 func (sc *StandardSshManager) initNativeClient() error {
 	if _, ok := sc.Client.(*ssh.NativeClient); ok {
 
-		slog.Debug("Authenticating using SSH key", "path", sc.SshKeyPaths)
-		auth := &ssh.Auth{Keys: sc.SshKeyPaths}
+		slog.Debug("Authenticating using SSH key", "path", sc.SshKeyPath)
+		auth := &ssh.Auth{Keys: []string{sc.SshKeyPath}}
 
 		client, err := ssh.NewNativeClient(sc.UserName, sc.HostName, port, auth)
 		if err != nil {

@@ -438,10 +438,10 @@ var getSSHMaxAttempts = func() int {
 }
 
 // initSshManager Initialize SSH Manager client
-func (d *Driver) initSshManager(maxAttempts int, sshKeyPaths []string) error {
+func (d *Driver) initSshManager(maxAttempts int) error {
 	if !d.SshManager.IsReady() {
 		slog.Warn("SSH Manager is NOT initialized then start init procedure")
-
+		var sshKeyPath string
 		// OsImageSshHostParsedKey may be nil when the driver was restored from JSON
 		// (e.g. during Remove, Start, Stop) because it is not serializable.
 		// In that case, re-parse from the raw string.
@@ -453,6 +453,9 @@ func (d *Driver) initSshManager(maxAttempts int, sshKeyPaths []string) error {
 				return fmt.Errorf("invalid SSH host public key format: %w", err)
 			}
 			d.OsImageSshHostParsedKey = parsedKey
+			sshKeyPath = d.GetSSHKeyPath()
+		} else {
+			sshKeyPath = d.FirstLoginSshKey
 		}
 
 		hostName, err := d.GetSSHHostname()
@@ -461,7 +464,7 @@ func (d *Driver) initSshManager(maxAttempts int, sshKeyPaths []string) error {
 			return err
 		}
 		slog.Info("Acquired SSH hostname", "hostname", hostName)
-		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), sshKeyPaths, d.OsImageSshHostParsedKey)
+		sshManager, err := sshutils.NewStandardSshManager(hostName, d.GetSSHUsername(), sshKeyPath, d.OsImageSshHostParsedKey)
 		if err != nil {
 			slog.Error("Could not create SSH Manager because of an error", "err", err)
 			return err
@@ -659,7 +662,7 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
-	if err := d.initSshManager(getSSHMaxAttempts(), []string{d.FirstLoginSshKey, d.GetSSHKeyPath()}); err != nil {
+	if err := d.initSshManager(getSSHMaxAttempts()); err != nil {
 		slog.Error("Error while initializing SSH Manager", "err", err)
 		return err
 	}
@@ -905,7 +908,7 @@ func (d *Driver) Remove() error {
 	}
 
 	// Attempt OS deregistration during machine removal
-	if err := d.initSshManager(REMOVE_SSH_MAX_ATTEMPTS, []string{d.GetSSHKeyPath()}); err != nil {
+	if err := d.initSshManager(REMOVE_SSH_MAX_ATTEMPTS); err != nil {
 		// If ssh manager cannot be initialized then do not return error and proceed with machine removal
 		slog.Warn("SSH unavailable - could not read registration status; proceeding with machine removal; if the machine was previously registered, manual action might be required", "err", err)
 	} else {
