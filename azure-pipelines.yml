@@ -1,0 +1,49 @@
+
+trigger: none
+pr: none
+
+variables:
+- group: lupi-var-gr-1
+
+# Run every 15 minutes
+# schedules:
+#   - cron: '*/55 * * * *'
+#     displayName: 'GitHub to Azure synchronization'
+#     branches:
+#       include:
+#         - main
+#     always: true
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: none
+
+  - bash: |
+      set -euo pipefail
+
+      echo "Starting GitHub to Azure synchronization"
+
+      # Clone all GitHub branches and tags
+      git clone --bare "$GITHUB_REPO_URL" github.git
+
+      echo "GitHub repository fetched successfully"
+
+      # Push all branches and tags to Azure Repos
+      # Remove Azure branches/tags that no longer exist on GitHub
+      git -C github.git \
+        -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" \
+        push --prune "$AZURE_REPO_URL" \
+        '+refs/heads/*:refs/heads/*' \
+        '+refs/tags/*:refs/tags/*'
+
+      echo "Synchronization completed successfully"
+
+    displayName: 'Mirror all GitHub branches and tags to Azure'
+
+    env:
+      GITHUB_REPO_URL: $(GITHUB_REPO_URL)
+      AZURE_REPO_URL: $(AZURE_REPO_URL)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
