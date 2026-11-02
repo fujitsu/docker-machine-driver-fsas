@@ -153,7 +153,7 @@ func TestParseSSHPublicKeyBase64PartDoubleQuoted(t *testing.T) {
 }
 
 func TestNewStandardSshManagerNilHostPublicKey(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, nil)
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", nil)
 	assert.Nil(t, manager)
 	assert.ErrorIs(t, err, ErrNoneOfConstructorArgsCanBeEmpty)
 }
@@ -178,7 +178,7 @@ func TestInitNativeClientUsesConfiguredHostKey(t *testing.T) {
 	}), 0600))
 
 	expectedHostKey := parsedHostPublicKey(t)
-	manager, err := NewStandardSshManager("host1", "user1", []string{firstKeyPath, keyPath}, expectedHostKey)
+	manager, err := NewStandardSshManager("host1", "user1", firstKeyPath, expectedHostKey)
 	require.NoError(t, err)
 	require.NoError(t, manager.initNativeClient())
 
@@ -197,11 +197,11 @@ func TestInitNativeClientUsesConfiguredHostKey(t *testing.T) {
 }
 
 func Test_runCommand_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{} // This is a trick to avoid initializing SSH key auth method during the unit test
+	manager.SshKeyPath = "" // This is a trick to avoid initializing SSH key auth method during the unit test
 
 	command := "echo Hello"
 	output, err := manager.runCommand(command)
@@ -213,7 +213,7 @@ func Test_runCommand_Success(t *testing.T) {
 }
 
 func Test_runCommand_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -222,7 +222,7 @@ func Test_runCommand_Fail(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{} // This is a trick to avoid initializing SSH key auth method during the unit test
+	manager.SshKeyPath = "" // This is a trick to avoid initializing SSH key auth method during the unit test
 
 	output, err := manager.runCommand("custom command")
 
@@ -231,7 +231,7 @@ func Test_runCommand_Fail(t *testing.T) {
 }
 
 func Test_runCommand_Success_Missing_Exit(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -240,7 +240,7 @@ func Test_runCommand_Success_Missing_Exit(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{} // This is a trick to avoid initializing SSH key auth method during the unit test
+	manager.SshKeyPath = "" // This is a trick to avoid initializing SSH key auth method during the unit test
 
 	command := "cloud-init --reboot"
 	output, err := manager.runCommand(command)
@@ -250,21 +250,21 @@ func Test_runCommand_Success_Missing_Exit(t *testing.T) {
 }
 
 func TestWriteFileOnRemoteMachine_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	manager.Client = &MockSSHClient{}
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.WriteFileOnRemoteMachine("", "Lorem impsum", 0744)
 	assert.NoError(t, err)
 }
 
 func Test_executeRemoteFile_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.executeRemoteFile("custom command", true)
 	assert.NoError(t, err)
@@ -273,7 +273,7 @@ func Test_executeRemoteFile_Success(t *testing.T) {
 }
 
 func Test_executeRemoteFile_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{
 		OutputFunc: func(command string) (string, error) {
@@ -281,7 +281,7 @@ func Test_executeRemoteFile_Fail(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.executeRemoteFile("custom command", false)
 	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
@@ -290,11 +290,11 @@ func Test_executeRemoteFile_Fail(t *testing.T) {
 }
 
 func Test_removeRemoteFile_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.removeRemoteFile("file", true)
 	assert.NoError(t, err)
@@ -303,7 +303,7 @@ func Test_removeRemoteFile_Success(t *testing.T) {
 }
 
 func Test_removeRemoteFile_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{
 		OutputFunc: func(command string) (string, error) {
@@ -311,7 +311,7 @@ func Test_removeRemoteFile_Fail(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.removeRemoteFile("file", false)
 	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
@@ -333,7 +333,7 @@ func TestGenerateSecureRandomInt_InvalidRange(t *testing.T) {
 }
 
 func Test_ExecuteScript_RemovesScriptAndDirectory(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -342,7 +342,7 @@ func Test_ExecuteScript_RemovesScriptAndDirectory(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	scriptName := "" // it means generating filename
 	scriptContent := "echo Hello"
@@ -361,11 +361,11 @@ func Test_ExecuteScript_RemovesScriptAndDirectory(t *testing.T) {
 }
 
 func Test_createRemoteDir(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.createRemoteDir("/tmp/mytestdir")
 	assert.NoError(t, err)
@@ -374,11 +374,11 @@ func Test_createRemoteDir(t *testing.T) {
 }
 
 func Test_getRandomScriptPath(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	path, err := manager.getRandomScriptPath()
 	assert.NoError(t, err)
@@ -388,12 +388,12 @@ func Test_getRandomScriptPath(t *testing.T) {
 }
 
 func Test_removeRemoteDir(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.removeRemoteDir("/tmp/mytestdir", false)
 	assert.NoError(t, err)
@@ -402,12 +402,12 @@ func Test_removeRemoteDir(t *testing.T) {
 }
 
 func Test_RebootCloudInit_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.RebootCloudInit()
 	assert.NoError(t, err)
@@ -417,7 +417,7 @@ func Test_RebootCloudInit_Success(t *testing.T) {
 }
 
 func Test_RebootCloudInit_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	mockClient := &MockSSHClient{
@@ -426,7 +426,7 @@ func Test_RebootCloudInit_Fail(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.RebootCloudInit()
 	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
@@ -504,13 +504,12 @@ func Test_getSshClientConfig_PassOnly(t *testing.T) {
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
 
-	keyPaths := []string{"/path/to/invalid/key1", "/path/to/invalid/key2"}
-	mockParser.On("Parse", keyPaths[0]).Return(nil)
-	mockParser.On("Parse", keyPaths[1]).Return(nil)
+	keyPath := "/path/to/invalid/key1"
+	mockParser.On("Parse", keyPath).Return(nil)
 
 	manager := &StandardSshManager{
 		UserName:      "testuser",
-		SshKeyPaths:   keyPaths,
+		SshKeyPath:    keyPath,
 		HostPublicKey: sshPub,
 		keyParser:     mockParser,
 	}
@@ -531,15 +530,15 @@ func Test_getSshClientConfig_PassAndKey(t *testing.T) {
 	require.NoError(t, err)
 	signer, err := gossh.NewSignerFromKey(priv)
 	require.NoError(t, err)
-	keyPaths := []string{"/path/to/invalid/key1"}
+	keyPath := "/path/to/invalid/key1"
 
 	// Configure the mock to return a valid signer when Parse is called.
 	// This simulates finding and successfully parsing a private key.
-	mockParser.On("Parse", keyPaths[0]).Return(signer)
+	mockParser.On("Parse", keyPath).Return(signer)
 
 	manager := &StandardSshManager{
 		UserName:      "testuser",
-		SshKeyPaths:   keyPaths,
+		SshKeyPath:    keyPath,
 		HostPublicKey: sshPub,
 		keyParser:     mockParser, // Inject the mock
 	}
@@ -557,7 +556,7 @@ func Test_getSshClientConfig_PassAndKey(t *testing.T) {
 }
 
 func Test_DeregisterOS_Success(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	emptyProducts := []models.SuseProduct{}
 	jsonOutput, _ := json.Marshal(emptyProducts)
@@ -570,7 +569,7 @@ func Test_DeregisterOS_Success(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
 	assert.NoError(t, err)
@@ -579,7 +578,7 @@ func Test_DeregisterOS_Success(t *testing.T) {
 }
 
 func Test_DeregisterOS_Fail(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	mockClient := &MockSSHClient{
 		OutputFunc: func(command string) (string, error) {
@@ -587,7 +586,7 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
 	assert.ErrorIs(t, err, MOCK_ERROR_FOR_OUTPUT_METHOD)
@@ -595,7 +594,7 @@ func Test_DeregisterOS_Fail(t *testing.T) {
 }
 
 func Test_DeregisterOS_Skip_When_NoRegisteredProducts(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	products := []models.SuseProduct{
 		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Not Registered"},
@@ -611,7 +610,7 @@ func Test_DeregisterOS_Skip_When_NoRegisteredProducts(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
 	assert.NoError(t, err)
@@ -620,7 +619,7 @@ func Test_DeregisterOS_Skip_When_NoRegisteredProducts(t *testing.T) {
 }
 
 func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedHostPublicKey(t))
 	assert.NoError(t, err)
 	products := []models.SuseProduct{
 		{Identifier: "SLES", Version: "15.6", Arch: "x86_64", Status: "Registered"},
@@ -639,7 +638,7 @@ func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
 		},
 	}
 	manager.Client = mockClient
-	manager.SshKeyPaths = []string{}
+	manager.SshKeyPath = ""
 
 	err = manager.DeregisterOS()
 	assert.NoError(t, err)
@@ -649,7 +648,7 @@ func Test_DeregisterOS_Run_WhenRegistered(t *testing.T) {
 
 func TestHostPublicKeyIsValid_AlreadyValid(t *testing.T) {
 	parsedKey := parsedHostPublicKey(t)
-	manager, err := NewStandardSshManager("host1", "user1", []string{"mock/path1", "mock/path2"}, parsedKey)
+	manager, err := NewStandardSshManager("host1", "user1", "mock/path1", parsedKey)
 	require.NoError(t, err)
 
 	oldIsPublicKeyValid := IsPublicKeyValid
@@ -678,7 +677,7 @@ func TestHostPublicKeyIsValid_OtherDialError_ReturnsWrappedError(t *testing.T) {
 		IsPublicKeyValid = oldIsPublicKeyValid
 	}()
 
-	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
@@ -701,7 +700,7 @@ func TestHostPublicKeyIsValid_ZeroMaxAttempts_NormalizedToOne(t *testing.T) {
 		IsPublicKeyValid = oldIsPublicKeyValid
 	}()
 
-	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("nonexistent-host.invalid", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	dialCalls := 0
@@ -726,7 +725,7 @@ func TestHostPublicKeyIsValid_ConnectionRefused_ReturnsError(t *testing.T) {
 		IsPublicKeyValid = oldIsPublicKeyValid
 	}()
 
-	manager, err := NewStandardSshManager("127.0.0.1", "user1", []string{"mock/path1", "mock/path2"}, parsedHostPublicKey(t))
+	manager, err := NewStandardSshManager("127.0.0.1", "user1", "mock/path1", parsedHostPublicKey(t))
 	require.NoError(t, err)
 
 	SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
