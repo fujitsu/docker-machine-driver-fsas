@@ -172,6 +172,9 @@ func (sc *StandardSshManager) getSshClientConfig() *gossh.ClientConfig {
 		slog.Debug("Added SSH private key to auth methods",
 			"keyPath", sc.SshKeyPath,
 			"pubkey", string(gossh.MarshalAuthorizedKey(sshPrivateKey.PublicKey())))
+	} else {
+		slog.Error("Failed to parse SSH private key", "keyPath", sc.SshKeyPath)
+		return nil
 	}
 
 	slog.Debug("host public key", "hostPublicKey", string(gossh.MarshalAuthorizedKey(sc.HostPublicKey)))
@@ -406,6 +409,9 @@ func (sc *StandardSshManager) WriteFileOnRemoteMachine(path, fileContent string,
 
 	if _, ok := sc.Client.(*ssh.NativeClient); ok {
 		config := sc.getSshClientConfig()
+		if config == nil {
+			return fmt.Errorf("failed to get SSH client config, check SSH key path and host public key")
+		}
 		address := fmt.Sprintf("%s:%d", sc.HostName, port)
 		conn, err := SSHDial("tcp", address, config)
 		if err != nil {
