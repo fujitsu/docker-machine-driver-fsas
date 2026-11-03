@@ -26,6 +26,14 @@ declare -A pairs=(
     ['<dev-spec-json-2-comp-nic-3rd-sub>']='<dev-spec-json-2-comp-nic-3rd-sub>'
 )
 
+# IMPORTANT: in array "pairs" adjust number of spaces in multiline fields e.g. firstLoginSshKey to match
+# indentation in yaml files e.g.
+# ['<first-login-ssh-key>']='-----BEGIN OPENSSH PRIVATE KEY-----
+#      line1
+#      line2
+#      -----END OPENSSH PRIVATE KEY-----'
+
+
 function print_red(){
     printf "\e[31m$1\e[0m"
 }
@@ -41,10 +49,16 @@ keys=''
 # update helm chart fields using the array 'pairs'
 for i in helm-chart-*.yaml; do
     printf "=> updating file: $i ... ";
+    # for key in "${!pairs[@]}"; do
+    #     # debug "#debug# updating key: $key with value: ${pairs[$key]}\n"
+    #     sed -i "s#${key}#${pairs[$key]}#g" "$i"
+    #     # collect keys
+    #     keys+="$key|"
+    # done
     for key in "${!pairs[@]}"; do
-        # debug "#debug# updating key: $key with value: ${pairs[$key]}\n"
-        sed -i "s#${key}#${pairs[$key]}#g" "$i"
-        # collect keys
+        KEY="$key" VALUE="${pairs[$key]}" \
+            perl -0pi -e 's/\Q$ENV{KEY}\E/$ENV{VALUE}/g' "$i"
+
         keys+="$key|"
     done
 
