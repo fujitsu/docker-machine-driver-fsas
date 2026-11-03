@@ -1,24 +1,20 @@
+trigger:
+  branches:
+    include:
+      - 'feature/sync-repos'
 
-trigger: none
 pr: none
 
 variables:
 - group: lupi-var-gr-1
 
-# Run every 15 minutes
-# schedules:
-#   - cron: '*/55 * * * *'
-#     displayName: 'GitHub to Azure synchronization'
-#     branches:
-#       include:
-#         - main
-#     always: true
-
 pool:
   vmImage: ubuntu-latest
 
 steps:
-  - checkout: none
+  - checkout: self
+    persistCredentials: "true"
+    fetchDepth: "0"
 
   - bash: |
       set -euo pipefail
@@ -46,4 +42,67 @@ steps:
       GITHUB_REPO_URL: $(GITHUB_REPO_URL)
       AZURE_REPO_URL: $(AZURE_REPO_URL)
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+
+  - bash: |
+      set -euo pipefail
+
+      echo "Starting GitHub -> Azure -> GitHub synchronization"
+
+      # Identify the branch
+      BRANCH="${BUILD_SOURCEBRANCH#refs/heads/}"
+
+      if [ "$BRANCH" = "$BUILD_SOURCEBRANCH" ]; then
+        echo "Not a branch. Skipping."
+        exit 0
+      fi
+
+      # Configure Git identity for merge commits
+      git config user.name "Azure Sync Bot"
+      git config user.email "azure-sync-bot@example.com"
+
+      repopat="https://${GITHUB_PAT}@github.com/fujitsu/docker-machine-driver-fsas"
+
+      # Add GitHub as a second remote
+      git remote add github "$GITHUB_REPO_URL"
+      git remote set-url --push github "$repopat"
+      echo "repo remotes: "
+      git remote -v
+
+      # Fetch latest GitHub branch
+      echo "Fetching GitHub changes..."
+
+      git fetch github "refs/heads/$BRANCH:refs/remotes/github/$BRANCH"
+
+      # Merge GitHub changes into Azure branch
+      echo "Merging GitHub changes..."
+
+      git merge --no-ff --no-edit \
+        -m "Merge latest GitHub changes [skip ci]" \
+        "refs/remotes/github/$BRANCH"
+
+      # Save merged changes in Azure Repos
+      echo "Updating Azure Repos..."
+
+      git push origin "HEAD:refs/heads/$BRANCH"
+
+      # Forward the merged result to GitHub
+      echo "Updating GitHub..."
+      echo "branch= $BRANCH"
+      echo "gh user= $GITHUB_USERNAME"
+
+      echo "Pushing merged changes to GitHub..."
+      git push github "HEAD:refs/heads/$BRANCH"
+
+      echo "Synchronization completed successfully."
+
+    displayName: 'Merge GitHub changes and synchronize repositories'
+
+    env:
+      GITHUB_REPO_URL: $(GITHUB_REPO_URL)
+      GITHUB_USERNAME: $(GITHUB_USERNAME)
+      GITHUB_PAT: $(GITHUB_PAT)
+      BUILD_SOURCEBRANCH: $(Build.SourceBranch)
+      AGENT_TEMPDIRECTORY: $(Agent.TempDirectory)
+
 
