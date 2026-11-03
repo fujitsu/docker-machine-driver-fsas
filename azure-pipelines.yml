@@ -69,17 +69,17 @@ steps:
       echo "repo remotes: "
       git remote -v
 
-      # Fetch latest GitHub branch
-      echo "Fetching GitHub changes..."
+      if git ls-remote --exit-code --heads github "$BRANCH" >/dev/null; then
+        echo "Fetching GitHub changes..."
+        git fetch github "refs/heads/$BRANCH:refs/remotes/github/$BRANCH"
 
-      git fetch github "refs/heads/$BRANCH:refs/remotes/github/$BRANCH"
-
-      # Merge GitHub changes into Azure branch
-      echo "Merging GitHub changes..."
-
-      git merge --no-ff --no-edit \
-        -m "Merge latest GitHub changes [skip ci]" \
-        "refs/remotes/github/$BRANCH"
+        echo "Merging GitHub changes..."
+        git merge --no-ff --no-edit \
+          -m "Merge latest GitHub changes [skip ci]" \
+          "refs/remotes/github/$BRANCH"
+      else
+        echo "GitHub branch '$BRANCH' does not exist; it will be created."
+      fi
 
       # Save merged changes in Azure Repos
       echo "Updating Azure Repos..."
