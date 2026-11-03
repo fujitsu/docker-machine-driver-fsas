@@ -94,7 +94,7 @@ questions:
 - variable: fsas.controlPlane.networkBaremetalUuid
   label: Baremetal Network UUID
   type: string
-  required: true
+  required: false
   group: FSAS Control Plane
 
 - variable: fsas.controlPlane.networkProvisionUuid
@@ -166,7 +166,7 @@ questions:
 - variable: fsas.worker.networkBaremetalUuid
   label: Baremetal Network UUID
   type: string
-  required: true
+  required: false
   group: FSAS Worker
 
 - variable: fsas.worker.networkProvisionUuid

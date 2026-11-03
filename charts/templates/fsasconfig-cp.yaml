@@ -20,7 +20,7 @@ slesRegistrationEmail: ""
 osImageName: {{ required "fsas.controlPlane.osImageName is required" .Values.fsas.controlPlane.osImageName | quote }}
 computeConditionsJson: {{ required "fsas.controlPlane.computeConditionsJson is required" .Values.fsas.controlPlane.computeConditionsJson | toJson }}
 devicesSpecJson: {{ required "fsas.controlPlane.devicesSpecJson is required" .Values.fsas.controlPlane.devicesSpecJson | toJson }}
-networkBaremetalUuid: {{ required "fsas.controlPlane.networkBaremetalUuid is required" .Values.fsas.controlPlane.networkBaremetalUuid | quote }}
+networkBaremetalUuid: {{ .Values.fsas.controlPlane.networkBaremetalUuid | quote }}
 networkProvisionUuid: {{ required "fsas.controlPlane.networkProvisionUuid is required" .Values.fsas.controlPlane.networkProvisionUuid | quote }}
 networkProvisionDefaultGw: {{ required "fsas.controlPlane.networkProvisionDefaultGw is required" .Values.fsas.controlPlane.networkProvisionDefaultGw | quote }}
 enableBaremetalBonding: {{ .Values.fsas.controlPlane.enableBaremetalBonding }}
