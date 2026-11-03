@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - 'feature/sync-repos'
+      - '*'
 
 pr: none
 
