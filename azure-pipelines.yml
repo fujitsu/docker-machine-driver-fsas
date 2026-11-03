@@ -104,5 +104,3 @@ steps:
       GITHUB_PAT: $(GITHUB_PAT)
       BUILD_SOURCEBRANCH: $(Build.SourceBranch)
       AGENT_TEMPDIRECTORY: $(Agent.TempDirectory)
-
-
