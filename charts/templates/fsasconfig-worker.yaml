@@ -25,7 +25,7 @@ networkProvisionUuid: {{ required "fsas.worker.networkProvisionUuid is required"
 networkProvisionDefaultGw: {{ required "fsas.worker.networkProvisionDefaultGw is required" .Values.fsas.worker.networkProvisionDefaultGw | quote }}
 enableBaremetalBonding: {{ .Values.fsas.worker.enableBaremetalBonding }}
 sshUser: {{ required "fsas.worker.sshUser is required" .Values.fsas.worker.sshUser | quote }}
-sshPassword: {{ required "fsas.worker.sshPassword is required" .Values.fsas.worker.sshPassword | quote }}
+firstLoginSshKey: {{ required "fsas.worker.firstLoginSshKey is required" .Values.fsas.worker.firstLoginSshKey | quote }}
 imageOsSshHostPubKey: {{ required "fsas.worker.imageOsSshHostPubKey is required" .Values.fsas.worker.imageOsSshHostPubKey | quote }}
 userdata: {{ .Values.fsas.worker.userdata | quote }}
 {{- end }}

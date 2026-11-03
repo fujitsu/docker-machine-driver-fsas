@@ -15,7 +15,7 @@ declare -A pairs=(
     ['<netp-gw>']='<netp-gw>'
     ['<os-image-name>']='<os-image-name>'
     ['<ssh-user>']='<ssh-user>'
-    ['<ssh-pwd>']='<ssh-pwd>'
+    ['<first-login-ssh-key>']='<first-login-ssh-key>'
     ['<image-ssh-pub-key>']='<image-ssh-pub-key>'
     ['<comp-cond-json>']='<comp-cond-json>'
     ['<dev-spec-json>']='<dev-spec-json>'
@@ -44,7 +44,6 @@ for i in helm-chart-*.yaml; do
     for key in "${!pairs[@]}"; do
         # debug "#debug# updating key: $key with value: ${pairs[$key]}\n"
         sed -i "s#${key}#${pairs[$key]}#g" "$i"
-
         # collect keys
         keys+="$key|"
     done

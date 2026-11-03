@@ -39,7 +39,8 @@ fsas:
     enableBaremetalBonding: "false"
     osImageName: <os-image-name>
     sshUser: <ssh-user>
-    sshPassword: <ssh-pwd>
+    firstLoginSshKey: |-
+      <first-login-ssh-key>
     imageOsSshHostPubKey: <image-ssh-pub-key>
     userdata:
 
@@ -57,7 +58,7 @@ fsas:
     osImageName:
     imageOsSshHostPubKey:
     sshUser:
-    sshPassword:
+    firstLoginSshKey:
     userdata:
     computeConditionsJson:
     devicesSpecJson:

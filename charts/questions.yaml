@@ -129,11 +129,10 @@ questions:
   default: rancher
   group: FSAS Control Plane
 
-- variable: fsas.controlPlane.sshPassword
-  label: SSH Password
-  type: password
+- variable: fsas.controlPlane.firstLoginSshKey
+  label: First Login SSH Private Key
+  type: multiline
   required: true
-  default: rancher
   group: FSAS Control Plane
 
 - variable: fsas.controlPlane.userdata
@@ -201,11 +200,10 @@ questions:
   default: rancher
   group: FSAS Worker
 
-- variable: fsas.worker.sshPassword
-  label: SSH Password
-  type: password
+- variable: fsas.worker.firstLoginSshKey
+  label: First Login SSH Private Key
+  type: multiline
   required: true
-  default: rancher
   group: FSAS Worker
 
 - variable: fsas.worker.userdata

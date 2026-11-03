@@ -42,7 +42,8 @@ fsas:
     enableBaremetalBonding: false
     osImageName: sles16
     sshUser: rancher-username
-    sshPassword: rancher-password
+    firstLoginSshKey: |-
+      <paste multiline SSH private key here>
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
     userdata:
 
@@ -60,7 +61,8 @@ fsas:
     osImageName: sles16
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AA...
     sshUser: rancher-username
-    sshPassword: rancher-password
+    firstLoginSshKey: |-
+      <paste multiline SSH private key here>
     userdata:
 
     computeConditionsJson: >

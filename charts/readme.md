@@ -37,8 +37,8 @@ The templates currently read these key paths from `values.yaml`:
 - `machinePools.*` for the machine definition (single or multi-node)
 - `rkeConfig.*` for RKE2 and upgrade behavior
 - `machineSelectorConfig.*` for node-level options
-- `fsas.controlPlane.*` for FSAS driver Control Plane settings (networks, gateway, bonding, OS image, SSH user and password)
-- `fsas.worker.*` for FSAS driver worker settings (networks, gateway, bonding, OS image, SSH user and password)
+- `fsas.controlPlane.*` for FSAS driver Control Plane settings (networks, gateway, bonding, OS image, SSH user and first-login SSH private key)
+- `fsas.worker.*` for FSAS driver worker settings (networks, gateway, bonding, OS image, SSH user and first-login SSH private key)
 
 If you render from CLI, make sure your override file uses the same paths used by templates.
 
@@ -84,7 +84,8 @@ fsas:
     enableBaremetalBonding: false
     osImageName: sles16
     sshUser: rancher
-    sshPassword: rancher
+    firstLoginSshKey: |-
+      <paste multiline SSH private key here>
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
     userdata: ""
     computeConditionsJson: >
@@ -123,7 +124,8 @@ fsas:
     enableBaremetalBonding: false
     osImageName: sles16
     sshUser: rancher
-    sshPassword: rancher
+    firstLoginSshKey: |-
+      <paste multiline SSH private key here>
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
     userdata: ""
     computeConditionsJson: >
@@ -138,7 +140,8 @@ fsas:
 	enableBaremetalBonding: true
     osImageName: sles16
     sshUser: rancher
-    sshPassword: rancher
+    firstLoginSshKey: |-
+      <paste multiline SSH private key here>
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
     userdata: ""
     computeConditionsJson: >
@@ -184,7 +187,8 @@ fsas:
     enableBaremetalBonding: false
     osImageName: sles16
     sshUser: rancher
-    sshPassword: rancher
+    firstLoginSshKey: |-
+      <paste multiline SSH private key here>
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
     userdata: ""
     computeConditionsJson: >
@@ -199,7 +203,8 @@ fsas:
 	enableBaremetalBonding: true
     osImageName: sles16
     sshUser: rancher
-    sshPassword: rancher
+    firstLoginSshKey: |-
+      <paste multiline SSH private key here>
     imageOsSshHostPubKey: ecdsa-sha2-nistp256 AAA=
     userdata: ""
     computeConditionsJson: >
