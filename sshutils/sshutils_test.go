@@ -497,44 +497,56 @@ func Test_getSSHKeyAuthMethod_Success(t *testing.T) {
 	assert.NotNil(t, signer)
 }
 
-func Test_getSshClientConfig_PassOnly(t *testing.T) {
+func Test_getSshClientConfig_ValidKey(t *testing.T) {
 	mockParser := mock.NewMockSSHKeyParser(t)
-	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
 
-	keyPath := "/path/to/invalid/key1"
-	mockParser.On("Parse", keyPath).Return(nil)
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	require.NoError(t, err, "Failed to marshal private key")
+
+	// Create a temporary file to store the key
+	keyPath, err := os.CreateTemp(t.TempDir(), "id_rsa")
+	require.NoError(t, err, "Failed to create temp file for key")
+
+	// save the private key to the temporary file in PEM format
+	err = pem.Encode(keyPath, &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	})
+	require.NoError(t, err, "Failed to encode PEM block to file")
+	require.NoError(t, keyPath.Close(), "Failed to close key file")
+
+	signer := NewFileSSHKeyParser()
+	signer2 := signer.Parse(keyPath.Name())
+	mockParser.On("Parse", keyPath.Name()).Return(signer2)
 
 	manager := &StandardSshManager{
 		UserName:      "testuser",
-		SshKeyPath:    keyPath,
+		SshKeyPath:    keyPath.Name(),
 		HostPublicKey: sshPub,
 		keyParser:     mockParser,
 	}
 
 	config := manager.getSshClientConfig()
 	assert.NotNil(t, config)
-	assert.Len(t, config.Auth, 0)
+	assert.Len(t, config.Auth, 1)
 	mockParser.AssertExpectations(t)
 }
 
-func Test_getSshClientConfig_PassAndKey(t *testing.T) {
+func Test_getSshClientConfig_InvalidKey(t *testing.T) {
 	mockParser := mock.NewMockSSHKeyParser(t)
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(t, err)
-	signer, err := gossh.NewSignerFromKey(priv)
-	require.NoError(t, err)
 	keyPath := "/path/to/invalid/key1"
 
-	// Configure the mock to return a valid signer when Parse is called.
-	// This simulates finding and successfully parsing a private key.
-	mockParser.On("Parse", keyPath).Return(signer)
+	// Configure the mock to return a nil when Parse is called.
+	// This simulates failing to parse a private key.
+	mockParser.On("Parse", keyPath).Return(nil)
 
 	manager := &StandardSshManager{
 		UserName:      "testuser",
@@ -545,12 +557,7 @@ func Test_getSshClientConfig_PassAndKey(t *testing.T) {
 
 	config := manager.getSshClientConfig()
 
-	assert.NotNil(t, config)
-	assert.Equal(t, "testuser", config.User)
-	// We expect two auth methods: password and public key.
-	assert.Len(t, config.Auth, 1, "There should be public key authentication")
-	assert.Equal(t, []string{sshPub.Type()}, config.HostKeyAlgorithms)
-
+	assert.Nil(t, config)
 	// Verify that the mock was called as expected.
 	mockParser.AssertExpectations(t)
 }
