@@ -25,7 +25,7 @@ networkProvisionUuid: {{ required "fsas.controlPlane.networkProvisionUuid is req
 networkProvisionDefaultGw: {{ required "fsas.controlPlane.networkProvisionDefaultGw is required" .Values.fsas.controlPlane.networkProvisionDefaultGw | quote }}
 enableBaremetalBonding: {{ .Values.fsas.controlPlane.enableBaremetalBonding }}
 sshUser: {{ required "fsas.controlPlane.sshUser is required" .Values.fsas.controlPlane.sshUser | quote }}
-sshPassword: {{ required "fsas.controlPlane.sshPassword is required" .Values.fsas.controlPlane.sshPassword | quote }}
+firstLoginSshKey: {{ required "fsas.controlPlane.firstLoginSshKey is required" .Values.fsas.controlPlane.firstLoginSshKey | quote }}
 imageOsSshHostPubKey: {{ required "fsas.controlPlane.imageOsSshHostPubKey is required" .Values.fsas.controlPlane.imageOsSshHostPubKey | quote }}
 userdata: {{ .Values.fsas.controlPlane.userdata | quote }}
 {{- end }}
