@@ -3,6 +3,7 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
+kube_version='v1.34.3'
 
 function printf_red() {
   printf "${RED}${1}${NC}"
@@ -15,7 +16,7 @@ function printf_green() {
 cfile='values.custom.yaml'
 
 printf "==> Linting values file ... "
-lint_response=$(helm lint . -f $cfile)
+lint_response=$(helm lint . -f $cfile --kube-version "$kube_version")
 
 echo $lint_response | egrep 'WARN|ERROR'
 if [[ $? -eq 0 ]]; then
@@ -30,7 +31,7 @@ if [[ -f $rfile ]]; then
   rm $rfile
 fi
 
-helm template fsas-cluster . -f $cfile >$rfile
+helm template fsas-cluster . -f $cfile --kube-version "$kube_version" > $rfile
 if [[ $? -ne 0 ]]; then
   printf_red "\nRendering error. Abort\n"
   exit 1
