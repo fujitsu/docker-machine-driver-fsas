@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 func TestMain(m *testing.M) {
@@ -92,7 +93,6 @@ func TestSetConfigFromFlagsTrimsWhitespace(t *testing.T) {
 		CreateFlags: driver.GetCreateFlags(),
 		FlagsValues: map[string]interface{}{
 			"fsas-ssh-user":                     "  user  ",
-			"fsas-ssh-password":                 "  secret-pass  ",
 			"fsas-tenant-uuid":                  "  cdi-test  ",
 			"fsas-credentials-username":         "  admin  ",
 			"fsas-credentials-password":         "  admin-pass  ",
@@ -111,6 +111,7 @@ func TestSetConfigFromFlagsTrimsWhitespace(t *testing.T) {
 			"fsas-image-os-ssh-host-pub-key":    "  " + hostPublicKey + "  ",
 			"fsas-sles-registration-code":       "",
 			"fsas-sles-registration-email":      "",
+			"fsas-first-login-ssh-key":          "111-222-333",
 		},
 	}
 
@@ -133,8 +134,7 @@ func TestSetConfigFromFlagsTrimsWhitespace(t *testing.T) {
 	assert.Equal(t, "userData.json", driver.UserDataFile, "UserDataFile should be trimmed")
 	assert.Equal(t, hostPublicKey, driver.OsImageSshHostPubKey, "OsImageSshHostPubKey should be trimmed")
 
-	// Verify passwords are NOT trimmed (whitespace may be intentional)
-	assert.Equal(t, "  secret-pass  ", driver.SSHPassword, "SSHPassword should NOT be trimmed")
+	// Verify password is NOT trimmed (whitespace may be intentional)
 	assert.Equal(t, "  admin-pass  ", driver.Password, "Password should NOT be trimmed")
 }
 
@@ -282,7 +282,6 @@ func TestCheckConfigTenantSuccess(t *testing.T) {
 		BaseDriver:                &drivers.BaseDriver{},
 		FabricManager:             mockFM,
 		Keycloak:                  mockKeycloak,
-		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
 		NetworkBaremetalUUID:      "test",
 		NetworkProvisionUUID:      "test",
@@ -293,6 +292,7 @@ func TestCheckConfigTenantSuccess(t *testing.T) {
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      hostPublicKey,
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -313,7 +313,6 @@ func TestCheckConfigEmptySshHostPubKey(t *testing.T) {
 		BaseDriver:                &drivers.BaseDriver{},
 		FabricManager:             mockFM,
 		Keycloak:                  mockKeycloak,
-		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
 		NetworkBaremetalUUID:      "test",
 		NetworkProvisionUUID:      "test",
@@ -324,6 +323,7 @@ func TestCheckConfigEmptySshHostPubKey(t *testing.T) {
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      "",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -343,7 +343,6 @@ func TestCheckConfigInvalidSshHostPubKey(t *testing.T) {
 		BaseDriver:                &drivers.BaseDriver{},
 		FabricManager:             mockFM,
 		Keycloak:                  mockKeycloak,
-		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
 		NetworkBaremetalUUID:      "test",
 		NetworkProvisionUUID:      "test",
@@ -354,6 +353,7 @@ func TestCheckConfigInvalidSshHostPubKey(t *testing.T) {
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      "not-a-valid ssh-key",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -374,7 +374,6 @@ func TestCheckConfig_SlesParamsFail(t *testing.T) {
 		BaseDriver:                &drivers.BaseDriver{},
 		FabricManager:             mockFM,
 		Keycloak:                  mockKeycloak,
-		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
 		NetworkBaremetalUUID:      "test",
 		NetworkProvisionUUID:      "test",
@@ -386,6 +385,7 @@ func TestCheckConfig_SlesParamsFail(t *testing.T) {
 		UserDataFile:              "userData.json",
 		OsImageSshHostPubKey:      hostPublicKey,
 		SlesRegistrationCode:      "123",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -440,7 +440,6 @@ func TestCheckConfigTenantFailed(t *testing.T) {
 		BaseDriver:                &drivers.BaseDriver{},
 		FabricManager:             mockFM,
 		Keycloak:                  mockKeycloak,
-		SSHPassword:               "pass",
 		ComputeConditionsJson:     "test",
 		NetworkBaremetalUUID:      "test",
 		NetworkProvisionUUID:      "test",
@@ -450,6 +449,7 @@ func TestCheckConfigTenantFailed(t *testing.T) {
 		TenantUuid:                "cdi-test",
 		OsImageName:               "Ubuntu",
 		UserDataFile:              "userData.json",
+		FirstLoginSshKey:          "111-222-333",
 	}
 	driver.SSHUser = "user"
 
@@ -467,7 +467,6 @@ func TestCheckConfigSSHUserFailed(t *testing.T) {
 	driver := &Driver{
 		BaseDriver:            &drivers.BaseDriver{},
 		FabricManager:         mockFM,
-		SSHPassword:           "pass",
 		ComputeConditionsJson: "test",
 		NetworkBaremetalUUID:  "test",
 		NetworkProvisionUUID:  "test",
@@ -862,29 +861,41 @@ func TestInitSshManagerSuccess(t *testing.T) {
 			SSHKeyPath: "/tmp/test-key",
 			IPAddress:  "192.168.1.10",
 		},
-		SSHPassword:             "rancher",
 		OsImageSshHostPubKey:    hostPubKeyStr,
 		OsImageSshHostParsedKey: parsedKey,
 		SshManager:              mockSSH,
+		FirstLoginSshKey:        "firstLoginSSHKeyPath",
 	}
 
 	mockSSH.On("IsReady").Return(false)
-	old := sshutils.IsPublicKeyValid
-	sshutils.IsPublicKeyValid = true
-	defer func() { sshutils.IsPublicKeyValid = old }()
+	oldSSHDial := sshutils.SSHDial
+	oldIsPublicKeyValid := sshutils.IsPublicKeyValid
+	defer func() {
+		sshutils.SSHDial = oldSSHDial
+		sshutils.IsPublicKeyValid = oldIsPublicKeyValid
+	}()
+	sshutils.IsPublicKeyValid = false
+	sshutils.SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+		assert.Equal(t, "tcp", network)
+		assert.Equal(t, "192.168.1.10:22", addr)
+		assert.Equal(t, "rancher", config.User)
+		require.NoError(t, config.HostKeyCallback("192.168.1.10", nil, parsedKey))
+		return nil, fmt.Errorf("handshake terminated after host key verification")
+	}
 
 	err = driver.initSshManager(3)
 
-	sshutils.IsPublicKeyValid = false
 	assert.NoError(t, err)
-	// After successful init, SshManager should have been replaced with a real StandardSshManager
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
 }
 
 func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 	mockSSH := sshMock.NewMockSshManager(t)
 	hostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+	mismatchedHostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHMl5neMPoM8XtWmsrSI1TxGe+iWUwfeA62gW0y7a5SM+vJ7WafERtBZJlWBgfOv+zVEPdUjkO0fnWoVbELLjSI="
 	parsedKey, err := sshutils.ParseSSHPublicKey(hostPubKeyStr)
+	require.NoError(t, err)
+	mismatchedKey, err := sshutils.ParseSSHPublicKey(mismatchedHostPubKeyStr)
 	require.NoError(t, err)
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
@@ -892,21 +903,35 @@ func TestInitSshManagerFailPublicKeyFailed(t *testing.T) {
 			SSHKeyPath: "/tmp/test-key",
 			IPAddress:  "192.168.1.10",
 		},
-		SSHPassword:             "rancher",
 		OsImageSshHostPubKey:    hostPubKeyStr,
 		OsImageSshHostParsedKey: parsedKey,
 		SshManager:              mockSSH,
+		FirstLoginSshKey:        "firstLoginSSHKeyPath",
 	}
 
 	mockSSH.On("IsReady").Return(false)
-	// Setting an IP address as a string that starts with "["" will cause an error:
-	// "Failed to dial SSH server: err=dial tcp: address [test:22: missing ']' in address;"
-	driver.IPAddress = "[test"
+	oldSSHDial := sshutils.SSHDial
+	oldIsPublicKeyValid := sshutils.IsPublicKeyValid
+	defer func() {
+		sshutils.SSHDial = oldSSHDial
+		sshutils.IsPublicKeyValid = oldIsPublicKeyValid
+	}()
+	sshutils.IsPublicKeyValid = false
+	sshutils.SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+		assert.Equal(t, "tcp", network)
+		assert.Equal(t, "192.168.1.10:22", addr)
+		assert.Equal(t, "rancher", config.User)
+		err := config.HostKeyCallback("192.168.1.10", nil, mismatchedKey)
+		require.EqualError(t, err, "mismatch between received host key and reference host key")
+		return nil, fmt.Errorf("mismatch between received host key and reference host key")
+	}
+
 	err = driver.initSshManager(3)
 	assert.Error(t, err)
+	assert.EqualError(t, err, "mismatch between received host key and reference host key")
 	// SshManager must NOT be replaced when HostPublicKeyIsValid fails, so that
 	// subsequent callers (e.g. Remove) correctly see IsReady()==false and skip SSH.
-	assert.IsType(t, &sshMock.MockSshManager{}, driver.SshManager)
+	assert.Same(t, mockSSH, driver.SshManager)
 }
 
 // TestInitSshManagerRetriggersAfterPublicKeyValidationFailed is the regression
@@ -928,7 +953,6 @@ func TestInitSshManagerRetriggersAfterPublicKeyValidationFailed(t *testing.T) {
 			SSHKeyPath: "/tmp/test-key",
 			IPAddress:  "[test", // malformed address: HostPublicKeyIsValid fails immediately
 		},
-		SSHPassword:             "rancher",
 		OsImageSshHostPubKey:    hostPubKeyStr,
 		OsImageSshHostParsedKey: parsedKey,
 		SshManager:              &sshutils.StandardSshManager{}, // real manager: IsReady() reads the package var
@@ -953,28 +977,38 @@ func TestInitSshManagerRetriggersAfterPublicKeyValidationFailed(t *testing.T) {
 func TestInitSshManagerSuccessWithParsedKeyNil(t *testing.T) {
 	// Simulates the Remove/JSON-restore path where OsImageSshHostParsedKey is nil
 	// (not serialized) but the raw string is available for lazy re-parsing.
-	mockSSH := sshMock.NewMockSshManager(t)
+	initialSSH := sshMock.NewMockSshManager(t)
 	hostPubKeyStr := "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNlLkDgzQ7FWYLi7wl3ljvaF/n0FEpSrML23hJjvv3HfEvNJxNbjm1GomnefDM9/qYV2pRAganbMMnCG8gs7KD8="
+	parsedKey, err := sshutils.ParseSSHPublicKey(hostPubKeyStr)
+	require.NoError(t, err)
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			SSHUser:    "rancher",
 			SSHKeyPath: "/tmp/test-key",
 			IPAddress:  "192.168.1.10",
 		},
-		SSHPassword:             "rancher",
 		OsImageSshHostPubKey:    hostPubKeyStr,
 		OsImageSshHostParsedKey: nil,
-		SshManager:              mockSSH,
+		SshManager:              initialSSH,
 	}
 
-	mockSSH.On("IsReady").Return(false)
-	sshutils.IsPublicKeyValid = true
-
-	old := sshutils.IsPublicKeyValid
-	sshutils.IsPublicKeyValid = true
-	defer func() { sshutils.IsPublicKeyValid = old }()
-	err := driver.initSshManager(3)
+	initialSSH.On("IsReady").Return(false)
+	oldSSHDial := sshutils.SSHDial
+	oldIsPublicKeyValid := sshutils.IsPublicKeyValid
+	defer func() {
+		sshutils.SSHDial = oldSSHDial
+		sshutils.IsPublicKeyValid = oldIsPublicKeyValid
+	}()
 	sshutils.IsPublicKeyValid = false
+	sshutils.SSHDial = func(network, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+		assert.Equal(t, "tcp", network)
+		assert.Equal(t, "192.168.1.10:22", addr)
+		assert.Equal(t, "rancher", config.User)
+		require.NoError(t, config.HostKeyCallback("192.168.1.10", nil, parsedKey))
+		return nil, fmt.Errorf("handshake terminated after host key verification")
+	}
+
+	err = driver.initSshManager(3)
 	assert.NoError(t, err)
 	assert.IsType(t, &sshutils.StandardSshManager{}, driver.SshManager)
 	// The parsed key should have been populated by lazy parsing
@@ -990,7 +1024,6 @@ func TestInitSshManagerFailInvalidPubKeyFormat(t *testing.T) {
 			SSHKeyPath: "/tmp/test-key",
 			IPAddress:  "192.168.1.10",
 		},
-		SSHPassword:             "rancher",
 		OsImageSshHostPubKey:    "not-a-valid ssh-key",
 		OsImageSshHostParsedKey: nil,
 		SshManager:              mockSSH,
@@ -1027,7 +1060,6 @@ func TestInitSshManagerFailNewStandardSshManager(t *testing.T) {
 			SSHKeyPath: "",
 			IPAddress:  "192.168.1.10",
 		},
-		SSHPassword:             "",
 		OsImageSshHostPubKey:    "",
 		OsImageSshHostParsedKey: nil,
 		SshManager:              mockSSH,
@@ -1193,6 +1225,7 @@ func TestCreate(t *testing.T) {
 		DnsIp:                 "test",
 		SlesRegistrationCode:  "somecode010101",
 		SlesRegistrationEmail: "hoge@example.com",
+		FirstLoginSshKey:      "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1224,7 +1257,7 @@ func TestCreate(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
-	mockCfg.On("DisableSSHLogin").Return(nil)
+	mockCfg.On("RemoveFirstSSHLogin", "firstLoginSSHKeyPath").Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	metadataPath := filepath.Join(cloudInitDirPath, "meta-data")
@@ -1274,6 +1307,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 		DnsIp:                 "test",
 		SlesRegistrationCode:  "somecode010101",
 		SlesRegistrationEmail: "hoge@example.com",
+		FirstLoginSshKey:      "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -1304,7 +1338,7 @@ func TestCreateCloudInitFail(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", "ff3a4a18-1ef9-4e17-9c8d-eec35b3c638f").Return(nil)
 	mockCfg.On("InjectOSRegistration", driver.SlesRegistrationCode, driver.SlesRegistrationEmail).Return(nil)
-	mockCfg.On("DisableSSHLogin").Return(nil)
+	mockCfg.On("RemoveFirstSSHLogin", "firstLoginSSHKeyPath").Return(nil)
 	// applyCloudInit
 	userdataPath := filepath.Join(cloudInitDirPath, "user-data")
 	mockSSH.On("WriteFileOnRemoteMachine", userdataPath, "custom-user-data.yaml", fs.FileMode(0700)).Return(fmt.Errorf("WriteFileOnRemoteMachine failed"))
@@ -1965,7 +1999,6 @@ func TestStop_success(t *testing.T) {
 			IPAddress: "10.1.2.3",
 			SSHUser:   "user-1",
 		},
-		SSHPassword:   "password1",
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
@@ -1994,7 +2027,6 @@ func TestStop_GracefulShutdown_failed(t *testing.T) {
 			IPAddress: "10.1.2.3",
 			SSHUser:   "user-1",
 		},
-		SSHPassword:   "password1",
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
@@ -2021,7 +2053,6 @@ func TestStop_waitForStatus_failed(t *testing.T) {
 			IPAddress: "10.1.2.3",
 			SSHUser:   "user-1",
 		},
-		SSHPassword:   "password1",
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
@@ -2048,7 +2079,6 @@ func TestRestartSuccess(t *testing.T) {
 			IPAddress: "10.1.2.3",
 			SSHUser:   "user-1",
 		},
-		SSHPassword:   "password1",
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
@@ -2074,7 +2104,6 @@ func TestRestartFailReboot(t *testing.T) {
 			IPAddress: "10.1.2.3",
 			SSHUser:   "user-1",
 		},
-		SSHPassword:   "password1",
 		MachineUUID:   "cdd792f2-5591-4c18-a8bd-1c39e55dedfa",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
@@ -2101,7 +2130,6 @@ func TestRestartFailEmptyMachineUUID(t *testing.T) {
 			IPAddress: "10.1.2.3",
 			SSHUser:   "user-1",
 		},
-		SSHPassword:   "password1",
 		MachineUUID:   "",
 		FabricManager: mockFM,
 		Keycloak:      mockKeycloak,
@@ -2546,6 +2574,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 		NetworkProvisionUUID:   testProvisionUUID,
 		NtpUrl:                 "test",
 		DnsIp:                  "test",
+		FirstLoginSshKey:       "firstLoginSSHKeyPath",
 	}
 	driver.MachineName = "machineNameTest"
 
@@ -2579,7 +2608,7 @@ func TestCreate_BondingEnabled_BootCmdInjected(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", testMachineUUID).Return(nil)
 	mockCfg.On("InjectOSRegistration", "", "").Return(nil)
-	mockCfg.On("DisableSSHLogin").Return(nil)
+	mockCfg.On("RemoveFirstSSHLogin", "firstLoginSSHKeyPath").Return(nil)
 
 	expectedBootCmds := []string{
 		`find /etc/NetworkManager/system-connections/ -type f ! -name "*cloud-init*" -delete`,
@@ -2669,7 +2698,6 @@ func TestCreate_BondingEnabled_BootCmdFailed(t *testing.T) {
 	mockCfg.On("ImplantSSHKey", "machines/machineNameTest/id_rsa", "").Return(nil)
 	mockCfg.On("ImplantRKE2Config", "100-fsas-providerid.yaml", testMachineUUID).Return(nil)
 	mockCfg.On("InjectOSRegistration", "", "").Return(nil)
-	mockCfg.On("DisableSSHLogin").Return(nil)
 
 	bootCmdErr := fmt.Errorf("bootcmd injection failed")
 	expectedBootCmds := []string{
