@@ -1,18 +1,14 @@
 #!/usr/bin/env bash
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
 kube_version='v1.34.3'
 
-function printf_red() {
-  printf "${RED}${1}${NC}"
+function printf_red(){
+    printf "\e[31m$1\e[0m"
 }
 
-function printf_green() {
-  printf "${GREEN}${1}${NC}"
+function printf_green(){
+    printf "\e[32m$1\e[0m"
 }
-
 if [[ -z $1 ]]; then
   echo "Pass config file as param e.g. values.custom.yaml. Abort"
   exit 1

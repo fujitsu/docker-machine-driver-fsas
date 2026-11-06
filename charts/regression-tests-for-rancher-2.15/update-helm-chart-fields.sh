@@ -29,18 +29,18 @@ declare -A pairs=(
 # IMPORTANT: in array "pairs" adjust number of spaces in multiline fields e.g. firstLoginSshKey
 # to match indentation in yaml files e.g.
 # ['<first-login-ssh-key>']='-----BEGIN OPENSSH PRIVATE KEY-----
-#      line1
-#      line2
-#      -----END OPENSSH PRIVATE KEY-----'
+#   line1
+#   line2
+#   -----END OPENSSH PRIVATE KEY-----'
 
 
-function print_red(){
+function printf_red(){
     printf "\e[31m$1\e[0m"
 }
-function print_yellow(){
+function printf_yellow(){
     printf "\e[33m$1\e[0m"
 }
-function print_green(){
+function printf_green(){
     printf "\e[32m$1\e[0m"
 }
 
@@ -49,7 +49,7 @@ keys=''
 # update helm chart fields using the array 'pairs'
 for i in helm-chart-*.yaml; do
     if [[ ! -f "$i" ]]; then
-        print_red "Error: file not found: $i\n"
+        printf_red "Error: file not found: $i\n"
     fi
     printf "=> updating file: $i ... ";
     for key in "${!pairs[@]}"; do
@@ -65,19 +65,19 @@ for i in helm-chart-*.yaml; do
 
     # after replacing keys check if by accident any defined placeholders are left
     if [[ $(egrep "$keys" "$i" | wc -l) -ne 0 ]]; then
-        print_red "Warning: defined placeholders left:\n"
+        printf_red "Warning: defined placeholders left:\n"
         result=$(egrep -n "$keys" "$i")
-        print_red "    $result\n"
+        printf_red "    $result\n"
     fi
 
     # after replacing keys check if by accident any generic placeholders are left
     if [[ $(grep '<[^>]*>' "$i" | wc -l) -ne 0 ]]; then
-        print_yellow "    Warning: generic placeholders left:\n"
-        print_yellow "    $(grep -n '<[^>]*>' "$i")\n"
+        printf_yellow "    Warning: generic placeholders left:\n"
+        printf_yellow "    $(grep -n '<[^>]*>' "$i")\n"
     fi
 
     if [[ $(egrep "$keys" "$i" | wc -l) -eq 0 && $(grep '<[^>]*>' "$i" | wc -l) -eq 0 ]] ; then
-        print_green "OK\n"
+        printf_green "OK\n"
     fi
 
 done
