@@ -13,7 +13,12 @@ function printf_green() {
   printf "${GREEN}${1}${NC}"
 }
 
-cfile='values.custom.yaml'
+if [[ -z $1 ]]; then
+  echo "Pass config file as param e.g. values.custom.yaml. Abort"
+  exit 1
+fi
+
+cfile="$1"
 
 printf "==> Linting values file ... "
 lint_response=$(helm lint . -f $cfile --kube-version "$kube_version")
