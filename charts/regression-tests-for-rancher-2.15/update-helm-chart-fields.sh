@@ -10,7 +10,6 @@ declare -A pairs=(
     ['<cc-id-no-reg-code>']='<cc-id-no-reg-code>'
     ['<cc-id-reg-ok>']='<cc-id-reg-ok>'
     ['<netb-id>']='<netb-id>'
-    ['<netb-gw>']='<netb-gw>'
     ['<netp-id>']='<netp-id>'
     ['<netp-gw>']='<netp-gw>'
     ['<os-image-name>']='<os-image-name>'
