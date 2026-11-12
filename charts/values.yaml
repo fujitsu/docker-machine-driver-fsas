@@ -46,7 +46,7 @@ fsas:
     enableBaremetalBonding: false
     osImageName: ""
     sshUser: ""
-    sshPassword: ""
+    firstLoginSshKey: ""
     imageOsSshHostPubKey: ""
     userdata: ""
     computeConditionsJson: >
@@ -62,7 +62,7 @@ fsas:
     osImageName: ""
     imageOsSshHostPubKey: ""
     sshUser: ""
-    sshPassword: ""
+    firstLoginSshKey: ""
     userdata: ""
     computeConditionsJson: >
       []

@@ -1,7 +1,11 @@
 package cfgutils
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/fs"
 	"os"
@@ -12,6 +16,7 @@ import (
 	"github.com/fujitsu/docker-machine-driver-fsas/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 )
 
@@ -1040,86 +1045,6 @@ func TestInjectOSRegistration(t *testing.T) {
 	}
 }
 
-func TestDisableSSHLogin(t *testing.T) {
-	testCases := []struct {
-		name            string
-		readFileContent []byte
-		expectedStr     string
-		expectedError   error
-	}{
-		{name: "case 1: add item to empty cloud-init file",
-			readFileContent: []byte(userdataSampleContentNoSections),
-			expectedStr:     expectedStrDisablePwdAuth,
-			expectedError:   nil,
-		},
-
-		{name: "case 2: add item when section 'runcmd' exists",
-			readFileContent: []byte(userdataSampleContent1rc),
-			expectedStr:     expectedStrDisablePwdAuth1rc,
-			expectedError:   nil,
-		},
-
-		{name: "case 3: section 'ssh_pwauth' does exist; should overwrite existing value",
-			readFileContent: []byte(sampleDisablePwdAuthExists),
-			expectedStr:     expectedStrDisablePwdAuth,
-			expectedError:   nil,
-		},
-
-		{name: "case 4: add item when sections 'runcmd' and 'write_files' exist",
-			readFileContent: []byte(sample1rc2wf),
-			expectedStr:     expectedDisablePwdAuth1rc2wf,
-			expectedError:   nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		var expected, observed cloudInitFile
-		t.Run(tc.name, func(t *testing.T) {
-			tempFile, err := os.CreateTemp(t.TempDir(), "userdata.yaml")
-			require.NoError(t, err, "Failed to create temp file")
-			defer func() {
-				err := tempFile.Close()
-				require.NoError(t, err, "Failed to close temp file")
-				err = os.Remove(tempFile.Name())
-				require.NoError(t, err, "Failed to delete temp file")
-			}()
-
-			if _, err := tempFile.WriteString(string(tc.readFileContent)); err != nil {
-				require.NoError(t, err, "Failed to write to temp file")
-			}
-
-			sc := NewStandardCfgManager("[]", tempFile.Name())
-			err = sc.DisableSSHLogin()
-
-			if tc.expectedError != nil {
-				assert.ErrorIs(t, err, tc.expectedError,
-					fmt.Sprintf("expected: %v, but got: %v", tc.expectedError, err))
-			} else {
-
-				/* convert to YAML objects;
-				   Since YAML maps do not preserve ordering, comparing YAML as raw text will always fail.
-				   Thus compare YAML semantically and not textually.
-				*/
-				if err := yaml.Unmarshal([]byte(tc.expectedStr), &expected); err != nil {
-					t.Fatalf("failed to unmarshal expected: %v", err)
-				}
-
-				fileContent, err := os.ReadFile(tempFile.Name())
-				require.NoError(t, err, "Failed to read from temp file")
-				if err := yaml.Unmarshal(fileContent, &observed); err != nil {
-					t.Fatalf("failed to unmarshal observed: %v", err)
-				}
-
-				assert.Equal(t, expected, observed)
-
-				lines := strings.Split(string(fileContent), "\n")
-				assert.Contains(t, lines[1], "ssh_pwauth: false",
-					fmt.Sprintf("Expected annotation 'ssh_pwauth: false' not found in 1-st line"))
-			}
-		})
-	}
-}
-
 func TestPrepareNetworkConfigSuccess(t *testing.T) {
 	manager := NewStandardCfgManager("[]", "")
 
@@ -1274,4 +1199,92 @@ func TestPrepareNetworkConfigMissingSubnetKeys(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.expectedErrorStr)
 		})
 	}
+}
+
+func TestRemoveFirstSSHLogin(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	require.NoError(t, err)
+
+	privateKeyPath := filepath.Join(t.TempDir(), "id_ed25519")
+	require.NoError(t, os.WriteFile(privateKeyPath, pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	}), 0600))
+
+	userDataPath := filepath.Join(t.TempDir(), "user-data")
+	require.NoError(t, os.WriteFile(userDataPath, nil, 0600))
+
+	manager := NewStandardCfgManager("[]", userDataPath)
+	require.NoError(t, manager.RemoveFirstSSHLogin(privateKeyPath))
+
+	sshPublicKey, err := ssh.NewPublicKey(publicKey)
+	require.NoError(t, err)
+	expectedPublicKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPublicKey)))
+	expectedCommand := fmt.Sprintf(
+		`sed -i "\|^%s.*|d" /home/rancher/.ssh/authorized_keys`,
+		expectedPublicKey,
+	)
+
+	userData, err := os.ReadFile(userDataPath)
+	require.NoError(t, err)
+	var observed map[string][]string
+	require.NoError(t, yaml.Unmarshal(userData, &observed))
+	assert.Equal(t, []string{expectedCommand}, observed["runcmd"])
+}
+
+func TestRemoveFirstSSHLogin_PrivateKeyError(t *testing.T) {
+	testCases := []struct {
+		name        string
+		keyContents []byte
+		keyExists   bool
+		errorText   string
+	}{
+		{
+			name:      "private key does not exist",
+			keyExists: false,
+			errorText: "read private key:",
+		},
+		{
+			name:        "private key is invalid",
+			keyContents: []byte("not a private key"),
+			keyExists:   true,
+			errorText:   "parse private key:",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			privateKeyPath := filepath.Join(t.TempDir(), "id_ed25519")
+			if tc.keyExists {
+				require.NoError(t, os.WriteFile(privateKeyPath, tc.keyContents, 0600))
+			}
+
+			manager := NewStandardCfgManager("[]", filepath.Join(t.TempDir(), "user-data"))
+			err := manager.RemoveFirstSSHLogin(privateKeyPath)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.errorText)
+		})
+	}
+}
+
+func TestRemoveFirstSSHLogin_ExtendUserdataError(t *testing.T) {
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	require.NoError(t, err)
+
+	privateKeyPath := filepath.Join(t.TempDir(), "id_ed25519")
+	require.NoError(t, os.WriteFile(privateKeyPath, pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	}), 0600))
+
+	manager := NewStandardCfgManager("[]", filepath.Join(t.TempDir(), "missing", "user-data"))
+	err = manager.RemoveFirstSSHLogin(privateKeyPath)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "no such file or directory")
 }
