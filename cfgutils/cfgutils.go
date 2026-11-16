@@ -108,13 +108,10 @@ func (sc *StandardCfgManager) PrepareNetworkConfig(lanports []models.Lanport, su
 		slog.Debug("Created bond interface")
 	}
 
-	networkConfig := models.NetworkConfig{
-		Network: models.NetworkSpec{
-			SchemaVersion: models.NetworkConfigVersion2,
-			Renderer:      models.RendererNetworkManager,
-			Ethernets:     ethernets,
-			Bonds:         bonds,
-		},
+	networkConfig := models.NetworkSpec{
+		SchemaVersion: models.NetworkConfigVersion2,
+		Ethernets:     ethernets,
+		Bonds:         bonds,
 	}
 
 	rawYaml, err := yaml.Marshal(networkConfig)

@@ -82,7 +82,7 @@ type NetworkConfig struct {
 
 type NetworkSpec struct {
 	SchemaVersion int                 `yaml:"version"`
-	Renderer      string              `yaml:"renderer"`
+	Renderer      string              `yaml:"renderer,omitempty"`
 	Ethernets     map[string]Ethernet `yaml:"ethernets,omitempty"`
 	Bonds         map[string]Bond     `yaml:"bonds,omitempty"`
 }
