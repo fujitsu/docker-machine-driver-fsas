@@ -923,12 +923,7 @@ func TestImplantSSHKey(t *testing.T) {
 
 			tempDir := t.TempDir()
 			sshPrivKeyPath := filepath.Join(tempDir, "id_rsa")
-			sshPubKeyPath, err := os.Create(filepath.Join(tempDir, "id_rsa.pub"))
-			sshPubKeyPath.Write([]byte(string("ssh-rsa AAAAB3NzaC1yc")))
-			defer func() {
-				err = os.Remove(fmt.Sprintf("%s.pub", sshPrivKeyPath))
-				require.NoError(t, err, "Failed to delete temp file with ssh public key")
-			}()
+			require.NoError(t, os.WriteFile(sshPrivKeyPath+".pub", []byte("ssh-rsa AAAAB3NzaC1yc"), 0600))
 
 			sc := NewStandardCfgManager("[]", userdataFile.Name())
 			err = sc.ImplantSSHKey(sshPrivKeyPath, sshUser)
@@ -1052,25 +1047,69 @@ func TestPrepareNetworkConfigSuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, networkConfigString)
 
-	var config models.NetworkConfig
+	var config models.NetworkSpec
 	err = yaml.Unmarshal([]byte(networkConfigString), &config)
 	assert.NoError(t, err)
 
+	assert.Contains(t, networkConfigString, "version:")
+	assert.NotContains(t, networkConfigString, "network:")
+
 	// Verify ethernets: 2 baremetal, 2 provisioning, 1 custom
-	assert.Len(t, config.Network.Ethernets, 5)
-	assert.Contains(t, config.Network.Ethernets, "bare0")
-	assert.Contains(t, config.Network.Ethernets, "bare1")
-	assert.Contains(t, config.Network.Ethernets, "prov2")
-	assert.Contains(t, config.Network.Ethernets, "prov3")
-	assert.Contains(t, config.Network.Ethernets, "custom4")
+	assert.Len(t, config.Ethernets, 5)
+	assert.Contains(t, config.Ethernets, "bare0")
+	assert.Contains(t, config.Ethernets, "bare1")
+	assert.Contains(t, config.Ethernets, "prov2")
+	assert.Contains(t, config.Ethernets, "prov3")
+	assert.Contains(t, config.Ethernets, "custom4")
 
 	// Verify bond created from onboard interfaces (idx 1 and 2)
-	assert.Len(t, config.Network.Bonds, 1)
-	bond := config.Network.Bonds["bond0"]
+	assert.Len(t, config.Bonds, 1)
+	bond := config.Bonds["bond0"]
 	assert.ElementsMatch(t, []string{"bare0", "bare1"}, bond.Interfaces)
 	assert.True(t, bond.DHCP4)
 	assert.Equal(t, models.BondModeActiveBackup, bond.Parameters.Mode)
 	assert.Equal(t, models.FailoverMacPolicyActive, bond.Parameters.FailoverMacPolicy)
+}
+
+func TestPrepareNetworkConfigNoRenderer(t *testing.T) {
+	manager := NewStandardCfgManager("[]", "")
+	lanports := []models.Lanport{
+		{SubnetUUID: "baremetal", MACAddress: "30:e2:71:00:01:43", LanportIdx: 1, NicType: models.NicTypeOnboard},
+		{SubnetUUID: "provisioning", MACAddress: "6c:92:cf:4f:59:a1", LanportIdx: 3, NicType: models.NicTypeOnboard},
+		{SubnetUUID: "baremetal", MACAddress: "6c:92:cf:4f:59:a0", LanportIdx: 2, NicType: models.NicTypeOnboard},
+	}
+
+	got, err := manager.PrepareNetworkConfig(lanports, map[string]string{
+		"baremetal": "baremetal", "provisioning": "provisioning",
+	})
+	require.NoError(t, err)
+
+	expected := `version: 2
+ethernets:
+  bare0:
+    match:
+      macaddress: 30:e2:71:00:01:43
+    dhcp4: true
+  bare2:
+    match:
+      macaddress: 6c:92:cf:4f:59:a0
+    dhcp4: true
+  prov1:
+    match:
+      macaddress: 6c:92:cf:4f:59:a1
+    dhcp4: true
+bonds:
+  bond0:
+    interfaces: [bare0, bare2]
+    dhcp4: true
+    parameters:
+      mode: active-backup
+      fail-over-mac-policy: active
+`
+	var expectedConfig, actualConfig map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(expected), &expectedConfig))
+	require.NoError(t, yaml.Unmarshal([]byte(got), &actualConfig))
+	assert.Equal(t, expectedConfig, actualConfig)
 }
 
 func TestPrepareNetworkConfigEmptyLanports(t *testing.T) {
@@ -1106,11 +1145,11 @@ func TestPrepareNetworkConfigAllComposableNoBond(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, networkConfigString)
 
-	var config models.NetworkConfig
+	var config models.NetworkSpec
 	err = yaml.Unmarshal([]byte(networkConfigString), &config)
 	assert.NoError(t, err)
-	assert.Empty(t, config.Network.Bonds, "No bond should be created for composable-only lanports")
-	assert.Len(t, config.Network.Ethernets, 2)
+	assert.Empty(t, config.Bonds, "No bond should be created for composable-only lanports")
+	assert.Len(t, config.Ethernets, 2)
 }
 
 func TestPrepareNetworkConfigSingleOnboardNoBond(t *testing.T) {
@@ -1136,11 +1175,11 @@ func TestPrepareNetworkConfigSingleOnboardNoBond(t *testing.T) {
 	networkConfigString, err := manager.PrepareNetworkConfig(lanports, models.ExpectedSubnets)
 	assert.NoError(t, err)
 
-	var config models.NetworkConfig
+	var config models.NetworkSpec
 	err = yaml.Unmarshal([]byte(networkConfigString), &config)
 	assert.NoError(t, err)
-	assert.Empty(t, config.Network.Bonds, "Bond requires at least 2 onboard interfaces")
-	assert.Len(t, config.Network.Ethernets, 2)
+	assert.Empty(t, config.Bonds, "Bond requires at least 2 onboard interfaces")
+	assert.Len(t, config.Ethernets, 2)
 }
 
 func TestPrepareNetworkConfigCustomSubnetNaming(t *testing.T) {
@@ -1160,10 +1199,10 @@ func TestPrepareNetworkConfigCustomSubnetNaming(t *testing.T) {
 	networkConfigString, err := manager.PrepareNetworkConfig(lanports, models.ExpectedSubnets)
 	assert.NoError(t, err)
 
-	var config models.NetworkConfig
+	var config models.NetworkSpec
 	err = yaml.Unmarshal([]byte(networkConfigString), &config)
 	assert.NoError(t, err)
-	_, hasCustom := config.Network.Ethernets["custom0"]
+	_, hasCustom := config.Ethernets["custom0"]
 	assert.True(t, hasCustom, "Unknown subnet should produce 'custom' prefix")
 }
 
@@ -1286,5 +1325,5 @@ func TestRemoveFirstSSHLogin_ExtendUserdataError(t *testing.T) {
 	manager := NewStandardCfgManager("[]", filepath.Join(t.TempDir(), "missing", "user-data"))
 	err = manager.RemoveFirstSSHLogin(privateKeyPath)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "no such file or directory")
+	assert.ErrorIs(t, err, fs.ErrNotExist)
 }
