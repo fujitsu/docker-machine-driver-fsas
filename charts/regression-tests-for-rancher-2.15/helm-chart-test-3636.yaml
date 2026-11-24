@@ -36,7 +36,7 @@ fsas:
     networkBaremetalUuid: <netb-id>
     networkProvisionUuid: <netp-id>
     networkProvisionDefaultGw: <netp-gw>
-    enableBaremetalBonding: "false"
+    enableBaremetalBonding: "true"
     osImageName: <os-image-name>
     sshUser: <ssh-user>
     firstLoginSshKey: |-
